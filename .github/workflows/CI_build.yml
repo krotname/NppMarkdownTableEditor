@@ -14,10 +14,22 @@ jobs:
 
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v3
+
+    - name: Ensure ARM64 C++ build tools
+      if: matrix.build_platform == 'ARM64'
+      shell: pwsh
+      run: |
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+        $installer = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vs_installer.exe"
+        $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+        & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --quiet --norestart --nocache
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+          throw "Visual Studio Installer failed with exit code $LASTEXITCODE"
+        }
 
     - name: MSBuild of plugin dll
       working-directory: vs.proj\
@@ -32,21 +44,21 @@ jobs:
 
     - name: Archive artifacts for x64
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
           name: plugin_dll_x64
           path: bin64\MarkdownTableEditor.dll
 
     - name: Archive artifacts for Win32
       if: matrix.build_platform == 'Win32' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
           name: plugin_dll_x86
           path: bin\MarkdownTableEditor.dll
 
     - name: Archive artifacts for ARM64
       if: matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
           name: plugin_dll_arm64
           path: arm64\MarkdownTableEditor.dll

@@ -50,6 +50,20 @@ const UINT tableSizeMaxRows = 200;
 
 HINSTANCE g_moduleHandle = NULL;
 
+const UINT legacySciGetTextRange = 2162;
+
+struct LegacySciCharacterRange
+{
+	Sci_PositionCR cpMin;
+	Sci_PositionCR cpMax;
+};
+
+struct LegacySciTextRange
+{
+	LegacySciCharacterRange chrg;
+	char *lpstrText;
+};
+
 ShortcutKey g_alignShortcut = { true, true, false, 'A' };
 ShortcutKey g_nextCellShortcut = { true, true, false, VK_RIGHT };
 ShortcutKey g_previousCellShortcut = { true, true, false, VK_LEFT };
@@ -80,11 +94,11 @@ std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
 
 	const std::size_t length = static_cast<std::size_t>(end - start);
 	std::vector<char> buffer(length + 1, '\0');
-	Sci_TextRangeFull range;
-	range.chrg.cpMin = start;
-	range.chrg.cpMax = end;
+	LegacySciTextRange range;
+	range.chrg.cpMin = static_cast<Sci_PositionCR>(start);
+	range.chrg.cpMax = static_cast<Sci_PositionCR>(end);
 	range.lpstrText = &buffer[0];
-	const LRESULT copied = ::SendMessage(scintilla, SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+	const LRESULT copied = ::SendMessage(scintilla, legacySciGetTextRange, 0, reinterpret_cast<LPARAM>(&range));
 	if (copied <= 0)
 		return std::string();
 	return std::string(&buffer[0], static_cast<std::size_t>(copied));

@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the leading v
+        required: true
+        default: 5.5.0
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.inputs.version }}"
+          if (-not $version) {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+  build:
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Win32
+            label: x86
+          - platform: x64
+            label: x64
+          - platform: ARM64
+            label: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure ARM64 C++ build tools
+        if: matrix.platform == 'ARM64'
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $installer = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vs_installer.exe"
+          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --quiet --norestart --nocache
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+            throw "Visual Studio Installer failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Build package
+        shell: pwsh
+        run: .\build.ps1 -Version '${{ needs.version.outputs.version }}' -Platform '${{ matrix.platform }}'
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: notepad-${{ matrix.label }}
+          path: |
+            build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}.zip
+            build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}-pluginadmin.zip
+          if-no-files-found: error
+
+  release:
+    needs:
+      - version
+      - build
+    runs-on: windows-latest
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $files = Get-ChildItem -LiteralPath release-assets -Recurse -File -Filter "*.zip" | Sort-Object Name
+          if (-not $files) {
+            throw "No release ZIP files were downloaded."
+          }
+
+          $hashPath = Join-Path $PWD "SHA256SUMS.txt"
+          $hashLines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          [IO.File]::WriteAllLines($hashPath, $hashLines, [Text.UTF8Encoding]::new($false))
+
+          $notesPath = Join-Path $PWD "release-notes.md"
+          $notes = @(
+            "## What's Changed",
+            "",
+            "- Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.",
+            "- Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.",
+            "- Included SHA-256 sums for Plugin Admin verification.",
+            "",
+            "## Validation",
+            "",
+            "- GitHub Actions release build completed for Win32, x64, and ARM64."
+          )
+          [IO.File]::WriteAllLines($notesPath, $notes, [Text.UTF8Encoding]::new($false))
+
+          $assetPaths = @($files.FullName) + @($hashPath)
+          gh release view $env:TAG_NAME --repo $env:GITHUB_REPOSITORY *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          if ($releaseExists) {
+            $uploadArgs = @("release", "upload", $env:TAG_NAME) + $assetPaths + @("--repo", $env:GITHUB_REPOSITORY, "--clobber")
+            & gh @uploadArgs
+            gh release edit $env:TAG_NAME --repo $env:GITHUB_REPOSITORY --title "Markdown Table Editor $env:VERSION" --notes-file $notesPath --latest
+          }
+          else {
+            $createArgs = @("release", "create", $env:TAG_NAME) + $assetPaths + @("--repo", $env:GITHUB_REPOSITORY, "--target", $env:GITHUB_SHA, "--title", "Markdown Table Editor $env:VERSION", "--notes-file", $notesPath, "--latest")
+            & gh @createArgs
+          }

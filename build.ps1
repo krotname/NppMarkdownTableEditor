@@ -1,7 +1,7 @@
 param(
 	[string]$Configuration = "Release",
 	[string]$Platform = "x64",
-	[string]$Version = "0.5.0"
+	[string]$Version = "5.5.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,11 +45,34 @@ function Get-OutputDirectory([string]$ProjectRoot, [string]$Platform) {
 	return Join-Path $ProjectRoot "bin"
 }
 
+function Resolve-BuildPlatform([string]$Platform) {
+	if ($Platform -eq "x86") {
+		return "Win32"
+	}
+	if ($Platform -eq "arm" -or $Platform -eq "arm64") {
+		return "ARM64"
+	}
+	return $Platform
+}
+
+function Get-PackagePlatformLabel([string]$Platform) {
+	if ($Platform -eq "Win32") {
+		return "x86"
+	}
+	if ($Platform -eq "ARM64") {
+		return "arm64"
+	}
+	return $Platform
+}
+
+$BuildPlatform = Resolve-BuildPlatform $Platform
+$PackagePlatform = Get-PackagePlatformLabel $BuildPlatform
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BuildDir = Join-Path $ProjectRoot "build"
 $PackageRoot = Join-Path $BuildDir "dist"
 $PackageDir = Join-Path $PackageRoot "MarkdownTableEditor"
-$ZipPath = Join-Path $BuildDir "MarkdownTableEditor-$Version-$Platform.zip"
+$ZipPath = Join-Path $BuildDir "MarkdownTableEditor-$Version-$PackagePlatform.zip"
+$PluginAdminZipPath = Join-Path $BuildDir "MarkdownTableEditor-$Version-$PackagePlatform-pluginadmin.zip"
 $PluginProject = Join-Path $ProjectRoot "vs.proj\NppPluginTemplate.vcxproj"
 $TestProject = Join-Path $ProjectRoot "tests\CoreSmoke.vcxproj"
 
@@ -58,7 +81,7 @@ if (Test-Path -LiteralPath $BuildDir) {
 }
 New-Item -ItemType Directory -Path $PackageDir | Out-Null
 
-Invoke-VsCommand "msbuild `"$PluginProject`" /t:Rebuild /p:Configuration=$Configuration /p:Platform=$Platform /m"
+Invoke-VsCommand "msbuild `"$PluginProject`" /t:Rebuild /p:Configuration=$Configuration /p:Platform=$BuildPlatform /m"
 Invoke-VsCommand "msbuild `"$TestProject`" /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m"
 
 $TestExe = Join-Path $ProjectRoot "tests\CoreSmoke.exe"
@@ -70,7 +93,7 @@ if ($LASTEXITCODE -ne 0) {
 	throw "Core smoke tests failed with exit code $LASTEXITCODE"
 }
 
-$OutputDir = Get-OutputDirectory $ProjectRoot $Platform
+$OutputDir = Get-OutputDirectory $ProjectRoot $BuildPlatform
 $DllPath = Join-Path $OutputDir "MarkdownTableEditor.dll"
 if (-not (Test-Path -LiteralPath $DllPath)) {
 	throw "Plugin DLL not found: $DllPath"
@@ -85,4 +108,14 @@ if (Test-Path -LiteralPath $ZipPath) {
 }
 Compress-Archive -LiteralPath $PackageDir -DestinationPath $ZipPath -CompressionLevel Optimal
 
+if (Test-Path -LiteralPath $PluginAdminZipPath) {
+	Remove-Item -LiteralPath $PluginAdminZipPath -Force
+}
+Compress-Archive -LiteralPath @(
+	(Join-Path $PackageDir "MarkdownTableEditor.dll"),
+	(Join-Path $PackageDir "license.txt"),
+	(Join-Path $PackageDir "readme.FIRST")
+) -DestinationPath $PluginAdminZipPath -CompressionLevel Optimal
+
 Write-Output "Built $ZipPath"
+Write-Output "Built $PluginAdminZipPath"
