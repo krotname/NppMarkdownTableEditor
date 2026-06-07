@@ -214,6 +214,25 @@ int main()
 			"| Chen   |   100 |"
 		});
 
+	expectLines("sort rows ascending keeps stable ties", MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |",
+			"| Anna | 2 |",
+			"| Boris | 10 |",
+			"| Chen | 2 |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::SortRowsAscending).lines,
+		{
+			"| Name  | Score |",
+			"| ----- | ----: |",
+			"| Anna  |     2 |",
+			"| Chen  |     2 |",
+			"| Boris |    10 |"
+		});
+
 	expectLines("sort rows descending text", MarkdownTable::apply(
 		{
 			"| Name | Score |",
@@ -241,11 +260,27 @@ int main()
 			"| Dmitry | QA       | 7     |"
 		});
 
+	expectLines("quoted csv to table", MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"A, B\"\nBob,\"said \"\"hi\"\"\"").lines,
+		{
+			"| Name | Note      |",
+			"| ---- | --------- |",
+			"| Anna | A, B      |",
+			"| Bob  | said \"hi\" |"
+		});
+
 	expectLines("tsv to table escapes pipes", MarkdownTable::convertDelimitedToTable("Name\tNote\nAnna\tA|B").lines,
 		{
 			"| Name | Note |",
 			"| ---- | ---- |",
 			"| Anna | A\\|B |"
+		});
+
+	expectLines("tsv to table pads uneven rows", MarkdownTable::convertDelimitedToTable("A\tB\tC\n1\t2\n3\t4\t5").lines,
+		{
+			"| A   | B   | C   |",
+			"| --- | --- | --- |",
+			"| 1   | 2   |     |",
+			"| 3   | 4   | 5   |"
 		});
 
 	const MarkdownTable::EditResult created = MarkdownTable::createTable(3, 2);
@@ -259,6 +294,14 @@ int main()
 			"|          |          |          |",
 			"|          |          |          |"
 		});
+
+	expectLines("create minimum table", MarkdownTable::createTable(0, 0).lines,
+		{
+			"| Column 1 |",
+			"| -------- |"
+		});
+
+	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n\t").ok);
 
 	if (g_failures != 0)
 	{

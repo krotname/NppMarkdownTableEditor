@@ -30,49 +30,46 @@ GIF собран из реальных скриншотов Notepad++ под Win
 
 Markdown Foundry - это расширение для Visual Studio Code: https://marketplace.visualstudio.com/items?itemName=dvlprlife.mdfoundry
 
-| Критерий                           | Markdown Table Editor                                                                      | Markdown Foundry                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Редактор                           | Notepad++                                                                                  | Visual Studio Code 1.85+                                                    |
-| Основной фокус                     | Легкое редактирование Markdown pipe-таблиц в Notepad++                                     | Широкий набор инструментов Markdown-авторинга для VS Code                   |
-| Установка                          | DLL из GitHub Release в каталог плагинов Notepad++                                         | Расширение из Visual Studio Marketplace                                     |
-| Выравнивание таблицы               | Есть                                                                                       | Есть                                                                        |
-| Сохранение `:---`, `:---:`, `---:` | Есть                                                                                       | Есть                                                                        |
-| Escaped pipes `\|` внутри ячеек    | Поддерживаются                                                                             | Поддерживаются                                                              |
-| Действие `Tab` внутри таблицы      | Выравнивает таблицу; вне таблицы передает обычный `Tab` в Scintilla                        | Переходит к следующей ячейке; `Shift+Tab` - к предыдущей                    |
-| Вставка и удаление строк/колонок   | Есть                                                                                       | Есть                                                                        |
-| Перемещение строк/колонок          | Есть                                                                                       | Есть                                                                        |
-| Сортировка строк по колонке        | Есть, включая числовое сравнение при числовых значениях                                    | Есть, включая автоопределение числовых колонок                              |
-| Конвертация CSV/TSV в таблицу      | Есть, по выделенному тексту                                                               | Есть                                                                        |
-| Вставка новой таблицы по размеру   | Есть, через диалог `Insert table...`                                                       | Есть                                                                        |
-| Markdown-форматирование текста     | Не заявлено                                                                                | Есть: bold, italic, code, headings, lists, task lists и другие команды      |
-| Вставка ссылок и изображений       | Не заявлена                                                                                | Есть                                                                        |
-| Генерация Table of Contents        | Не заявлена                                                                                | Есть                                                                        |
-| Учет ширины CJK-символов           | Есть                                                                                       | Не заявлен на странице Marketplace                                          |
-| Лицензия                           | GPL-2.0                                                                                    | MIT                                                                         |
-| Лучше подходит для                 | Пользователей Notepad++, которым нужен быстрый table editor без перехода в другой редактор | Пользователей VS Code, которым нужен полноценный Markdown-authoring toolkit |
-
-## Команды
+| Критерий                           | Markdown Table Editor                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| Редактор                           | Notepad++                                                                                  |
+| Основной фокус                     | Легкое редактирование Markdown pipe-таблиц в Notepad++                                     |
+| Установка                          | DLL из GitHub Release в каталог плагинов Notepad++                                         |
+| Выравнивание таблицы               | Есть                                                                                       |
+| Сохранение `:---`, `:---:`, `---:` | Есть                                                                                       |
+| Escaped pipes `\|` внутри ячеек    | Поддерживаются                                                                             |
+| Действие `Tab` внутри таблицы      | Выравнивает таблицу; вне таблицы передает обычный `Tab` в Scintilla                        |
+| Вставка и удаление строк/колонок   | Есть                                                                                       |
+| Перемещение строк/колонок          | Есть                                                                                       |
+| Сортировка строк по колонке        | Есть, включая числовое сравнение при числовых значениях                                    |
+| Конвертация CSV/TSV в таблицу      | Есть, по выделенному тексту                                                                |
+| Вставка новой таблицы по размеру   | Есть, через диалог `Insert table...`                                                       |
+| Учет ширины CJK-символов           | Есть                                                                                       |
+| Лицензия                           | GPL-2.0                                                                                    |
+| Лучше подходит для                 | Пользователей Notepad++, которым нужен быстрый table editor без перехода в другой редактор |
+																																
+## Команды                                                                                                                         
 
 Команды доступны в меню `Plugins > Markdown Table Editor`.
 
-| Команда в меню | Сочетание по умолчанию |
-| --- | --- |
-| Tab: align table or indent | Tab |
-| Align table | Ctrl+Alt+A |
-| Next cell | Ctrl+Alt+Right |
-| Previous cell | Ctrl+Alt+Left |
-| Insert row below | Ctrl+Alt+Down |
-| Delete row | Ctrl+Alt+Up |
-| Insert column right | Ctrl+Alt+Shift+Right |
-| Delete column | Ctrl+Alt+Shift+Left |
-| Move row up | нет |
-| Move row down | нет |
-| Move column left | нет |
-| Move column right | нет |
-| Sort rows ascending | нет |
-| Sort rows descending | нет |
-| Convert CSV/TSV selection to table | нет |
-| Insert table... | нет |
+| Команда в меню                     | Сочетание по умолчанию |
+| ---------------------------------- | ---------------------- |
+| Tab: align table or indent         | Tab                    |
+| Align table                        | Ctrl+Alt+A             |
+| Next cell                          | Ctrl+Alt+Right         |
+| Previous cell                      | Ctrl+Alt+Left          |
+| Insert row below                   | Ctrl+Alt+Down          |
+| Delete row                         | Ctrl+Alt+Up            |
+| Insert column right                | Ctrl+Alt+Shift+Right   |
+| Delete column                      | Ctrl+Alt+Shift+Left    |
+| Move row up                        | нет                    |
+| Move row down                      | нет                    |
+| Move column left                   | нет                    |
+| Move column right                  | нет                    |
+| Sort rows ascending                | нет                    |
+| Sort rows descending               | нет                    |
+| Convert CSV/TSV selection to table | нет                    |
+| Insert table...                    | нет                    |
 
 `Tab` учитывает контекст: если курсор находится внутри Markdown-таблицы, таблица выравнивается.
 Вне таблицы плагин передает стандартную команду Scintilla `Tab`.
