@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <utility>
 
 namespace MarkdownTable
 {
@@ -29,12 +30,30 @@ struct Table
 	std::vector<Align> alignments;
 	std::size_t columns = 0;
 	std::size_t separatorRow = static_cast<std::size_t>(-1);
+	bool leadingPipe = true;
+	bool trailingPipe = true;
 };
 
 struct FormatResult
 {
 	std::vector<std::string> lines;
-	std::vector<std::vector<std::size_t> > starts;
+	std::size_t targetRow = 0;
+	std::size_t targetColumn = 0;
+	std::size_t targetColumnOffset = 0;
+};
+
+struct SortKey
+{
+	bool numeric = false;
+	double number = 0;
+	std::string foldedText;
+	std::string text;
+};
+
+struct SortEntry
+{
+	Row row;
+	SortKey key;
 };
 
 bool isSpace(unsigned char ch)
@@ -167,6 +186,8 @@ Align parseAlignment(const std::string &cell)
 Table parseTable(const std::vector<std::string> &lines)
 {
 	Table table;
+	std::size_t leadingPipeRows = 0;
+	std::size_t trailingPipeRows = 0;
 	for (std::size_t i = 0; i < lines.size(); ++i)
 	{
 		Row row;
@@ -174,6 +195,16 @@ Table parseTable(const std::vector<std::string> &lines)
 		row.cells = splitCells(lines[i]);
 		table.columns = (std::max)(table.columns, row.cells.size());
 		table.rows.push_back(row);
+		if (startsWithUnescapedPipe(lines[i]))
+			++leadingPipeRows;
+		if (endsWithUnescapedPipe(trim(lines[i])))
+			++trailingPipeRows;
+	}
+
+	if (!lines.empty())
+	{
+		table.leadingPipe = leadingPipeRows * 2 >= lines.size();
+		table.trailingPipe = trailingPipeRows * 2 >= lines.size();
 	}
 
 	for (std::size_t i = 0; i < table.rows.size(); ++i)
@@ -303,7 +334,7 @@ std::string paddedCell(const std::string &cell, Align align, std::size_t width, 
 	return spaces(leftPad) + cell + spaces(rightPad);
 }
 
-FormatResult formatTable(const Table &table)
+FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn)
 {
 	std::vector<std::size_t> widths(table.columns, 3);
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
@@ -318,34 +349,44 @@ FormatResult formatTable(const Table &table)
 
 	FormatResult result;
 	result.lines.reserve(table.rows.size());
-	result.starts.reserve(table.rows.size());
+	result.targetRow = targetRow < table.rows.size() ? targetRow : 0;
+	result.targetColumn = targetColumn < table.columns ? targetColumn : 0;
 
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
-		std::string line = "|";
-		std::vector<std::size_t> starts(table.columns, 0);
+		std::string line = table.leadingPipe ? "|" : "";
 
 		for (std::size_t column = 0; column < table.columns; ++column)
 		{
+			if (column > 0)
+				line += " |";
+			if (table.leadingPipe || column > 0)
+				line.push_back(' ');
+
 			if (row.separator)
 			{
 				const std::string value = separatorCell(table.alignments[column], widths[column]);
-				line += " " + value + " |";
-				starts[column] = line.size() >= value.size() + 2 ? line.size() - value.size() - 2 : 0;
+				const std::size_t valueStart = line.size();
+				line += value;
+				if (rowIndex == result.targetRow && column == result.targetColumn)
+					result.targetColumnOffset = valueStart;
 			}
 			else
 			{
 				std::size_t contentOffset = 0;
 				const std::string value = paddedCell(row.cells[column], table.alignments[column], widths[column], &contentOffset);
-				const std::size_t cellStart = line.size() + 1;
-				line += " " + value + " |";
-				starts[column] = cellStart + contentOffset;
+				const std::size_t cellStart = line.size();
+				line += value;
+				if (rowIndex == result.targetRow && column == result.targetColumn)
+					result.targetColumnOffset = cellStart + contentOffset;
 			}
+
+			if (table.trailingPipe && column + 1 == table.columns)
+				line += " |";
 		}
 
 		result.lines.push_back(line);
-		result.starts.push_back(starts);
 	}
 
 	return result;
@@ -453,26 +494,32 @@ std::string lowerAscii(const std::string &value)
 	return lowered;
 }
 
-int compareCells(const std::string &left, const std::string &right)
+SortKey makeSortKey(const std::string &value)
 {
-	double leftNumber = 0;
-	double rightNumber = 0;
-	const bool leftNumeric = tryParseNumber(left, leftNumber);
-	const bool rightNumeric = tryParseNumber(right, rightNumber);
-	if (leftNumeric && rightNumeric)
+	SortKey key;
+	key.text = trim(value);
+	key.foldedText = lowerAscii(key.text);
+	key.numeric = tryParseNumber(value, key.number);
+	return key;
+}
+
+int compareSortKeys(const SortKey &left, const SortKey &right)
+{
+	if (left.numeric && right.numeric)
 	{
-		if (leftNumber < rightNumber)
+		if (left.number < right.number)
 			return -1;
-		if (leftNumber > rightNumber)
+		if (left.number > right.number)
 			return 1;
-		return 0;
 	}
 
-	const std::string leftText = lowerAscii(trim(left));
-	const std::string rightText = lowerAscii(trim(right));
-	if (leftText < rightText)
+	if (left.foldedText < right.foldedText)
 		return -1;
-	if (leftText > rightText)
+	if (left.foldedText > right.foldedText)
+		return 1;
+	if (left.text < right.text)
+		return -1;
+	if (left.text > right.text)
 		return 1;
 	return 0;
 }
@@ -486,14 +533,28 @@ std::size_t sortRows(Table &table, std::size_t column, bool ascending, std::size
 	if (firstDataRow >= table.rows.size())
 		return rowById(table, currentRowId, fallbackRow);
 
-	std::stable_sort(table.rows.begin() + static_cast<std::ptrdiff_t>(firstDataRow), table.rows.end(),
-		[column, ascending](const Row &left, const Row &right)
+	std::vector<SortEntry> entries;
+	entries.reserve(table.rows.size() - firstDataRow);
+	for (std::size_t i = firstDataRow; i < table.rows.size(); ++i)
+	{
+		SortEntry entry;
+		entry.row = table.rows[i];
+		entry.key = makeSortKey(entry.row.cells[column]);
+		entries.push_back(entry);
+	}
+
+	std::stable_sort(entries.begin(), entries.end(),
+		[ascending](const SortEntry &left, const SortEntry &right)
 		{
-			const int compared = compareCells(left.cells[column], right.cells[column]);
+			const int compared = compareSortKeys(left.key, right.key);
 			if (compared == 0)
 				return false;
 			return ascending ? compared < 0 : compared > 0;
 		});
+
+	for (std::size_t i = 0; i < entries.size(); ++i)
+		table.rows[firstDataRow + i] = entries[i].row;
+
 	return rowById(table, currentRowId, fallbackRow);
 }
 
@@ -548,17 +609,12 @@ void moveColumn(Table &table, std::size_t from, std::size_t to)
 	table.alignments.insert(table.alignments.begin() + static_cast<std::ptrdiff_t>(to), align);
 }
 
-void setResultFromFormat(EditResult &result, const FormatResult &formatted, std::size_t row, std::size_t column)
+void setResultFromFormat(EditResult &result, FormatResult &formatted)
 {
-	result.lines = formatted.lines;
-	result.targetRow = row < formatted.starts.size() ? row : 0;
-	result.targetColumn = column;
-	if (!formatted.starts.empty() && result.targetRow < formatted.starts.size())
-	{
-		if (result.targetColumn >= formatted.starts[result.targetRow].size())
-			result.targetColumn = formatted.starts[result.targetRow].empty() ? 0 : formatted.starts[result.targetRow].size() - 1;
-		result.targetColumnOffset = formatted.starts[result.targetRow][result.targetColumn];
-	}
+	result.lines = std::move(formatted.lines);
+	result.targetRow = formatted.targetRow;
+	result.targetColumn = formatted.targetColumn;
+	result.targetColumnOffset = formatted.targetColumnOffset;
 }
 
 char detectDelimiter(const std::string &text)
@@ -930,8 +986,8 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 			break;
 	}
 
-	const FormatResult formatted = formatTable(table);
-	setResultFromFormat(result, formatted, targetRow, targetColumn);
+	FormatResult formatted = formatTable(table, targetRow, targetColumn);
+	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;
 	return result;
@@ -942,20 +998,20 @@ EditResult convertDelimitedToTable(const std::string &text)
 	EditResult result;
 	if (!hasDelimitedStructure(text))
 	{
-		result.message = "No CSV or TSV rows found";
+		result.message = "No CSV or TSV data found";
 		return result;
 	}
 
 	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(text, detectDelimiter(text));
 	if (rows.empty())
 	{
-		result.message = "No CSV or TSV rows found";
+		result.message = "No CSV or TSV data found";
 		return result;
 	}
 
 	const Table table = tableFromRows(rows);
-	const FormatResult formatted = formatTable(table);
-	setResultFromFormat(result, formatted, 0, 0);
+	FormatResult formatted = formatTable(table, 0, 0);
+	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;
 	return result;
@@ -964,9 +1020,15 @@ EditResult convertDelimitedToTable(const std::string &text)
 EditResult createTable(std::size_t columns, std::size_t dataRows)
 {
 	EditResult result;
+	if (columns < 1)
+	{
+		result.message = "Invalid table size";
+		return result;
+	}
+
 	const Table table = emptyTable(columns, dataRows);
-	const FormatResult formatted = formatTable(table);
-	setResultFromFormat(result, formatted, 0, 0);
+	FormatResult formatted = formatTable(table, dataRows > 0 ? 2 : 0, 0);
+	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;
 	return result;

@@ -36,26 +36,17 @@ NppData nppData;
 
 namespace
 {
-struct DocumentLine
-{
-	std::string text;
-	std::string eol;
-	std::size_t start = 0;
-	std::size_t contentEnd = 0;
-	std::size_t fullEnd = 0;
-};
-
 struct TableSizeDialogState
 {
 	std::size_t columns = 3;
-	std::size_t dataRows = 2;
+	std::size_t dataRows = 3;
 	bool accepted = false;
 };
 
 const int tableSizeColumnsId = 1001;
 const int tableSizeRowsId = 1002;
-const UINT tableSizeMaxColumns = 20;
-const UINT tableSizeMaxRows = 50;
+const UINT tableSizeMaxColumns = 50;
+const UINT tableSizeMaxRows = 200;
 
 HINSTANCE g_moduleHandle = NULL;
 
@@ -82,16 +73,38 @@ void showMessage(const wchar_t *message)
 	::MessageBox(nppData._nppHandle, message, NPP_PLUGIN_NAME, MB_OK | MB_ICONINFORMATION);
 }
 
-std::string getText(HWND scintilla)
+std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
 {
-	const LRESULT lengthResult = ::SendMessage(scintilla, SCI_GETLENGTH, 0, 0);
-	if (lengthResult <= 0)
+	if (end <= start)
 		return std::string();
 
-	const std::size_t length = static_cast<std::size_t>(lengthResult);
+	const std::size_t length = static_cast<std::size_t>(end - start);
 	std::vector<char> buffer(length + 1, '\0');
-	::SendMessage(scintilla, SCI_GETTEXT, static_cast<WPARAM>(buffer.size()), reinterpret_cast<LPARAM>(&buffer[0]));
-	return std::string(&buffer[0], length);
+	Sci_TextRangeFull range;
+	range.chrg.cpMin = start;
+	range.chrg.cpMax = end;
+	range.lpstrText = &buffer[0];
+	const LRESULT copied = ::SendMessage(scintilla, SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+	if (copied <= 0)
+		return std::string();
+	return std::string(&buffer[0], static_cast<std::size_t>(copied));
+}
+
+Sci_Position lineStartPosition(HWND scintilla, std::size_t line)
+{
+	const LRESULT position = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(line), 0);
+	return position < 0 ? 0 : static_cast<Sci_Position>(position);
+}
+
+Sci_Position lineEndPosition(HWND scintilla, std::size_t line)
+{
+	const LRESULT position = ::SendMessage(scintilla, SCI_GETLINEENDPOSITION, static_cast<WPARAM>(line), 0);
+	return position < 0 ? lineStartPosition(scintilla, line) : static_cast<Sci_Position>(position);
+}
+
+std::string getLineText(HWND scintilla, std::size_t line)
+{
+	return getRangeText(scintilla, lineStartPosition(scintilla, line), lineEndPosition(scintilla, line));
 }
 
 std::string getSelectedText(HWND scintilla)
@@ -116,56 +129,47 @@ std::string currentEol(HWND scintilla)
 	return "\r\n";
 }
 
-std::vector<DocumentLine> splitDocument(const std::string &text)
+class ScintillaUndoAction
 {
-	std::vector<DocumentLine> lines;
-	std::size_t pos = 0;
-
-	while (pos < text.size())
+public:
+	explicit ScintillaUndoAction(HWND scintilla) : scintilla_(scintilla)
 	{
-		DocumentLine line;
-		line.start = pos;
-		while (pos < text.size() && text[pos] != '\r' && text[pos] != '\n')
-			++pos;
-
-		line.contentEnd = pos;
-		line.text = text.substr(line.start, line.contentEnd - line.start);
-
-		if (pos < text.size())
-		{
-			if (text[pos] == '\r' && pos + 1 < text.size() && text[pos + 1] == '\n')
-			{
-				line.eol = "\r\n";
-				pos += 2;
-			}
-			else
-			{
-				line.eol.assign(1, text[pos]);
-				++pos;
-			}
-		}
-
-		line.fullEnd = pos;
-		lines.push_back(line);
+		if (scintilla_)
+			::SendMessage(scintilla_, SCI_BEGINUNDOACTION, 0, 0);
 	}
 
-	if (lines.empty())
+	~ScintillaUndoAction()
 	{
-		DocumentLine line;
-		lines.push_back(line);
+		if (scintilla_)
+			::SendMessage(scintilla_, SCI_ENDUNDOACTION, 0, 0);
 	}
 
-	return lines;
+	ScintillaUndoAction(const ScintillaUndoAction &) = delete;
+	ScintillaUndoAction &operator=(const ScintillaUndoAction &) = delete;
+
+private:
+	HWND scintilla_;
+};
+
+std::string separatorAfterLine(HWND scintilla, std::size_t line, std::size_t lineCount)
+{
+	if (line + 1 >= lineCount)
+		return std::string();
+
+	const Sci_Position end = lineEndPosition(scintilla, line);
+	const Sci_Position nextStart = lineStartPosition(scintilla, line + 1);
+	return getRangeText(scintilla, end, nextStart);
 }
 
-std::string chooseEol(const std::vector<DocumentLine> &lines, std::size_t first, std::size_t last)
+std::string chooseEol(HWND scintilla, std::size_t first, std::size_t last, std::size_t lineCount)
 {
-	for (std::size_t i = first; i <= last && i < lines.size(); ++i)
+	for (std::size_t i = first; i <= last && i < lineCount; ++i)
 	{
-		if (!lines[i].eol.empty())
-			return lines[i].eol;
+		const std::string separator = separatorAfterLine(scintilla, i, lineCount);
+		if (!separator.empty())
+			return separator;
 	}
-	return "\r\n";
+	return currentEol(scintilla);
 }
 
 std::string joinLines(const std::vector<std::string> &lines, const std::string &eol)
@@ -188,9 +192,9 @@ std::size_t offsetForLineColumn(const std::vector<std::string> &lines, const std
 	return offset + columnOffset;
 }
 
-std::size_t positionForLineColumn(const std::vector<DocumentLine> &lines, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
+std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
 {
-	return lines[firstLine].start + offsetForLineColumn(replacementLines, eol, row, columnOffset);
+	return static_cast<std::size_t>(lineStartPosition(scintilla, firstLine)) + offsetForLineColumn(replacementLines, eol, row, columnOffset);
 }
 
 void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &edit)
@@ -200,6 +204,7 @@ void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &e
 	const std::string replacement = joinLines(edit.lines, eol);
 	const std::size_t targetOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
+	ScintillaUndoAction undo(scintilla);
 	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(replacement.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
 }
@@ -245,7 +250,7 @@ LRESULT CALLBACK tableSizeDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPA
 				const UINT dataRows = ::GetDlgItemInt(hwnd, tableSizeRowsId, &rowsOk, FALSE);
 				if (!columnsOk || !rowsOk || columns < 1 || columns > tableSizeMaxColumns || dataRows > tableSizeMaxRows)
 				{
-					::MessageBox(hwnd, TEXT("Use 1-20 columns and 0-50 data rows."), NPP_PLUGIN_NAME, MB_OK | MB_ICONWARNING);
+					::MessageBox(hwnd, TEXT("Use 1-50 columns and 0-200 data rows."), NPP_PLUGIN_NAME, MB_OK | MB_ICONWARNING);
 					return 0;
 				}
 
@@ -332,10 +337,10 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	if (!scintilla)
 		return false;
 
-	const std::string text = getText(scintilla);
-	std::vector<DocumentLine> lines = splitDocument(text);
-	if (lines.empty())
+	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
+	if (lineCountResult <= 0)
 		return false;
+	const std::size_t lineCount = static_cast<std::size_t>(lineCountResult);
 
 	const LRESULT currentPosResult = ::SendMessage(scintilla, SCI_GETCURRENTPOS, 0, 0);
 	const LRESULT currentLineResult = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(currentPosResult), 0);
@@ -343,10 +348,11 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 		return false;
 
 	std::size_t currentLine = static_cast<std::size_t>(currentLineResult);
-	if (currentLine >= lines.size())
-		currentLine = lines.size() - 1;
+	if (currentLine >= lineCount)
+		currentLine = lineCount - 1;
 
-	if (!MarkdownTable::isPotentialTableLine(lines[currentLine].text))
+	const std::string currentLineText = getLineText(scintilla, currentLine);
+	if (!MarkdownTable::isPotentialTableLine(currentLineText))
 	{
 		if (!quiet)
 			showMessage(L"Put the caret inside a Markdown pipe table first.");
@@ -354,20 +360,21 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	}
 
 	std::size_t firstLine = currentLine;
-	while (firstLine > 0 && MarkdownTable::isPotentialTableLine(lines[firstLine - 1].text))
+	while (firstLine > 0 && MarkdownTable::isPotentialTableLine(getLineText(scintilla, firstLine - 1)))
 		--firstLine;
 
 	std::size_t lastLine = currentLine;
-	while (lastLine + 1 < lines.size() && MarkdownTable::isPotentialTableLine(lines[lastLine + 1].text))
+	while (lastLine + 1 < lineCount && MarkdownTable::isPotentialTableLine(getLineText(scintilla, lastLine + 1)))
 		++lastLine;
 
 	std::vector<std::string> tableLines;
 	for (std::size_t i = firstLine; i <= lastLine; ++i)
-		tableLines.push_back(lines[i].text);
+		tableLines.push_back(getLineText(scintilla, i));
 
 	const std::size_t row = currentLine - firstLine;
-	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(lines[currentLine].start)));
-	const std::size_t column = MarkdownTable::columnFromCursor(lines[currentLine].text, byteColumn);
+	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
+	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
+	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
 	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, row, column, action);
 	if (!edit.ok)
 	{
@@ -376,11 +383,12 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 		return false;
 	}
 
-	const std::string eol = chooseEol(lines, firstLine, lastLine);
+	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
-	const std::size_t targetPosition = positionForLineColumn(lines, firstLine, edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+	const std::size_t targetPosition = positionForLineColumn(scintilla, firstLine, edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
-	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(lines[firstLine].start), static_cast<LPARAM>(lines[lastLine].contentEnd));
+	ScintillaUndoAction undo(scintilla);
+	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(lineStartPosition(scintilla, firstLine)), static_cast<LPARAM>(lineEndPosition(scintilla, lastLine)));
 	::SendMessage(scintilla, SCI_REPLACETARGET, static_cast<WPARAM>(replacement.size()), reinterpret_cast<LPARAM>(replacement.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
 	return true;
@@ -464,19 +472,18 @@ void insertIndentation(HWND scintilla)
 			--endLine;
 	}
 
+	ScintillaUndoAction undo(scintilla);
 	if (start == end || startLine == endLine)
 	{
 		::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(indent.c_str()));
 		return;
 	}
 
-	::SendMessage(scintilla, SCI_BEGINUNDOACTION, 0, 0);
 	for (LRESULT line = endLine; line >= startLine; --line)
 	{
 		const LRESULT position = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(line), 0);
 		::SendMessage(scintilla, SCI_INSERTTEXT, static_cast<WPARAM>(position), reinterpret_cast<LPARAM>(indent.c_str()));
 	}
-	::SendMessage(scintilla, SCI_ENDUNDOACTION, 0, 0);
 }
 }
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-labelledby="title desc">
+  <title id="title">Markdown Table Editor plugin icon</title>
+  <desc id="desc">A compact document with an aligned Markdown table and check mark.</desc>
+  <rect width="40" height="40" rx="7" fill="#EEF0F2"/>
+  <path d="M9.3 4.8h15.9l5.6 5.8v25.5H9.3c-2 0-3.5-1.6-3.5-3.5V8.3c0-1.9 1.5-3.5 3.5-3.5z" fill="#FFFFFF" stroke="#10233F" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M25.2 4.8v5.9c0 1.2 1 2.2 2.2 2.2h3.4" fill="none" stroke="#10233F" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M11.3 15.3v13M17.6 15.3v3.8M17.6 21.8v3.3M17.6 27.8v3.1M24 15.3v3.8M24 21.8v3.3M24 27.8v3.1M30.5 15.3v10.5" fill="none" stroke="#182538" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M13.3 18h4M13.3 23.2h4M13.3 28.4h4M25.8 18h4M25.8 23.2h4" fill="none" stroke="#182538" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M19.4 18h5M22.7 19.4v10.6M19.4 23.2h2.2M24.2 23.2h.7M19.4 28.4h2.2" fill="none" stroke="#F2A100" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M25.4 30.3l2.8 2.8 5.4-6.2" fill="none" stroke="#00A9A7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

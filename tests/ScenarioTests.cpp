@@ -259,6 +259,19 @@ void runEditorCommandScenarios()
 			"| -------- | -------- |",
 			"|          |          |"
 		});
+
+	const std::vector<std::string> unwrapped =
+	{
+		"Name | Age",
+		"--- | ---:",
+		"Anna | 20"
+	};
+	expectLines("unwrapped align preserves style", MarkdownTable::apply(unwrapped, 2, 1, MarkdownTable::Action::Align).lines,
+		{
+			"Name | Age",
+			"---- | --:",
+			"Anna |  20"
+		});
 }
 
 void runDelimitedScenarios()

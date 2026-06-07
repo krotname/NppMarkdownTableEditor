@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="240" viewBox="0 0 980 240" role="img" aria-labelledby="title desc">
+  <title id="title">Markdown Table Editor logo</title>
+  <desc id="desc">Horizontal logo lockup for Markdown Table Editor.</desc>
+  <rect width="980" height="240" rx="0" fill="#FFFFFF"/>
+  <g transform="translate(56 26) scale(.34)">
+    <rect width="512" height="512" rx="72" fill="#EEF0F2"/>
+    <path d="M122 58h230l76 78v324c0 27-22 49-49 49H122c-27 0-49-22-49-49V107c0-27 22-49 49-49z" fill="#FFFFFF" stroke="#10233F" stroke-width="16" stroke-linejoin="round"/>
+    <path d="M352 58v82c0 17 14 31 31 31h45" fill="none" stroke="#10233F" stroke-width="16" stroke-linejoin="round"/>
+    <path d="M141 174v182M220 174v58M220 262v44M220 334v44M304 174v58M304 262v44M304 334v44M392 174v182" fill="none" stroke="#182538" stroke-width="15" stroke-linecap="round"/>
+    <path d="M164 207h58M164 271h58M164 335h58M326 207h60M326 271h60M326 335h60" fill="none" stroke="#182538" stroke-width="15" stroke-linecap="round"/>
+    <path d="M245 207h63M286 224v178M245 271h30M306 271h8M245 335h30M306 335h8" fill="none" stroke="#F2A100" stroke-width="15" stroke-linecap="round"/>
+    <path d="M326 395l40 40 78-90" fill="none" stroke="#00A9A7" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M354 360v27M319 372l20 20M409 372l-20 20" fill="none" stroke="#00A9A7" stroke-width="14" stroke-linecap="round"/>
+  </g>
+  <text x="248" y="107" fill="#20242A" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="48" font-weight="750">Markdown Table</text>
+  <text x="248" y="162" fill="#51606C" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="40" font-weight="600">Editor</text>
+  <path d="M248 184h318" fill="none" stroke="#D49A32" stroke-width="8" stroke-linecap="round"/>
+</svg>
