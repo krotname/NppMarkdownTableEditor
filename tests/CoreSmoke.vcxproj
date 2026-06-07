@@ -12,9 +12,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoreSmoke.cpp" />
+    <ClCompile Include="ScenarioTests.cpp" />
     <ClCompile Include="..\src\MarkdownTableCore.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ScenarioTests.h" />
     <ClInclude Include="..\src\MarkdownTableCore.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

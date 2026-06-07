@@ -429,6 +429,55 @@ bool runInsertTable()
 	replaceSelectionWithEdit(scintilla, edit);
 	return true;
 }
+
+std::string indentationText(HWND scintilla)
+{
+	const bool useTabs = ::SendMessage(scintilla, SCI_GETUSETABS, 0, 0) != 0;
+	if (useTabs)
+		return "\t";
+
+	LRESULT tabWidth = ::SendMessage(scintilla, SCI_GETTABWIDTH, 0, 0);
+	if (tabWidth <= 0)
+		tabWidth = 4;
+	return std::string(static_cast<std::size_t>(tabWidth), ' ');
+}
+
+void insertIndentation(HWND scintilla)
+{
+	const std::string indent = indentationText(scintilla);
+	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	const LRESULT selectionEnd = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
+	if (selectionStart < 0 || selectionEnd < 0)
+		return;
+
+	const LRESULT start = (std::min)(selectionStart, selectionEnd);
+	const LRESULT end = (std::max)(selectionStart, selectionEnd);
+	LRESULT startLine = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(start), 0);
+	LRESULT endLine = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(end), 0);
+	if (startLine < 0 || endLine < 0)
+		return;
+
+	if (start != end && endLine > startLine)
+	{
+		const LRESULT endLineStart = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(endLine), 0);
+		if (end == endLineStart)
+			--endLine;
+	}
+
+	if (start == end || startLine == endLine)
+	{
+		::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(indent.c_str()));
+		return;
+	}
+
+	::SendMessage(scintilla, SCI_BEGINUNDOACTION, 0, 0);
+	for (LRESULT line = endLine; line >= startLine; --line)
+	{
+		const LRESULT position = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(line), 0);
+		::SendMessage(scintilla, SCI_INSERTTEXT, static_cast<WPARAM>(position), reinterpret_cast<LPARAM>(indent.c_str()));
+	}
+	::SendMessage(scintilla, SCI_ENDUNDOACTION, 0, 0);
+}
 }
 
 //
@@ -593,5 +642,5 @@ void tabOrIndent()
 
 	HWND scintilla = currentScintilla();
 	if (scintilla)
-		::SendMessage(scintilla, SCI_TAB, 0, 0);
+		insertIndentation(scintilla);
 }

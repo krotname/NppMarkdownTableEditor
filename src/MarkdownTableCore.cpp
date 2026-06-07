@@ -20,6 +20,7 @@ struct Row
 {
 	std::vector<std::string> cells;
 	bool separator = false;
+	std::size_t id = 0;
 };
 
 struct Table
@@ -169,6 +170,7 @@ Table parseTable(const std::vector<std::string> &lines)
 	for (std::size_t i = 0; i < lines.size(); ++i)
 	{
 		Row row;
+		row.id = i;
 		row.cells = splitCells(lines[i]);
 		table.columns = (std::max)(table.columns, row.cells.size());
 		table.rows.push_back(row);
@@ -202,6 +204,11 @@ Table parseTable(const std::vector<std::string> &lines)
 	}
 
 	return table;
+}
+
+bool isMarkdownTable(const Table &table)
+{
+	return table.separatorRow != static_cast<std::size_t>(-1) && table.separatorRow > 0;
 }
 
 bool isCjkCodePoint(unsigned int cp)
@@ -374,6 +381,13 @@ std::size_t editableRowCount(const Table &table)
 	return count;
 }
 
+bool canDeleteRow(const Table &table, std::size_t row)
+{
+	if (row >= table.rows.size() || table.rows[row].separator || editableRowCount(table) <= 1)
+		return false;
+	return table.separatorRow == static_cast<std::size_t>(-1) || row + 1 != table.separatorRow;
+}
+
 std::size_t closestEditableRow(const Table &table, std::size_t row)
 {
 	if (table.rows.empty())
@@ -398,6 +412,24 @@ std::size_t closestEditableRow(const Table &table, std::size_t row)
 	}
 
 	return 0;
+}
+
+std::size_t nextRowId(const Table &table)
+{
+	std::size_t id = 0;
+	for (std::size_t i = 0; i < table.rows.size(); ++i)
+		id = (std::max)(id, table.rows[i].id + 1);
+	return id;
+}
+
+std::size_t rowById(const Table &table, std::size_t id, std::size_t fallback)
+{
+	for (std::size_t i = 0; i < table.rows.size(); ++i)
+	{
+		if (table.rows[i].id == id)
+			return i;
+	}
+	return closestEditableRow(table, fallback);
 }
 
 bool tryParseNumber(const std::string &value, double &number)
@@ -445,14 +477,14 @@ int compareCells(const std::string &left, const std::string &right)
 	return 0;
 }
 
-void sortRows(Table &table, std::size_t column, bool ascending)
+std::size_t sortRows(Table &table, std::size_t column, bool ascending, std::size_t currentRowId, std::size_t fallbackRow)
 {
 	if (column >= table.columns || table.rows.empty())
-		return;
+		return closestEditableRow(table, fallbackRow);
 
 	const std::size_t firstDataRow = table.separatorRow != static_cast<std::size_t>(-1) ? table.separatorRow + 1 : 0;
 	if (firstDataRow >= table.rows.size())
-		return;
+		return rowById(table, currentRowId, fallbackRow);
 
 	std::stable_sort(table.rows.begin() + static_cast<std::ptrdiff_t>(firstDataRow), table.rows.end(),
 		[column, ascending](const Row &left, const Row &right)
@@ -462,11 +494,13 @@ void sortRows(Table &table, std::size_t column, bool ascending)
 				return false;
 			return ascending ? compared < 0 : compared > 0;
 		});
+	return rowById(table, currentRowId, fallbackRow);
 }
 
 void insertEmptyRow(Table &table, std::size_t index)
 {
 	Row row;
+	row.id = nextRowId(table);
 	row.cells.assign(table.columns, std::string());
 	if (index > table.rows.size())
 		index = table.rows.size();
@@ -532,33 +566,56 @@ char detectDelimiter(const std::string &text)
 	std::size_t tabs = 0;
 	std::size_t commas = 0;
 	bool inQuotes = false;
+	bool cellBlank = true;
 
 	for (std::size_t i = 0; i < text.size(); ++i)
 	{
 		const char ch = text[i];
-		if (ch == '"')
+		if (inQuotes)
 		{
-			if (inQuotes && i + 1 < text.size() && text[i + 1] == '"')
-			{
+			if (ch == '"' && i + 1 < text.size() && text[i + 1] == '"')
 				++i;
-			}
-			else
-			{
-				inQuotes = !inQuotes;
-			}
-			continue;
+			else if (ch == '"')
+				inQuotes = false;
 		}
-
-		if (!inQuotes)
+		else if (ch == '"' && cellBlank)
 		{
-			if (ch == '\t')
-				++tabs;
-			else if (ch == ',')
-				++commas;
+			inQuotes = true;
+		}
+		else if (ch == '\t')
+		{
+			++tabs;
+			cellBlank = true;
+		}
+		else if (ch == ',')
+		{
+			++commas;
+			cellBlank = true;
+		}
+		else if (ch == '\r' || ch == '\n')
+		{
+			cellBlank = true;
+		}
+		else if (!isSpace(static_cast<unsigned char>(ch)))
+		{
+			cellBlank = false;
 		}
 	}
 
 	return tabs > commas ? '\t' : ',';
+}
+
+bool hasDelimitedStructure(const std::string &text)
+{
+	const std::string value = trim(text);
+	if (value.empty())
+		return false;
+	for (std::size_t i = 0; i < value.size(); ++i)
+	{
+		if (value[i] == ',' || value[i] == '\t' || value[i] == '\r' || value[i] == '\n')
+			return true;
+	}
+	return false;
 }
 
 bool hasCellContent(const std::vector<std::string> &row)
@@ -581,36 +638,48 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 	for (std::size_t i = 0; i < text.size(); ++i)
 	{
 		const char ch = text[i];
-		if (ch == '"')
+		if (inQuotes)
 		{
-			if (inQuotes && i + 1 < text.size() && text[i + 1] == '"')
+			if (ch == '"')
 			{
-				cell += '"';
-				++i;
+				if (i + 1 < text.size() && text[i + 1] == '"')
+				{
+					cell += '"';
+					++i;
+				}
+				else
+				{
+					inQuotes = false;
+				}
+			}
+			else if (ch == '\r' || ch == '\n')
+			{
+				cell += ' ';
+				if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+					++i;
 			}
 			else
 			{
-				inQuotes = !inQuotes;
+				cell += ch;
 			}
 			continue;
 		}
 
-		if (inQuotes && (ch == '\r' || ch == '\n'))
+		if (ch == '"' && trim(cell).empty())
 		{
-			cell += '\n';
-			if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
-				++i;
+			cell.clear();
+			inQuotes = true;
 			continue;
 		}
 
-		if (!inQuotes && ch == delimiter)
+		if (ch == delimiter)
 		{
 			row.push_back(trim(cell));
 			cell.clear();
 			continue;
 		}
 
-		if (!inQuotes && (ch == '\r' || ch == '\n'))
+		if (ch == '\r' || ch == '\n')
 		{
 			row.push_back(trim(cell));
 			cell.clear();
@@ -657,6 +726,7 @@ Table tableFromRows(const std::vector<std::vector<std::string> > &rows)
 	for (std::size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex)
 	{
 		Row row;
+		row.id = table.rows.size();
 		row.cells.reserve(table.columns);
 		for (std::size_t column = 0; column < table.columns; ++column)
 			row.cells.push_back(column < rows[rowIndex].size() ? escapeMarkdownCell(rows[rowIndex][column]) : std::string());
@@ -666,6 +736,7 @@ Table tableFromRows(const std::vector<std::vector<std::string> > &rows)
 		{
 			Row separator;
 			separator.separator = true;
+			separator.id = table.rows.size();
 			separator.cells.assign(table.columns, "---");
 			table.separatorRow = table.rows.size();
 			table.rows.push_back(separator);
@@ -684,18 +755,21 @@ Table emptyTable(std::size_t columns, std::size_t dataRows)
 	table.alignments.assign(table.columns, Align::None);
 
 	Row header;
+	header.id = table.rows.size();
 	for (std::size_t column = 0; column < table.columns; ++column)
 		header.cells.push_back(std::string("Column ") + std::to_string(column + 1));
 	table.rows.push_back(header);
 
 	Row separator;
 	separator.separator = true;
+	separator.id = table.rows.size();
 	separator.cells.assign(table.columns, "---");
 	table.rows.push_back(separator);
 
 	for (std::size_t rowIndex = 0; rowIndex < dataRows; ++rowIndex)
 	{
 		Row row;
+		row.id = table.rows.size();
 		row.cells.assign(table.columns, std::string());
 		table.rows.push_back(row);
 	}
@@ -744,6 +818,12 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 	}
 
 	Table table = parseTable(lines);
+	if (!isMarkdownTable(table))
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
 	if (row >= table.rows.size())
 		row = table.rows.size() - 1;
 	if (column >= table.columns)
@@ -751,6 +831,7 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 
 	std::size_t targetRow = row;
 	std::size_t targetColumn = column;
+	const std::size_t currentRowId = table.rows[row].id;
 
 	switch (action)
 	{
@@ -786,7 +867,7 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 			break;
 
 		case Action::DeleteRow:
-			if (!table.rows[row].separator && editableRowCount(table) > 1)
+			if (canDeleteRow(table, row))
 			{
 				table.rows.erase(table.rows.begin() + static_cast<std::ptrdiff_t>(row));
 				if (table.separatorRow != static_cast<std::size_t>(-1) && row < table.separatorRow)
@@ -838,13 +919,11 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 			break;
 
 		case Action::SortRowsAscending:
-			sortRows(table, column, true);
-			targetRow = closestEditableRow(table, row);
+			targetRow = sortRows(table, column, true, currentRowId, row);
 			break;
 
 		case Action::SortRowsDescending:
-			sortRows(table, column, false);
-			targetRow = closestEditableRow(table, row);
+			targetRow = sortRows(table, column, false, currentRowId, row);
 			break;
 
 		case Action::Align:
@@ -861,6 +940,12 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 EditResult convertDelimitedToTable(const std::string &text)
 {
 	EditResult result;
+	if (!hasDelimitedStructure(text))
+	{
+		result.message = "No CSV or TSV rows found";
+		return result;
+	}
+
 	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(text, detectDelimiter(text));
 	if (rows.empty())
 	{

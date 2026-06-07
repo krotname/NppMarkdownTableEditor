@@ -1,4 +1,5 @@
 #include "../src/MarkdownTableCore.h"
+#include "ScenarioTests.h"
 
 #include <iostream>
 #include <string>
@@ -52,6 +53,27 @@ void expectLines(const char *name, const std::vector<std::string> &actual, const
 	for (std::size_t i = 0; i < actual.size(); ++i)
 		std::cerr << actual[i] << "\n";
 }
+
+void expectContains(const char *name, const std::string &actual, const std::string &expected)
+{
+	if (actual.find(expected) != std::string::npos)
+		return;
+
+	++g_failures;
+	std::cerr << name << " failed: expected to contain \"" << expected << "\"\n";
+}
+
+std::string joinLinesForCheck(const std::vector<std::string> &lines)
+{
+	std::string result;
+	for (std::size_t i = 0; i < lines.size(); ++i)
+	{
+		if (i != 0)
+			result += "\n";
+		result += lines[i];
+	}
+	return result;
+}
 }
 
 int main()
@@ -79,11 +101,20 @@ int main()
 			"| Alexander |   7 |"
 		});
 
+	const MarkdownTable::EditResult plainPipe = MarkdownTable::apply({ "Use A | B in text" }, 0, 0, MarkdownTable::Action::Align);
+	expectTrue("plain pipe is not table", !plainPipe.ok);
+	expectSize("plain pipe keeps empty result", plainPipe.lines.size(), 0);
+
 	const MarkdownTable::EditResult next = MarkdownTable::apply(input, 3, 1, MarkdownTable::Action::NextCell);
 	expectTrue("next cell ok", next.ok);
 	expectSize("next cell row count", next.lines.size(), 5);
 	expectSize("next cell target row", next.targetRow, 4);
 	expectSize("next cell target column", next.targetColumn, 0);
+
+	const MarkdownTable::EditResult previous = MarkdownTable::apply(input, 2, 0, MarkdownTable::Action::PreviousCell);
+	expectTrue("previous cell ok", previous.ok);
+	expectSize("previous cell skips separator", previous.targetRow, 0);
+	expectSize("previous cell wraps to last column", previous.targetColumn, 1);
 
 	const MarkdownTable::EditResult insertColumn = MarkdownTable::apply(input, 2, 0, MarkdownTable::Action::InsertColumnRight);
 	expectTrue("insert column ok", insertColumn.ok);
@@ -93,6 +124,33 @@ int main()
 			"| --------- | --- | --: |",
 			"| Anna      |     |  20 |",
 			"| Alexander |     |   7 |"
+		});
+
+	expectLines("delete column preserves alignment", MarkdownTable::apply(input, 2, 0, MarkdownTable::Action::DeleteColumn).lines,
+		{
+			"| Age |",
+			"| --: |",
+			"|  20 |",
+			"|   7 |"
+		});
+
+	const MarkdownTable::EditResult deleteLastColumn = MarkdownTable::apply(input, 2, 1, MarkdownTable::Action::DeleteColumn);
+	expectTrue("delete last column ok", deleteLastColumn.ok);
+	expectSize("delete last column target", deleteLastColumn.targetColumn, 0);
+	expectLines("delete last column", deleteLastColumn.lines,
+		{
+			"| Name      |",
+			"| --------- |",
+			"| Anna      |",
+			"| Alexander |"
+		});
+
+	expectLines("move column preserves alignment", MarkdownTable::apply(input, 2, 1, MarkdownTable::Action::MoveColumnLeft).lines,
+		{
+			"| Age | Name      |",
+			"| --: | --------- |",
+			"|  20 | Anna      |",
+			"|   7 | Alexander |"
 		});
 
 	const std::vector<std::string> unwrapped =
@@ -147,6 +205,50 @@ int main()
 			"| тест | 1     |",
 			"| 表   | 22    |"
 		});
+
+	const MarkdownTable::EditResult largeFishTable = MarkdownTable::apply(
+		{
+			"| Topic | Description | Note |",
+			"| --- | --- | --- |",
+			"| Lorem | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. | alpha |",
+			"| Рыба | Съешь еще этих мягких французских булок, да выпей чаю; длинная проверка ширины кириллицы. | beta \\| pipe |",
+			"| CJK | 表示確認のための長いセルと punctuation, commas, and quotes \"ok\". | gamma |",
+			"| Mixed | Markdown \\| escaped pipe stays in one cell while text keeps going for a wider table. | delta |",
+			"| Numbers | 1234567890 9876543210 3.1415926535 -42.75 and padded numeric-looking prose. | epsilon |",
+			"| URL | https://example.com/path/to/a/very/long/resource?query=markdown-table-editor&fixture=fish | zeta |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::Align);
+	expectTrue("large fish table ok", largeFishTable.ok);
+	expectSize("large fish table line count", largeFishTable.lines.size(), 8);
+	const std::string largeFishText = joinLinesForCheck(largeFishTable.lines);
+	expectContains("large fish keeps lorem", largeFishText, "Lorem ipsum dolor sit amet");
+	expectContains("large fish keeps cyrillic", largeFishText, "Съешь еще этих мягких французских булок");
+	expectContains("large fish keeps cjk", largeFishText, "表示確認");
+	expectContains("large fish keeps escaped pipe", largeFishText, "Markdown \\| escaped pipe");
+	expectContains("large fish keeps url", largeFishText, "https://example.com/path/to/a/very/long/resource");
+
+	std::vector<std::string> hugeTableLines;
+	hugeTableLines.push_back("| Id | Payload | Note |");
+	hugeTableLines.push_back("| --- | --- | --- |");
+	const std::string hugePayload =
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua; "
+		"Съешь еще этих мягких французских булок для проверки длинной кириллицы; "
+		"表示確認 and Markdown \\| escaped pipe remain stable.";
+	for (std::size_t i = 0; i < 160; ++i)
+	{
+		hugeTableLines.push_back(
+			std::string("| row-") + std::to_string(i) + " | " + hugePayload + " chunk-" + std::to_string(i) + " | note-" + std::to_string(i) + " |");
+	}
+	const MarkdownTable::EditResult hugeTable = MarkdownTable::apply(hugeTableLines, 80, 1, MarkdownTable::Action::Align);
+	expectTrue("huge generated table ok", hugeTable.ok);
+	expectSize("huge generated table line count", hugeTable.lines.size(), 162);
+	const std::string hugeTableText = joinLinesForCheck(hugeTable.lines);
+	expectContains("huge generated table keeps first row", hugeTableText, "row-0");
+	expectContains("huge generated table keeps last row", hugeTableText, "row-159");
+	expectContains("huge generated table keeps long payload", hugeTableText, "Lorem ipsum dolor sit amet");
+	expectContains("huge generated table keeps escaped pipe", hugeTableText, "Markdown \\| escaped pipe");
 
 	expectLines("alignment variants", MarkdownTable::apply(
 		{
@@ -289,6 +391,20 @@ int main()
 			"| Chen   |   100 |"
 		});
 
+	const MarkdownTable::EditResult sortTarget = MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |",
+			"| Anna | 42 |",
+			"| Dmitry | 7 |",
+			"| Chen | 100 |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::SortRowsAscending);
+	expectTrue("sort target ok", sortTarget.ok);
+	expectSize("sort target follows current row", sortTarget.targetRow, 3);
+
 	expectLines("sort rows ascending keeps stable ties", MarkdownTable::apply(
 		{
 			"| Name | Score |",
@@ -375,6 +491,18 @@ int main()
 			"| Bob  | said \"hi\" |"
 		});
 
+	expectLines("csv escaped quotes and crlf", MarkdownTable::convertDelimitedToTable(
+		"Name,Quote,Raw\r\n"
+		"Anna,\"He said \"\"Hi\"\"\",a\"b\r\n"
+		"\r\n"
+		"Bob,\"line\r\nbreak\",x").lines,
+		{
+			"| Name | Quote        | Raw |",
+			"| ---- | ------------ | --- |",
+			"| Anna | He said \"Hi\" | a\"b |",
+			"| Bob  | line break   | x   |"
+		});
+
 	expectLines("csv crlf and multiline quoted cell", MarkdownTable::convertDelimitedToTable("Name,Note\r\nAnna,\"line 1\r\nline 2\"\r\nBob,done\r\n").lines,
 		{
 			"| Name | Note          |",
@@ -405,6 +533,37 @@ int main()
 			"| 3   | 4   | 5   |"
 		});
 
+	const MarkdownTable::EditResult largeFishCsv = MarkdownTable::convertDelimitedToTable(
+		"Name,Story,Score\r\n"
+		"Anna,\"Lorem ipsum dolor sit amet, consectetur adipiscing elit, with comma\",42\r\n"
+		"Борис,\"Длинная рыба с переносом\r\nвнутри кавычек и pipe |\",7\r\n"
+		"Chen,\"CJK 表 with comma, quote \"\"ok\"\", and more filler text\",100\r\n"
+		"Delta,\"one two three four five six seven eight nine ten\",-12.5\r\n");
+	expectTrue("large fish csv ok", largeFishCsv.ok);
+	expectSize("large fish csv line count", largeFishCsv.lines.size(), 6);
+	const std::string largeFishCsvText = joinLinesForCheck(largeFishCsv.lines);
+	expectContains("large fish csv keeps lorem", largeFishCsvText, "Lorem ipsum dolor sit amet");
+	expectContains("large fish csv flattens newline", largeFishCsvText, "переносом внутри кавычек");
+	expectContains("large fish csv escapes pipe", largeFishCsvText, "pipe \\|");
+	expectContains("large fish csv keeps quotes", largeFishCsvText, "quote \"ok\"");
+
+	std::string hugeCsv = "Id,Text,Score\r\n";
+	for (std::size_t i = 0; i < 220; ++i)
+	{
+		hugeCsv += std::string("row-") + std::to_string(i) + ",\""
+			"Lorem ipsum dolor sit amet, consectetur adipiscing elit, with comma, "
+			"quote \"\"ok\"\", pipe |, кириллица, 表, and generated chunk " + std::to_string(i) + "\"," +
+			std::to_string(static_cast<int>(i) - 110) + "\r\n";
+	}
+	const MarkdownTable::EditResult hugeCsvTable = MarkdownTable::convertDelimitedToTable(hugeCsv);
+	expectTrue("huge generated csv ok", hugeCsvTable.ok);
+	expectSize("huge generated csv line count", hugeCsvTable.lines.size(), 222);
+	const std::string hugeCsvText = joinLinesForCheck(hugeCsvTable.lines);
+	expectContains("huge generated csv keeps first row", hugeCsvText, "row-0");
+	expectContains("huge generated csv keeps last row", hugeCsvText, "row-219");
+	expectContains("huge generated csv escapes pipe", hugeCsvText, "pipe \\|");
+	expectContains("huge generated csv keeps quotes", hugeCsvText, "quote \"ok\"");
+
 	const MarkdownTable::EditResult created = MarkdownTable::createTable(3, 2);
 	expectTrue("create table ok", created.ok);
 	expectSize("create table target row", created.targetRow, 0);
@@ -423,7 +582,72 @@ int main()
 			"| -------- |"
 		});
 
+	expectTrue("plain text is not csv", !MarkdownTable::convertDelimitedToTable("just a note").ok);
 	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n\t").ok);
+
+	expectLines("keep markdown header row", MarkdownTable::apply(
+		{
+			"| H | V |",
+			"| --- | --- |",
+			"| a | b |"
+		},
+		0,
+		0,
+		MarkdownTable::Action::DeleteRow).lines,
+		{
+			"| H   | V   |",
+			"| --- | --- |",
+			"| a   | b   |"
+		});
+
+	expectLines("keep separator row", MarkdownTable::apply(
+		{
+			"| H | V |",
+			"| --- | --- |",
+			"| a | b |"
+		},
+		1,
+		0,
+		MarkdownTable::Action::DeleteRow).lines,
+		{
+			"| H   | V   |",
+			"| --- | --- |",
+			"| a   | b   |"
+		});
+
+	const MarkdownTable::EditResult insertRowBelowHeader = MarkdownTable::apply(
+		{
+			"| H | V |",
+			"| --- | --- |"
+		},
+		0,
+		0,
+		MarkdownTable::Action::InsertRowBelow);
+	expectTrue("insert row below header ok", insertRowBelowHeader.ok);
+	expectSize("insert row below header target", insertRowBelowHeader.targetRow, 2);
+	expectLines("insert row below header", insertRowBelowHeader.lines,
+		{
+			"| H   | V   |",
+			"| --- | --- |",
+			"|     |     |"
+		});
+
+	expectLines("keep header above separator", MarkdownTable::apply(
+		{
+			"| A |",
+			"| --- |",
+			"| 1 |"
+		},
+		0,
+		0,
+		MarkdownTable::Action::MoveRowDown).lines,
+		{
+			"| A   |",
+			"| --- |",
+			"| 1   |"
+		});
+
+	g_failures += runScenarioUnitTests();
 
 	if (g_failures != 0)
 	{
