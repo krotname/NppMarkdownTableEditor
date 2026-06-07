@@ -35,6 +35,7 @@
     <ClInclude Include="..\src\DockingFeature\StaticDialog.h" />
     <ClInclude Include="..\src\DockingFeature\Window.h" />
     <ClInclude Include="..\src\menuCmdID.h" />
+    <ClInclude Include="..\src\MarkdownTableCore.h" />
     <ClInclude Include="..\src\Notepad_plus_msgs.h" />
     <ClInclude Include="..\src\PluginDefinition.h" />
     <ClInclude Include="..\src\PluginInterface.h" />
@@ -44,6 +45,7 @@
   <ItemGroup>
     <ClCompile Include="..\src\DockingFeature\GoToLineDlg.cpp" />
     <ClCompile Include="..\src\DockingFeature\StaticDialog.cpp" />
+    <ClCompile Include="..\src\MarkdownTableCore.cpp" />
     <ClCompile Include="..\src\NppPluginDemo.cpp" />
     <ClCompile Include="..\src\PluginDefinition.cpp" />
   </ItemGroup>
@@ -119,6 +121,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TargetName>MarkdownTableEditor</TargetName>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>

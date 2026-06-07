@@ -1,37 +1,30 @@
-Even your grandmom can do it!
+Markdown Table Editor для Notepad++
 
-This template is done for making plugin development as easy and simple as possible.
+Этот пакет содержит плагин Notepad++ для редактирования Markdown-таблиц.
+Плагин выравнивает pipe-таблицы, перемещает курсор между ячейками, добавляет и удаляет строки и колонки, а также перемещает строки и колонки.
 
-A simple plugin can be done through 4 steps, by editing only 2 files (PluginDefinition.h and PluginDefinition.cpp) :
-1. Define your plugin name in "PluginDefinition.h"
-2. Define your plugin commands number in "PluginDefinition.h"
-3. Customize plugin commands names and associated function name (and the other stuff, optional) in "PluginDefinition.cpp".
-4. Define the associated functions
+Быстрая установка:
+1. Соберите `MarkdownTableEditor.dll` или возьмите готовую DLL из релиза.
+2. Создайте каталог `MarkdownTableEditor` в каталоге плагинов Notepad++.
+3. Скопируйте `MarkdownTableEditor.dll` в этот каталог.
+4. Перезапустите Notepad++.
 
-Just follow the 4 steps (commented) in both PluginDefinition.h and PluginDefinition.cpp files :
-//-------------------------------------//
-//-- STEP 1. DEFINE YOUR PLUGIN NAME --//
-//-------------------------------------//
+Обычный путь для 64-битной версии Notepad++:
+`C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll`
 
-//-----------------------------------------------//
-//-- STEP 2. DEFINE YOUR PLUGIN COMMAND NUMBER --//
-//-----------------------------------------------//
+Команды доступны в меню `Plugins > Markdown Table Editor`.
+Если курсор находится внутри Markdown-таблицы, `Tab` выравнивает таблицу; вне таблицы работает обычный отступ Scintilla.
 
-//--------------------------------------------//
-//-- STEP 3. CUSTOMIZE YOUR PLUGIN COMMANDS --//
-//--------------------------------------------//
+Сборка Release x64:
+`MSBuild.exe vs.proj\NppPluginTemplate.vcxproj /p:Configuration=Release /p:Platform=x64`
 
-//----------------------------------------------//
-//-- STEP 4. DEFINE YOUR ASSOCIATED FUNCTIONS --//
-//----------------------------------------------//	
+Тесты ядра:
+`MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64`
+`tests\CoreSmoke.exe`
 
-Any questions and suggestions please post here :
-https://community.notepad-plus-plus.org/category/5/notepad-plugin-development
+Проект основан на официальном C++-шаблоне плагина Notepad++:
+https://github.com/npp-plugins/plugintemplate
 
-For more information about plugin development, please check here:
+Документация по разработке плагинов Notepad++:
 https://npp-user-manual.org/docs/plugins/#how-to-develop-a-plugin
 https://npp-user-manual.org/docs/plugin-communication/
-
-
-Don HO
-don.h@free.fr

@@ -28,7 +28,7 @@
 //-------------------------------------//
 // Here define your plugin name
 //
-const TCHAR NPP_PLUGIN_NAME[] = TEXT("Notepad++ plugin template");
+const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 
 //-----------------------------------------------//
 //-- STEP 2. DEFINE YOUR PLUGIN COMMAND NUMBER --//
@@ -36,7 +36,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Notepad++ plugin template");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 2;
+const int nbFunc = 12;
 
 
 //
@@ -70,7 +70,17 @@ bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey 
 //
 // Your plugin command functions
 //
-void hello();
-void helloDlg();
+void alignTable();
+void nextCell();
+void previousCell();
+void insertRowBelow();
+void deleteRow();
+void insertColumnRight();
+void deleteColumn();
+void moveRowUp();
+void moveRowDown();
+void moveColumnLeft();
+void moveColumnRight();
+void tabOrIndent();
 
 #endif //PLUGINDEFINITION_H

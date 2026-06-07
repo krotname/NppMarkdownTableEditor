@@ -1,9 +1,11 @@
 *.sdf
 *.sln
 *.suo
+.idea/
 bin/
 bin64/
 arm64/
+tests/obj/
 vs.proj/Debug
 vs.proj/Release
 vs.proj/x64
@@ -17,3 +19,8 @@ vs.proj/.vs/
 *.aps
 *.zip
 *.bak
+*.exp
+*.exe
+*.lib
+*.obj
+*.pdb
