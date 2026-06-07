@@ -595,6 +595,14 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 			continue;
 		}
 
+		if (inQuotes && (ch == '\r' || ch == '\n'))
+		{
+			cell += '\n';
+			if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+				++i;
+			continue;
+		}
+
 		if (!inQuotes && ch == delimiter)
 		{
 			row.push_back(trim(cell));

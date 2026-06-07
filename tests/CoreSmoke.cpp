@@ -29,6 +29,15 @@ void expectSize(const char *name, std::size_t actual, std::size_t expected)
 	std::cerr << name << " failed: expected " << expected << ", got " << actual << "\n";
 }
 
+void expectString(const char *name, const std::string &actual, const std::string &expected)
+{
+	if (actual == expected)
+		return;
+
+	++g_failures;
+	std::cerr << name << " failed: expected \"" << expected << "\", got \"" << actual << "\"\n";
+}
+
 void expectLines(const char *name, const std::vector<std::string> &actual, const std::vector<std::string> &expected)
 {
 	if (actual == expected)
@@ -47,6 +56,10 @@ void expectLines(const char *name, const std::vector<std::string> &actual, const
 
 int main()
 {
+	const MarkdownTable::EditResult emptyApply = MarkdownTable::apply(std::vector<std::string>(), 0, 0, MarkdownTable::Action::Align);
+	expectTrue("empty apply rejected", !emptyApply.ok);
+	expectString("empty apply message", emptyApply.message, "No table found");
+
 	const std::vector<std::string> input =
 	{
 		"| Name | Age |",
@@ -100,7 +113,9 @@ int main()
 	const std::string escaped = "| a \\| b | c |";
 	expectTrue("escaped pipe potential", MarkdownTable::isPotentialTableLine(escaped));
 	expectTrue("only escaped pipe is not table", !MarkdownTable::isPotentialTableLine("a \\| b"));
+	expectTrue("double escaped pipe is table", MarkdownTable::isPotentialTableLine("a \\\\| b"));
 	expectSize("escaped pipe cursor", MarkdownTable::columnFromCursor(escaped, escaped.find("c")), 1);
+	expectSize("cursor with leading spaces and pipe", MarkdownTable::columnFromCursor("  | a | b |", 8), 1);
 	expectLines("escaped pipe align", MarkdownTable::apply(
 		{
 			"| H | X |",
@@ -131,6 +146,23 @@ int main()
 			"| ---- | ----- |",
 			"| тест | 1     |",
 			"| 表   | 22    |"
+		});
+
+	expectLines("alignment variants", MarkdownTable::apply(
+		{
+			"| Left | Center | Right | Plain |",
+			"| :--- | :---: | ---: | --- |",
+			"| a | b | c | d |",
+			"| long | wide | 123 | text |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::Align).lines,
+		{
+			"| Left | Center | Right | Plain |",
+			"| :--- | :----: | ----: | ----- |",
+			"| a    |   b    |     c | d     |",
+			"| long |  wide  |   123 | text  |"
 		});
 
 	const MarkdownTable::EditResult deleteLast = MarkdownTable::apply(
@@ -195,6 +227,49 @@ int main()
 			"| 1   |"
 		});
 
+	expectLines("move row up blocked by separator", MarkdownTable::apply(
+		{
+			"| A |",
+			"| --- |",
+			"| 1 |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::MoveRowUp).lines,
+		{
+			"| A   |",
+			"| --- |",
+			"| 1   |"
+		});
+
+	expectLines("delete only column keeps table", MarkdownTable::apply(
+		{
+			"| A |",
+			"| --- |",
+			"| 1 |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::DeleteColumn).lines,
+		{
+			"| A   |",
+			"| --- |",
+			"| 1   |"
+		});
+
+	const MarkdownTable::EditResult previousFromData = MarkdownTable::apply(
+		{
+			"| A | B |",
+			"| --- | --- |",
+			"| 1 | 2 |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::PreviousCell);
+	expectTrue("previous from first data ok", previousFromData.ok);
+	expectSize("previous from first data row", previousFromData.targetRow, 0);
+	expectSize("previous from first data column", previousFromData.targetColumn, 1);
+
 	expectLines("sort rows ascending numeric", MarkdownTable::apply(
 		{
 			"| Name | Score |",
@@ -252,6 +327,38 @@ int main()
 			"| Anna   |    42 |"
 		});
 
+	expectLines("sort rows descending numeric decimals", MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |",
+			"| low | -1.5 |",
+			"| mid | 2 |",
+			"| high | 10.25 |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::SortRowsDescending).lines,
+		{
+			"| Name | Score |",
+			"| ---- | ----: |",
+			"| high | 10.25 |",
+			"| mid  |     2 |",
+			"| low  |  -1.5 |"
+		});
+
+	expectLines("sort table without data rows", MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |"
+		},
+		0,
+		1,
+		MarkdownTable::Action::SortRowsAscending).lines,
+		{
+			"| Name | Score |",
+			"| ---- | ----: |"
+		});
+
 	expectLines("csv to table", MarkdownTable::convertDelimitedToTable("Name,Role,Score\nAnna,Engineer,42\nDmitry,QA,7").lines,
 		{
 			"| Name   | Role     | Score |",
@@ -266,6 +373,21 @@ int main()
 			"| ---- | --------- |",
 			"| Anna | A, B      |",
 			"| Bob  | said \"hi\" |"
+		});
+
+	expectLines("csv crlf and multiline quoted cell", MarkdownTable::convertDelimitedToTable("Name,Note\r\nAnna,\"line 1\r\nline 2\"\r\nBob,done\r\n").lines,
+		{
+			"| Name | Note          |",
+			"| ---- | ------------- |",
+			"| Anna | line 1 line 2 |",
+			"| Bob  | done          |"
+		});
+
+	expectLines("delimiter ignores commas inside quotes", MarkdownTable::convertDelimitedToTable("Name\tNote\nAnna\t\"A,B\"").lines,
+		{
+			"| Name | Note |",
+			"| ---- | ---- |",
+			"| Anna | A,B  |"
 		});
 
 	expectLines("tsv to table escapes pipes", MarkdownTable::convertDelimitedToTable("Name\tNote\nAnna\tA|B").lines,
