@@ -17,7 +17,6 @@
 
 #include "PluginDefinition.h"
 #include "MarkdownTableCore.h"
-#include "menuCmdID.h"
 
 #include <algorithm>
 #include <sstream>
@@ -373,17 +372,31 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 		return false;
 	}
 
-	std::size_t firstLine = currentLine;
-	while (firstLine > 0 && MarkdownTable::isPotentialTableLine(getLineText(scintilla, firstLine - 1)))
-		--firstLine;
+	std::size_t potentialFirstLine = currentLine;
+	while (potentialFirstLine > 0 && MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialFirstLine - 1)))
+		--potentialFirstLine;
 
-	std::size_t lastLine = currentLine;
-	while (lastLine + 1 < lineCount && MarkdownTable::isPotentialTableLine(getLineText(scintilla, lastLine + 1)))
-		++lastLine;
+	std::size_t potentialLastLine = currentLine;
+	while (potentialLastLine + 1 < lineCount && MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialLastLine + 1)))
+		++potentialLastLine;
 
+	std::vector<std::string> candidateLines;
+	for (std::size_t i = potentialFirstLine; i <= potentialLastLine; ++i)
+		candidateLines.push_back(getLineText(scintilla, i));
+
+	const MarkdownTable::TableRange tableRange = MarkdownTable::findTableRange(candidateLines, currentLine - potentialFirstLine);
+	if (!tableRange.found)
+	{
+		if (!quiet)
+			showMessage(L"Could not edit the Markdown table.");
+		return false;
+	}
+
+	const std::size_t firstLine = potentialFirstLine + tableRange.firstRow;
+	const std::size_t lastLine = potentialFirstLine + tableRange.lastRow;
 	std::vector<std::string> tableLines;
-	for (std::size_t i = firstLine; i <= lastLine; ++i)
-		tableLines.push_back(getLineText(scintilla, i));
+	for (std::size_t i = tableRange.firstRow; i <= tableRange.lastRow; ++i)
+		tableLines.push_back(candidateLines[i]);
 
 	const std::size_t row = currentLine - firstLine;
 	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);

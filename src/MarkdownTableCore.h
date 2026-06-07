@@ -35,8 +35,16 @@ struct EditResult
 	std::size_t targetColumnOffset = 0;
 };
 
+struct TableRange
+{
+	bool found = false;
+	std::size_t firstRow = 0;
+	std::size_t lastRow = 0;
+};
+
 bool isPotentialTableLine(const std::string &line);
 std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn);
+TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row);
 EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::size_t column, Action action);
 EditResult convertDelimitedToTable(const std::string &text);
 EditResult createTable(std::size_t columns, std::size_t dataRows);

@@ -1,7 +1,7 @@
 param(
 	[string]$Configuration = "Release",
 	[string]$Platform = "x64",
-	[string]$Version = "5.5.0"
+	[string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,15 +11,19 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -Er
 
 function Get-VisualStudioPath {
 	$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-	if (-not (Test-Path -LiteralPath $vswhere)) {
-		throw "vswhere.exe not found"
+	$path = $null
+	if (Test-Path -LiteralPath $vswhere) {
+		$path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
 	}
 
-	$path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
 	if (-not $path) {
+		$fallback = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\2022\BuildTools"
+		if (Test-Path -LiteralPath (Join-Path $fallback "Common7\Tools\VsDevCmd.bat")) {
+			return $fallback
+		}
 		throw "Visual Studio Build Tools with MSBuild not found"
 	}
-	return $path
+	return ($path | Select-Object -First 1)
 }
 
 function Invoke-VsCommand([string]$Command) {
@@ -32,6 +36,37 @@ function Invoke-VsCommand([string]$Command) {
 	cmd.exe /d /s /c "`"$vsDevCmd`" -arch=amd64 -host_arch=amd64 >nul && $Command"
 	if ($LASTEXITCODE -ne 0) {
 		throw "Command failed with exit code $LASTEXITCODE"
+	}
+}
+
+function Read-ProjectVersion([string]$ProjectRoot) {
+	$versionPath = Join-Path $ProjectRoot "VERSION"
+	if (-not (Test-Path -LiteralPath $versionPath)) {
+		throw "VERSION file not found: $versionPath"
+	}
+	return (Get-Content -LiteralPath $versionPath -Raw).Trim()
+}
+
+function Convert-ToVersionParts([string]$Version) {
+	if ($Version -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
+		throw "Version must use major.minor.patch numeric format, for example 0.6.0. Got: $Version"
+	}
+
+	return [pscustomobject]@{
+		Major = [int]$matches[1]
+		Minor = [int]$matches[2]
+		Patch = [int]$matches[3]
+		Build = 0
+	}
+}
+
+function Assert-DllVersion([string]$DllPath, [string]$Version) {
+	$versionInfo = (Get-Item -LiteralPath $DllPath).VersionInfo
+	if ($versionInfo.FileVersion -ne $Version) {
+		throw "DLL FileVersion mismatch. Expected $Version, got $($versionInfo.FileVersion)"
+	}
+	if ($versionInfo.ProductVersion -ne $Version) {
+		throw "DLL ProductVersion mismatch. Expected $Version, got $($versionInfo.ProductVersion)"
 	}
 }
 
@@ -68,12 +103,15 @@ function Get-PackagePlatformLabel([string]$Platform) {
 $BuildPlatform = Resolve-BuildPlatform $Platform
 $PackagePlatform = Get-PackagePlatformLabel $BuildPlatform
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Version = if ([string]::IsNullOrWhiteSpace($Version)) { Read-ProjectVersion $ProjectRoot } else { $Version.Trim() }
+$VersionParts = Convert-ToVersionParts $Version
+
 $BuildDir = Join-Path $ProjectRoot "build"
 $PackageRoot = Join-Path $BuildDir "dist"
 $PackageDir = Join-Path $PackageRoot "MarkdownTableEditor"
 $ZipPath = Join-Path $BuildDir "MarkdownTableEditor-$Version-$PackagePlatform.zip"
 $PluginAdminZipPath = Join-Path $BuildDir "MarkdownTableEditor-$Version-$PackagePlatform-pluginadmin.zip"
-$PluginProject = Join-Path $ProjectRoot "vs.proj\NppPluginTemplate.vcxproj"
+$PluginProject = Join-Path $ProjectRoot "vs.proj\MarkdownTableEditor.vcxproj"
 $TestProject = Join-Path $ProjectRoot "tests\CoreSmoke.vcxproj"
 
 if (Test-Path -LiteralPath $BuildDir) {
@@ -81,7 +119,7 @@ if (Test-Path -LiteralPath $BuildDir) {
 }
 New-Item -ItemType Directory -Path $PackageDir | Out-Null
 
-Invoke-VsCommand "msbuild `"$PluginProject`" /t:Rebuild /p:Configuration=$Configuration /p:Platform=$BuildPlatform /m"
+Invoke-VsCommand "msbuild `"$PluginProject`" /t:Rebuild /p:Configuration=$Configuration /p:Platform=$BuildPlatform /p:MarkdownTableEditorVersionMajor=$($VersionParts.Major) /p:MarkdownTableEditorVersionMinor=$($VersionParts.Minor) /p:MarkdownTableEditorVersionPatch=$($VersionParts.Patch) /p:MarkdownTableEditorVersionBuild=$($VersionParts.Build) /m"
 Invoke-VsCommand "msbuild `"$TestProject`" /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m"
 
 $TestExe = Join-Path $ProjectRoot "tests\CoreSmoke.exe"
@@ -98,10 +136,13 @@ $DllPath = Join-Path $OutputDir "MarkdownTableEditor.dll"
 if (-not (Test-Path -LiteralPath $DllPath)) {
 	throw "Plugin DLL not found: $DllPath"
 }
+Assert-DllVersion $DllPath $Version
 
 Copy-Item -LiteralPath $DllPath -Destination $PackageDir -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "license.txt") -Destination $PackageDir -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "readme.FIRST") -Destination $PackageDir -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "NOTICE.md") -Destination $PackageDir -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "LICENSES") -Destination $PackageDir -Recurse -Force
 
 if (Test-Path -LiteralPath $ZipPath) {
 	Remove-Item -LiteralPath $ZipPath -Force
@@ -114,7 +155,9 @@ if (Test-Path -LiteralPath $PluginAdminZipPath) {
 Compress-Archive -LiteralPath @(
 	(Join-Path $PackageDir "MarkdownTableEditor.dll"),
 	(Join-Path $PackageDir "license.txt"),
-	(Join-Path $PackageDir "readme.FIRST")
+	(Join-Path $PackageDir "readme.FIRST"),
+	(Join-Path $PackageDir "NOTICE.md"),
+	(Join-Path $PackageDir "LICENSES")
 ) -DestinationPath $PluginAdminZipPath -CompressionLevel Optimal
 
 Write-Output "Built $ZipPath"

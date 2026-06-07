@@ -11,11 +11,12 @@ vs.proj/Debug
 vs.proj/Release
 vs.proj/x64
 vs.proj/ARM64
+vs.proj/Markdown.*
 vs.proj/NppPlugi.*
-vs.proj/NppPluginTemplate.opensdf
-vs.proj/NppPluginTemplate.exp
-vs.proj/NppPluginTemplate.lib
-vs.proj/NppPluginTemplate.vcxproj.user
+vs.proj/MarkdownTableEditor.opensdf
+vs.proj/MarkdownTableEditor.exp
+vs.proj/MarkdownTableEditor.lib
+vs.proj/MarkdownTableEditor.vcxproj.user
 vs.proj/.vs/
 *.aps
 *.zip

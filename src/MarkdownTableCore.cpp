@@ -183,6 +183,21 @@ Align parseAlignment(const std::string &cell)
 	return Align::None;
 }
 
+std::size_t tableRangeEnd(const std::vector<std::string> &lines, std::size_t firstRow, std::size_t separatorRow)
+{
+	const bool requireLeadingPipe = startsWithUnescapedPipe(lines[firstRow]) && startsWithUnescapedPipe(lines[separatorRow]);
+	std::size_t lastRow = separatorRow;
+	for (std::size_t row = separatorRow + 1; row < lines.size(); ++row)
+	{
+		if (!isPotentialTableLine(lines[row]))
+			break;
+		if (requireLeadingPipe && !startsWithUnescapedPipe(lines[row]))
+			break;
+		lastRow = row;
+	}
+	return lastRow;
+}
+
 Table parseTable(const std::vector<std::string> &lines)
 {
 	Table table;
@@ -486,19 +501,136 @@ bool tryParseNumber(const std::string &value, double &number)
 	return end && *end == '\0';
 }
 
-std::string lowerAscii(const std::string &value)
+bool isUtf8Continuation(unsigned char ch)
 {
-	std::string lowered = value;
-	for (std::size_t i = 0; i < lowered.size(); ++i)
-		lowered[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lowered[i])));
-	return lowered;
+	return (ch & 0xC0) == 0x80;
+}
+
+unsigned int readUtf8CodePoint(const std::string &value, std::size_t &offset)
+{
+	const unsigned char ch = static_cast<unsigned char>(value[offset]);
+	if ((ch & 0x80) == 0)
+	{
+		++offset;
+		return ch;
+	}
+
+	if ((ch & 0xE0) == 0xC0 && offset + 1 < value.size() && isUtf8Continuation(static_cast<unsigned char>(value[offset + 1])))
+	{
+		const unsigned int cp = static_cast<unsigned int>(((ch & 0x1F) << 6) |
+			(static_cast<unsigned char>(value[offset + 1]) & 0x3F));
+		offset += 2;
+		return cp;
+	}
+
+	if ((ch & 0xF0) == 0xE0 && offset + 2 < value.size() &&
+		isUtf8Continuation(static_cast<unsigned char>(value[offset + 1])) &&
+		isUtf8Continuation(static_cast<unsigned char>(value[offset + 2])))
+	{
+		const unsigned int cp = static_cast<unsigned int>(((ch & 0x0F) << 12) |
+			((static_cast<unsigned char>(value[offset + 1]) & 0x3F) << 6) |
+			(static_cast<unsigned char>(value[offset + 2]) & 0x3F));
+		offset += 3;
+		return cp;
+	}
+
+	if ((ch & 0xF8) == 0xF0 && offset + 3 < value.size() &&
+		isUtf8Continuation(static_cast<unsigned char>(value[offset + 1])) &&
+		isUtf8Continuation(static_cast<unsigned char>(value[offset + 2])) &&
+		isUtf8Continuation(static_cast<unsigned char>(value[offset + 3])))
+	{
+		const unsigned int cp = static_cast<unsigned int>(((ch & 0x07) << 18) |
+			((static_cast<unsigned char>(value[offset + 1]) & 0x3F) << 12) |
+			((static_cast<unsigned char>(value[offset + 2]) & 0x3F) << 6) |
+			(static_cast<unsigned char>(value[offset + 3]) & 0x3F));
+		offset += 4;
+		return cp;
+	}
+
+	++offset;
+	return ch;
+}
+
+void appendUtf8(std::string &result, unsigned int cp)
+{
+	if (cp <= 0x7F)
+	{
+		result.push_back(static_cast<char>(cp));
+	}
+	else if (cp <= 0x7FF)
+	{
+		result.push_back(static_cast<char>(0xC0 | ((cp >> 6) & 0x1F)));
+		result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+	}
+	else if (cp <= 0xFFFF)
+	{
+		result.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
+		result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+		result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+	}
+	else
+	{
+		result.push_back(static_cast<char>(0xF0 | ((cp >> 18) & 0x07)));
+		result.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+		result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+		result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+	}
+}
+
+unsigned int foldCaseCodePoint(unsigned int cp)
+{
+	if (cp >= 'A' && cp <= 'Z')
+		return cp + ('a' - 'A');
+	if (cp >= 0x00C0 && cp <= 0x00D6)
+		return cp + 0x20;
+	if (cp >= 0x00D8 && cp <= 0x00DE)
+		return cp + 0x20;
+	if (cp == 0x0178)
+		return 0x00FF;
+	if (cp >= 0x0391 && cp <= 0x03A1)
+		return cp + 0x20;
+	if (cp >= 0x03A3 && cp <= 0x03AB)
+		return cp + 0x20;
+	if (cp >= 0x0400 && cp <= 0x040F)
+		return cp + 0x50;
+	if (cp >= 0x0410 && cp <= 0x042F)
+		return cp + 0x20;
+
+	switch (cp)
+	{
+		case 0x0386:
+			return 0x03AC;
+		case 0x0388:
+			return 0x03AD;
+		case 0x0389:
+			return 0x03AE;
+		case 0x038A:
+			return 0x03AF;
+		case 0x038C:
+			return 0x03CC;
+		case 0x038E:
+			return 0x03CD;
+		case 0x038F:
+			return 0x03CE;
+		default:
+			return cp;
+	}
+}
+
+std::string foldCaseForSort(const std::string &value)
+{
+	std::string folded;
+	folded.reserve(value.size());
+	for (std::size_t offset = 0; offset < value.size();)
+		appendUtf8(folded, foldCaseCodePoint(readUtf8CodePoint(value, offset)));
+	return folded;
 }
 
 SortKey makeSortKey(const std::string &value)
 {
 	SortKey key;
 	key.text = trim(value);
-	key.foldedText = lowerAscii(key.text);
+	key.foldedText = foldCaseForSort(key.text);
 	key.numeric = tryParseNumber(value, key.number);
 	return key;
 }
@@ -862,6 +994,36 @@ std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn)
 		}
 	}
 	return column;
+}
+
+TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row)
+{
+	TableRange result;
+	if (lines.empty() || row >= lines.size())
+		return result;
+
+	for (std::size_t separatorRow = 1; separatorRow < lines.size(); ++separatorRow)
+	{
+		const std::size_t firstRow = separatorRow - 1;
+		if (!isPotentialTableLine(lines[firstRow]))
+			continue;
+
+		Row separator;
+		separator.cells = splitCells(lines[separatorRow]);
+		if (!isSeparatorRow(separator) && !isShortSeparatorLine(lines[separatorRow]))
+			continue;
+
+		const std::size_t lastRow = tableRangeEnd(lines, firstRow, separatorRow);
+		if (row >= firstRow && row <= lastRow)
+		{
+			result.found = true;
+			result.firstRow = firstRow;
+			result.lastRow = lastRow;
+			return result;
+		}
+	}
+
+	return result;
 }
 
 EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::size_t column, Action action)

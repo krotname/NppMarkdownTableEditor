@@ -387,7 +387,7 @@ enum Platform { PF_UNKNOWN, PF_X86, PF_X64, PF_IA64, PF_ARM64 };
 	// BOOL NPPM_MENUCOMMAND(0, int cmdID)
 	// Run Notepad++ command with the given command ID.
 	// wParam: 0 (not used)
-	// lParam[in]: cmdID - See "menuCmdID.h" for all the Notepad++ menu command items
+	// lParam[in]: cmdID - Notepad++ menu command item identifier
 	// Return TRUE
 
 	#define NPPM_TRIGGERTABBARCONTEXTMENU (NPPMSG + 49)

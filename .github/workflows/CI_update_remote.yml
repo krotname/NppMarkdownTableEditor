@@ -10,9 +10,8 @@ on:
 
 jobs:
   update:
-    # This job would annoy people who fork the template, or if plugintemplate ever becomes a "template repository"
-    #   if someone _wants_ this, change the name to match their own fork or project
-    if: ${{ github.repository == 'npp-plugins/plugintemplate' }}
+    # Keep the upstream sync limited to the canonical project repository.
+    if: ${{ github.repository == 'krotname/NppMarkdownTableEditor' }}
 
     permissions:
       contents: write
@@ -20,7 +19,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout plugintemplate repo
+    - name: Checkout Markdown Table Editor repo
       uses: actions/checkout@v6
 
     - name: Checkout N++ repo
@@ -49,13 +48,12 @@ jobs:
             "src\\Sci_Position.h" = "npp_repo\\scintilla\\include\\Sci_Position.h"
             "src\\Notepad_plus_msgs.h" = "npp_repo\\PowerEditor\\src\\MISC\\PluginsManager\\Notepad_plus_msgs.h"
             "src\\PluginInterface.h" = "npp_repo\\PowerEditor\\src\\MISC\\PluginsManager\\PluginInterface.h"
-            "src\\menuCmdID.h" = "npp_repo\\PowerEditor\\src\\menuCmdID.h"
             "src\\DockingFeature\\Docking.h" = "npp_repo\\PowerEditor\\src\\WinControls\\DockingWnd\\Docking.h"
             "src\\DockingFeature\\dockingResource.h" = "npp_repo\\PowerEditor\\src\\WinControls\\DockingWnd\\dockingResource.h"
             ##
             ### The following might be useful to plugin developers, but may require changes to make them compatible
             ###     as such, they are listed for reference, but not included as part of the automatic update
-            ###     of the template
+            ###     of the project
             ##
             #"src\\DockingFeature\\DockingDlgInterface.h" = "npp_repo\\PowerEditor\\src\\WinControls\\DockingWnd\\DockingDlgInterface.h"
             #"src\\DockingFeature\\StaticDialog.h" = "npp_repo\\PowerEditor\\src\\WinControls\\StaticDialog\\StaticDialog.h"
@@ -100,7 +98,7 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v7
       with:
         # GitHub will auto-link the upstream ref to the corresponding commit
-        commit_message: Sync template with notepad-plus-plus/notepad-plus-plus@${{ steps.diff_step.outputs.HEAD_REF }}
+        commit_message: Sync Notepad++ interface files with notepad-plus-plus/notepad-plus-plus@${{ steps.diff_step.outputs.HEAD_REF }}
 
     - name: If ANY_DIFFERENCE then add MSBuild to PATH
       if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
@@ -112,14 +110,14 @@ jobs:
       run: |
         foreach ($target in ('Win32', 'x64', 'ARM64'))
         {
-            msbuild NppPluginTemplate.vcxproj /m /p:configuration=Release /p:platform="$target"
+            msbuild MarkdownTableEditor.vcxproj /m /p:configuration=Release /p:platform="$target"
         }
 
     - name: Release
       if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
       uses: softprops/action-gh-release@v3
       with:
-        name: Plugin Template for Notepad++ release v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
+        name: Markdown Table Editor Notepad++ interface sync v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
         tag_name: v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
         target_commitish: ${{ github.ref_name }}
         token: ${{ secrets.GITHUB_TOKEN }}

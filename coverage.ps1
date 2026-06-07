@@ -26,15 +26,19 @@ function Format-Rate([int]$Covered, [int]$Valid) {
 
 function Get-VisualStudioPath {
 	$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-	if (-not (Test-Path -LiteralPath $vswhere)) {
-		throw "vswhere.exe not found"
+	$path = $null
+	if (Test-Path -LiteralPath $vswhere) {
+		$path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
 	}
 
-	$path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
 	if (-not $path) {
+		$fallback = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\2022\BuildTools"
+		if (Test-Path -LiteralPath (Join-Path $fallback "Common7\Tools\VsDevCmd.bat")) {
+			return $fallback
+		}
 		throw "Visual Studio Build Tools with MSBuild not found"
 	}
-	return $path
+	return ($path | Select-Object -First 1)
 }
 
 function Get-ClassLineStats($ClassNode) {

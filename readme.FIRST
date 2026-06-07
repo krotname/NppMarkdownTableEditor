@@ -17,14 +17,15 @@ Markdown Table Editor для Notepad++
 Если курсор находится внутри Markdown-таблицы, `Tab` выравнивает таблицу; вне таблицы работает обычный отступ Scintilla.
 
 Сборка Release x64:
-`MSBuild.exe vs.proj\NppPluginTemplate.vcxproj /p:Configuration=Release /p:Platform=x64`
+`MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64`
 
 Тесты ядра:
 `MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64`
 `tests\CoreSmoke.exe`
 
-Проект основан на официальном C++-шаблоне плагина Notepad++:
-https://github.com/npp-plugins/plugintemplate
+Лицензии:
+Основной пакет распространяется как GPL-3.0-or-later. См. `license.txt`.
+Сторонние notices и дополнительные тексты лицензий находятся в `NOTICE.md` и `LICENSES\`.
 
 Документация по разработке плагинов Notepad++:
 https://npp-user-manual.org/docs/plugins/#how-to-develop-a-plugin

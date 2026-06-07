@@ -252,6 +252,24 @@ void runEditorCommandScenarios()
 			"| Chen   |   100 |",
 			"| Anna   |    42 |"
 		});
+	expectLines("sort rows ascending cyrillic case fold", MarkdownTable::apply(
+		{
+			"| Name |",
+			"| --- |",
+			"| Яна |",
+			"| борис |",
+			"| Анна |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::SortRowsAscending).lines,
+		{
+			"| Name  |",
+			"| ----- |",
+			"| Анна  |",
+			"| борис |",
+			"| Яна   |"
+		});
 
 	expectLines("insert table dialog result", MarkdownTable::createTable(2, 1).lines,
 		{

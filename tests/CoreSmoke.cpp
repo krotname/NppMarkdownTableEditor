@@ -85,6 +85,21 @@ int main()
 	expectTrue("plain pipe is not table", !plainPipe.ok);
 	expectSize("plain pipe keeps empty result", plainPipe.lines.size(), 0);
 
+	const std::vector<std::string> adjacentPipeText =
+	{
+		"Use A | B in text",
+		"| H | V |",
+		"| --- | --- |",
+		"| a | b |",
+		"Next A | B"
+	};
+	const MarkdownTable::TableRange adjacentTable = MarkdownTable::findTableRange(adjacentPipeText, 3);
+	expectTrue("adjacent pipe range found", adjacentTable.found);
+	expectSize("adjacent pipe range start", adjacentTable.firstRow, 1);
+	expectSize("adjacent pipe range end", adjacentTable.lastRow, 3);
+	expectTrue("adjacent pipe text before rejected", !MarkdownTable::findTableRange(adjacentPipeText, 0).found);
+	expectTrue("adjacent pipe text after rejected", !MarkdownTable::findTableRange(adjacentPipeText, 4).found);
+
 	const MarkdownTable::EditResult next = MarkdownTable::apply(input, 3, 1, MarkdownTable::Action::NextCell);
 	expectTrue("next cell ok", next.ok);
 	expectSize("next cell row count", next.lines.size(), 5);
@@ -396,6 +411,25 @@ int main()
 			"| high | 10.25 |",
 			"| mid  |     2 |",
 			"| low  |  -1.5 |"
+		});
+
+	expectLines("sort rows ascending cyrillic case fold", MarkdownTable::apply(
+		{
+			"| Name |",
+			"| --- |",
+			"| Яна |",
+			"| борис |",
+			"| Анна |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::SortRowsAscending).lines,
+		{
+			"| Name  |",
+			"| ----- |",
+			"| Анна  |",
+			"| борис |",
+			"| Яна   |"
 		});
 
 	expectLines("sort table without data rows", MarkdownTable::apply(

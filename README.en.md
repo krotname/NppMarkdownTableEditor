@@ -51,6 +51,16 @@ If Windows does not allow writing to `Program Files`, install the plugin in the 
 %LOCALAPPDATA%\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 ```
 
+## Compatibility
+
+| Notepad++ architecture | Minimum version |
+| ---------------------- | --------------- |
+| x86                    | 7.5.9           |
+| x64                    | 8.3.1           |
+| ARM64                  | 8.3.1           |
+
+On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but table editing commands do not change the document. Notepad++ 7.5.9 was not released as an ARM64 build.
+
 ## Commands
 
 | Command                                        | What It Does                                                         |
@@ -96,7 +106,7 @@ The built ZIP appears in the `build` directory.
 Manual build through MSBuild:
 
 ```cmd
-MSBuild.exe vs.proj\NppPluginTemplate.vcxproj /p:Configuration=Release /p:Platform=x64
+MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
 The DLL is created here:

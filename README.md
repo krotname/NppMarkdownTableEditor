@@ -51,6 +51,16 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 %LOCALAPPDATA%\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 ```
 
+## Совместимость
+
+| Архитектура Notepad++ | Минимальная версия |
+| --------------------- | ------------------ |
+| x86                   | 7.5.9              |
+| x64                   | 8.3.1              |
+| ARM64                 | 8.3.1              |
+
+На x64 Notepad++ 7.5.9-8.2.1 плагин загружается и пункт меню появляется, но команды редактирования таблиц не меняют документ. Notepad++ 7.5.9 не выпускался в ARM64-сборке.
+
 ## Команды
 
 | Команда                                        | Что делает                                                               |
@@ -96,7 +106,7 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 Ручная сборка через MSBuild:
 
 ```cmd
-MSBuild.exe vs.proj\NppPluginTemplate.vcxproj /p:Configuration=Release /p:Platform=x64
+MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
 DLL будет создана здесь:
