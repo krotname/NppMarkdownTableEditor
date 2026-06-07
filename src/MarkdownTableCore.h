@@ -19,7 +19,9 @@ enum class Action
 	MoveRowUp,
 	MoveRowDown,
 	MoveColumnLeft,
-	MoveColumnRight
+	MoveColumnRight,
+	SortRowsAscending,
+	SortRowsDescending
 };
 
 struct EditResult
@@ -36,6 +38,8 @@ struct EditResult
 bool isPotentialTableLine(const std::string &line);
 std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn);
 EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::size_t column, Action action);
+EditResult convertDelimitedToTable(const std::string &text);
+EditResult createTable(std::size_t columns, std::size_t dataRows);
 }
 
 #endif

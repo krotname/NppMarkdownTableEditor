@@ -195,6 +195,71 @@ int main()
 			"| 1   |"
 		});
 
+	expectLines("sort rows ascending numeric", MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |",
+			"| Anna | 42 |",
+			"| Dmitry | 7 |",
+			"| Chen | 100 |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::SortRowsAscending).lines,
+		{
+			"| Name   | Score |",
+			"| ------ | ----: |",
+			"| Dmitry |     7 |",
+			"| Anna   |    42 |",
+			"| Chen   |   100 |"
+		});
+
+	expectLines("sort rows descending text", MarkdownTable::apply(
+		{
+			"| Name | Score |",
+			"| --- | ---: |",
+			"| Anna | 42 |",
+			"| Dmitry | 7 |",
+			"| Chen | 100 |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::SortRowsDescending).lines,
+		{
+			"| Name   | Score |",
+			"| ------ | ----: |",
+			"| Dmitry |     7 |",
+			"| Chen   |   100 |",
+			"| Anna   |    42 |"
+		});
+
+	expectLines("csv to table", MarkdownTable::convertDelimitedToTable("Name,Role,Score\nAnna,Engineer,42\nDmitry,QA,7").lines,
+		{
+			"| Name   | Role     | Score |",
+			"| ------ | -------- | ----- |",
+			"| Anna   | Engineer | 42    |",
+			"| Dmitry | QA       | 7     |"
+		});
+
+	expectLines("tsv to table escapes pipes", MarkdownTable::convertDelimitedToTable("Name\tNote\nAnna\tA|B").lines,
+		{
+			"| Name | Note |",
+			"| ---- | ---- |",
+			"| Anna | A\\|B |"
+		});
+
+	const MarkdownTable::EditResult created = MarkdownTable::createTable(3, 2);
+	expectTrue("create table ok", created.ok);
+	expectSize("create table target row", created.targetRow, 0);
+	expectSize("create table target column", created.targetColumn, 0);
+	expectLines("create table", created.lines,
+		{
+			"| Column 1 | Column 2 | Column 3 |",
+			"| -------- | -------- | -------- |",
+			"|          |          |          |",
+			"|          |          |          |"
+		});
+
 	if (g_failures != 0)
 	{
 		std::cerr << g_failures << " test(s) failed\n";

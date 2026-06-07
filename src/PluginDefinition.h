@@ -36,7 +36,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 12;
+const int nbFunc = 16;
 
 
 //
@@ -81,6 +81,10 @@ void moveRowUp();
 void moveRowDown();
 void moveColumnLeft();
 void moveColumnRight();
+void sortRowsAscending();
+void sortRowsDescending();
+void convertCsvTsvSelectionToTable();
+void insertTable();
 void tabOrIndent();
 
 #endif //PLUGINDEFINITION_H

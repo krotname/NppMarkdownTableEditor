@@ -45,6 +45,20 @@ struct DocumentLine
 	std::size_t fullEnd = 0;
 };
 
+struct TableSizeDialogState
+{
+	std::size_t columns = 3;
+	std::size_t dataRows = 2;
+	bool accepted = false;
+};
+
+const int tableSizeColumnsId = 1001;
+const int tableSizeRowsId = 1002;
+const UINT tableSizeMaxColumns = 20;
+const UINT tableSizeMaxRows = 50;
+
+HINSTANCE g_moduleHandle = NULL;
+
 ShortcutKey g_alignShortcut = { true, true, false, 'A' };
 ShortcutKey g_nextCellShortcut = { true, true, false, VK_RIGHT };
 ShortcutKey g_previousCellShortcut = { true, true, false, VK_LEFT };
@@ -78,6 +92,28 @@ std::string getText(HWND scintilla)
 	std::vector<char> buffer(length + 1, '\0');
 	::SendMessage(scintilla, SCI_GETTEXT, static_cast<WPARAM>(buffer.size()), reinterpret_cast<LPARAM>(&buffer[0]));
 	return std::string(&buffer[0], length);
+}
+
+std::string getSelectedText(HWND scintilla)
+{
+	const LRESULT lengthResult = ::SendMessage(scintilla, SCI_GETSELTEXT, 0, 0);
+	if (lengthResult <= 1)
+		return std::string();
+
+	const std::size_t length = static_cast<std::size_t>(lengthResult);
+	std::vector<char> buffer(length, '\0');
+	::SendMessage(scintilla, SCI_GETSELTEXT, 0, reinterpret_cast<LPARAM>(&buffer[0]));
+	return std::string(&buffer[0]);
+}
+
+std::string currentEol(HWND scintilla)
+{
+	const LRESULT mode = ::SendMessage(scintilla, SCI_GETEOLMODE, 0, 0);
+	if (mode == SC_EOL_LF)
+		return "\n";
+	if (mode == SC_EOL_CR)
+		return "\r";
+	return "\r\n";
 }
 
 std::vector<DocumentLine> splitDocument(const std::string &text)
@@ -144,12 +180,150 @@ std::string joinLines(const std::vector<std::string> &lines, const std::string &
 	return result;
 }
 
+std::size_t offsetForLineColumn(const std::vector<std::string> &lines, const std::string &eol, std::size_t row, std::size_t columnOffset)
+{
+	std::size_t offset = 0;
+	for (std::size_t i = 0; i < row && i < lines.size(); ++i)
+		offset += lines[i].size() + eol.size();
+	return offset + columnOffset;
+}
+
 std::size_t positionForLineColumn(const std::vector<DocumentLine> &lines, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
 {
-	std::size_t position = lines[firstLine].start;
-	for (std::size_t i = 0; i < row && i < replacementLines.size(); ++i)
-		position += replacementLines[i].size() + eol.size();
-	return position + columnOffset;
+	return lines[firstLine].start + offsetForLineColumn(replacementLines, eol, row, columnOffset);
+}
+
+void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &edit)
+{
+	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	const std::string eol = currentEol(scintilla);
+	const std::string replacement = joinLines(edit.lines, eol);
+	const std::size_t targetOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+
+	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(replacement.c_str()));
+	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
+}
+
+LRESULT CALLBACK tableSizeDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	TableSizeDialogState *state = reinterpret_cast<TableSizeDialogState *>(::GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+	switch (message)
+	{
+		case WM_CREATE:
+		{
+			CREATESTRUCT *create = reinterpret_cast<CREATESTRUCT *>(lParam);
+			state = reinterpret_cast<TableSizeDialogState *>(create->lpCreateParams);
+			::SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+
+			HFONT font = reinterpret_cast<HFONT>(::GetStockObject(DEFAULT_GUI_FONT));
+			HWND labelColumns = ::CreateWindowEx(0, TEXT("STATIC"), TEXT("Columns:"), WS_CHILD | WS_VISIBLE, 18, 20, 110, 22, hwnd, NULL, g_moduleHandle, NULL);
+			HWND editColumns = ::CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""), WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_AUTOHSCROLL, 140, 18, 120, 24, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(tableSizeColumnsId)), g_moduleHandle, NULL);
+			HWND labelRows = ::CreateWindowEx(0, TEXT("STATIC"), TEXT("Data rows:"), WS_CHILD | WS_VISIBLE, 18, 54, 110, 22, hwnd, NULL, g_moduleHandle, NULL);
+			HWND editRows = ::CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""), WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_AUTOHSCROLL, 140, 52, 120, 24, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(tableSizeRowsId)), g_moduleHandle, NULL);
+			HWND ok = ::CreateWindowEx(0, TEXT("BUTTON"), TEXT("OK"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 86, 96, 78, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDOK)), g_moduleHandle, NULL);
+			HWND cancel = ::CreateWindowEx(0, TEXT("BUTTON"), TEXT("Cancel"), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 176, 96, 78, 26, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDCANCEL)), g_moduleHandle, NULL);
+
+			HWND controls[] = { labelColumns, editColumns, labelRows, editRows, ok, cancel };
+			for (std::size_t i = 0; i < sizeof(controls) / sizeof(controls[0]); ++i)
+				::SendMessage(controls[i], WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+
+			::SetDlgItemInt(hwnd, tableSizeColumnsId, static_cast<UINT>(state->columns), FALSE);
+			::SetDlgItemInt(hwnd, tableSizeRowsId, static_cast<UINT>(state->dataRows), FALSE);
+			::SetFocus(editColumns);
+			return 0;
+		}
+
+		case WM_COMMAND:
+		{
+			const int command = LOWORD(wParam);
+			if (command == IDOK)
+			{
+				BOOL columnsOk = FALSE;
+				BOOL rowsOk = FALSE;
+				const UINT columns = ::GetDlgItemInt(hwnd, tableSizeColumnsId, &columnsOk, FALSE);
+				const UINT dataRows = ::GetDlgItemInt(hwnd, tableSizeRowsId, &rowsOk, FALSE);
+				if (!columnsOk || !rowsOk || columns < 1 || columns > tableSizeMaxColumns || dataRows > tableSizeMaxRows)
+				{
+					::MessageBox(hwnd, TEXT("Use 1-20 columns and 0-50 data rows."), NPP_PLUGIN_NAME, MB_OK | MB_ICONWARNING);
+					return 0;
+				}
+
+				state->columns = columns;
+				state->dataRows = dataRows;
+				state->accepted = true;
+				::DestroyWindow(hwnd);
+				return 0;
+			}
+			if (command == IDCANCEL)
+			{
+				::DestroyWindow(hwnd);
+				return 0;
+			}
+			break;
+		}
+
+		case WM_CLOSE:
+			::DestroyWindow(hwnd);
+			return 0;
+	}
+
+	return ::DefWindowProc(hwnd, message, wParam, lParam);
+}
+
+bool promptTableSize(TableSizeDialogState &state)
+{
+	const TCHAR className[] = TEXT("MarkdownTableEditorTableSizeDialog");
+	static bool registered = false;
+	if (!registered)
+	{
+		WNDCLASS wc;
+		ZeroMemory(&wc, sizeof(wc));
+		wc.lpfnWndProc = tableSizeDialogProc;
+		wc.hInstance = g_moduleHandle;
+		wc.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+		wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+		wc.lpszClassName = className;
+		if (!::RegisterClass(&wc))
+			return false;
+		registered = true;
+	}
+
+	RECT ownerRect;
+	::GetWindowRect(nppData._nppHandle, &ownerRect);
+	const int width = 300;
+	const int height = 170;
+	const int x = ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2;
+	const int y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2;
+	HWND dialog = ::CreateWindowEx(WS_EX_DLGMODALFRAME, className, TEXT("Insert Markdown table"), WS_CAPTION | WS_SYSMENU | WS_VISIBLE, x, y, width, height, nppData._nppHandle, NULL, g_moduleHandle, &state);
+	if (!dialog)
+		return false;
+
+	::EnableWindow(nppData._nppHandle, FALSE);
+	::ShowWindow(dialog, SW_SHOW);
+	::SetForegroundWindow(dialog);
+
+	MSG msg;
+	while (::IsWindow(dialog))
+	{
+		const BOOL messageResult = ::GetMessage(&msg, NULL, 0, 0);
+		if (messageResult <= 0)
+		{
+			if (messageResult == 0)
+				::PostQuitMessage(static_cast<int>(msg.wParam));
+			break;
+		}
+
+		if (!::IsDialogMessage(dialog, &msg))
+		{
+			::TranslateMessage(&msg);
+			::DispatchMessage(&msg);
+		}
+	}
+
+	::EnableWindow(nppData._nppHandle, TRUE);
+	::SetForegroundWindow(nppData._nppHandle);
+	return state.accepted;
 }
 
 bool runTableAction(MarkdownTable::Action action, bool quiet)
@@ -211,13 +385,58 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
 	return true;
 }
+
+bool runConvertDelimitedSelection()
+{
+	HWND scintilla = currentScintilla();
+	if (!scintilla)
+		return false;
+
+	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	const LRESULT selectionEnd = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
+	if (selectionStart == selectionEnd)
+	{
+		showMessage(L"Select CSV or TSV text first.");
+		return false;
+	}
+
+	const std::string selectedText = getSelectedText(scintilla);
+	MarkdownTable::EditResult edit = MarkdownTable::convertDelimitedToTable(selectedText);
+	if (!edit.ok)
+	{
+		showMessage(L"Could not convert the selected CSV/TSV text.");
+		return false;
+	}
+
+	replaceSelectionWithEdit(scintilla, edit);
+	return true;
+}
+
+bool runInsertTable()
+{
+	HWND scintilla = currentScintilla();
+	if (!scintilla)
+		return false;
+
+	TableSizeDialogState state;
+	if (!promptTableSize(state))
+		return false;
+
+	MarkdownTable::EditResult edit = MarkdownTable::createTable(state.columns, state.dataRows);
+	if (!edit.ok)
+		return false;
+
+	replaceSelectionWithEdit(scintilla, edit);
+	return true;
+}
 }
 
 //
 // Initialize your plugin data here
 // It will be called while plugin loading   
-void pluginInit(HANDLE /*hModule*/)
+void pluginInit(HANDLE hModule)
 {
+	g_moduleHandle = reinterpret_cast<HINSTANCE>(hModule);
 }
 
 //
@@ -254,7 +473,11 @@ void commandMenuInit()
 	setCommand(8, TEXT("Move row down"), moveRowDown, NULL, false);
 	setCommand(9, TEXT("Move column left"), moveColumnLeft, NULL, false);
 	setCommand(10, TEXT("Move column right"), moveColumnRight, NULL, false);
-	setCommand(11, TEXT("Tab: align table or indent"), tabOrIndent, &g_tabShortcut, false);
+	setCommand(11, TEXT("Sort rows ascending"), sortRowsAscending, NULL, false);
+	setCommand(12, TEXT("Sort rows descending"), sortRowsDescending, NULL, false);
+	setCommand(13, TEXT("Convert CSV/TSV selection to table"), convertCsvTsvSelectionToTable, NULL, false);
+	setCommand(14, TEXT("Insert table..."), insertTable, NULL, false);
+	setCommand(15, TEXT("Tab: align table or indent"), tabOrIndent, &g_tabShortcut, false);
 }
 
 //
@@ -341,6 +564,26 @@ void moveColumnLeft()
 void moveColumnRight()
 {
 	runTableAction(MarkdownTable::Action::MoveColumnRight, false);
+}
+
+void sortRowsAscending()
+{
+	runTableAction(MarkdownTable::Action::SortRowsAscending, false);
+}
+
+void sortRowsDescending()
+{
+	runTableAction(MarkdownTable::Action::SortRowsDescending, false);
+}
+
+void convertCsvTsvSelectionToTable()
+{
+	runConvertDelimitedSelection();
+}
+
+void insertTable()
+{
+	runInsertTable();
 }
 
 void tabOrIndent()
