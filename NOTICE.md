@@ -25,11 +25,15 @@ LGPL-3.0-or-later уведомление для этого resource-файла.
 
 Файлы Scintilla (`src/Scintilla.h`, `src/Sci_Position.h`) используют лицензию Scintilla.
 
+Тесты golden fixtures используют single-header библиотеку `nlohmann/json`, расположенную в
+`tests/third_party/nlohmann`, по лицензии MIT.
+
 Тексты лицензий, которые относятся к сторонним файлам:
 
 - `LICENSES/GPL-3.0-or-later.txt`
 - `LICENSES/LGPL-3.0-or-later.txt`
 - `LICENSES/Scintilla.txt`
+- `tests/third_party/nlohmann/LICENSE.MIT`
 
 ## Вдохновение
 

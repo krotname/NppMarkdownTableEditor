@@ -30,12 +30,14 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 ## Features
 
 - `Tab` inside a Markdown table aligns the table.
+- Outside Markdown tables, `Tab` works as the normal Notepad++ indent action.
 - Align the table around the caret.
 - Move to the next or previous cell.
 - Insert, delete, and move rows.
 - Insert, delete, and move columns.
 - Sort rows by the current column in ascending or descending order.
-- Convert selected CSV/TSV text into a Markdown table.
+- Convert selected CSV/TSV text or the current CSV/TSV block into a Markdown table.
+- CSV/TSV block detection ignores commas inside quotes and does not capture adjacent plain text.
 - Insert a new table with a selected number of columns and rows.
 - Preserve Markdown alignment markers: `---`, `:---`, `---:`, `:---:`.
 - Correctly handle escaped pipes: `\|`.
@@ -86,11 +88,11 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | `Move row up` / `Move row down`                | Moves the current row                                                |
 | `Move column left` / `Move column right`       | Moves the current column                                             |
 | `Sort rows ascending` / `Sort rows descending` | Sorts rows by the current column                                     |
-| `Convert CSV/TSV selection to table`           | Converts selected CSV/TSV to a Markdown table                        |
+| `Convert CSV/TSV to table`                     | Converts selected CSV/TSV or the current block to a Markdown table   |
 | `Insert table...`                              | Inserts a new table with the requested size                          |
 
-For example, select `Name,Score` and the next line `Anna,10`.
-Run `Plugins > Markdown Table Editor > Convert CSV/TSV selection to table`.
+For example, select `Name,Score` and the next line `Anna,10`, or place the caret inside such a block.
+Run `Plugins > Markdown Table Editor > Convert CSV/TSV to table`.
 You will get a Markdown table with `Name` and `Score` columns.
 
 Default keyboard shortcuts:

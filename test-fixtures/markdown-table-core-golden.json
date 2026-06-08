@@ -28,6 +28,30 @@
         "| Anna | line 1 line 2 |",
         "| Bob  | done          |"
       ]
+    },
+    {
+      "name": "json unicode escapes in csv fixture",
+      "input": "Name,Note\n\u0410\u043d\u044f,\uD83D\uDE00",
+      "lines": [
+        "| Name | Note |",
+        "| ---- | ---- |",
+        "| Аня  | 😀   |"
+      ]
+    },
+    {
+      "name": "multilingual csv unicode width",
+      "input": "Language,Sample,Script\nChinese,汉字,wide\nJapanese,日本語,kana\nKorean,한글,hangul\nArabic,العربية,rtl\nHindi,हिन्दी,devanagari\nThai,ภาษาไทย,thai\nGreek,ελληνικά,greek",
+      "lines": [
+        "| Language | Sample   | Script     |",
+        "| -------- | -------- | ---------- |",
+        "| Chinese  | 汉字     | wide       |",
+        "| Japanese | 日本語   | kana       |",
+        "| Korean   | 한글     | hangul     |",
+        "| Arabic   | العربية  | rtl        |",
+        "| Hindi    | हिन्दी      | devanagari |",
+        "| Thai     | ภาษาไทย  | thai       |",
+        "| Greek    | ελληνικά | greek      |"
+      ]
     }
   ],
   "edits": [
@@ -47,6 +71,34 @@
         "| ---- | ----- |",
         "| тест | 1     |",
         "| 表   | 22    |"
+      ]
+    },
+    {
+      "name": "multilingual unicode width align",
+      "action": "ALIGN",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Language | Sample | Count |",
+        "| --- | --- | ---: |",
+        "| Chinese | 汉字 | 1 |",
+        "| Japanese | 日本語 | 22 |",
+        "| Korean | 한글 | 333 |",
+        "| Arabic | العربية | 4444 |",
+        "| Hindi | हिन्दी | 55555 |",
+        "| Thai | ภาษาไทย | 666666 |",
+        "| Greek | ελληνικά | 7777777 |"
+      ],
+      "lines": [
+        "| Language | Sample   |   Count |",
+        "| -------- | -------- | ------: |",
+        "| Chinese  | 汉字     |       1 |",
+        "| Japanese | 日本語   |      22 |",
+        "| Korean   | 한글     |     333 |",
+        "| Arabic   | العربية  |    4444 |",
+        "| Hindi    | हिन्दी      |   55555 |",
+        "| Thai     | ภาษาไทย  |  666666 |",
+        "| Greek    | ελληνικά | 7777777 |"
       ]
     },
     {
@@ -71,6 +123,42 @@
         "| 🇺🇸     | flag      |",
         "| 👩‍💻     | zwj       |",
         "| á      | combining |"
+      ]
+    },
+    {
+      "name": "smiley emoji width align",
+      "action": "ALIGN",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "| Mood | Face | Note |",
+        "| --- | --- | --- |",
+        "| Happy | 😀 | single |",
+        "| Smile | 😃😄 | pair |",
+        "| Wink | 😉 | text |",
+        "| Laugh | 😂🤣 | double |",
+        "| Mixed | 🙂 ok | suffix |",
+        "| Tone | 🫶🏽 | skin |",
+        "| Exhale | 😮‍💨 | zwj |",
+        "| Dizzy | 😵‍💫 | face zwj |",
+        "| Love | ❤️‍🔥 | heart zwj |",
+        "| Keycap | 1️⃣ | keycap |",
+        "| Flag | 🇯🇵 | flag |"
+      ],
+      "lines": [
+        "| Mood   | Face  | Note      |",
+        "| ------ | ----- | --------- |",
+        "| Happy  | 😀    | single    |",
+        "| Smile  | 😃😄  | pair      |",
+        "| Wink   | 😉    | text      |",
+        "| Laugh  | 😂🤣  | double    |",
+        "| Mixed  | 🙂 ok | suffix    |",
+        "| Tone   | 🫶🏽    | skin      |",
+        "| Exhale | 😮‍💨    | zwj       |",
+        "| Dizzy  | 😵‍💫    | face zwj  |",
+        "| Love   | ❤️‍🔥    | heart zwj |",
+        "| Keycap | 1️⃣    | keycap    |",
+        "| Flag   | 🇯🇵    | flag      |"
       ]
     },
     {

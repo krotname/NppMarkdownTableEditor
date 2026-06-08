@@ -88,6 +88,8 @@ int main()
 	const MarkdownTable::EditResult plainPipe = MarkdownTable::apply({ "Use A | B in text" }, 0, 0, MarkdownTable::Action::Align);
 	expectTrue("plain pipe is not table", !plainPipe.ok);
 	expectSize("plain pipe keeps empty result", plainPipe.lines.size(), 0);
+	expectTrue("pipe-only separator is not table", !MarkdownTable::findTableRange({ "| A | B |", "|   |   |", "| 1 | 2 |" }, 2).found);
+	expectTrue("equals short separator is table", MarkdownTable::findTableRange({ "| A | B |", "| === | === |", "| 1 | 2 |" }, 2).found);
 
 	const std::vector<std::string> adjacentPipeText =
 	{
@@ -541,6 +543,8 @@ int main()
 
 	expectTrue("plain text is not csv", !MarkdownTable::convertDelimitedToTable("just a note").ok);
 	expectString("plain text csv message", MarkdownTable::convertDelimitedToTable("just a note").message, "No CSV or TSV data found");
+	expectTrue("plain multiline text is not csv", !MarkdownTable::convertDelimitedToTable("first line\nsecond line").ok);
+	expectTrue("single quoted comma cell is not csv", !MarkdownTable::convertDelimitedToTable("\"just, a note\"").ok);
 	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n\t").ok);
 
 	expectLines("keep markdown header row", MarkdownTable::apply(

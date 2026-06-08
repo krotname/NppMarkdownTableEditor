@@ -168,13 +168,16 @@ bool isShortSeparatorLine(const std::string &line)
 	if (value.empty() || value[0] != '|')
 		return false;
 
+	bool hasRule = false;
 	for (std::size_t i = 1; i < value.size(); ++i)
 	{
 		const char ch = value[i];
+		if (ch == '-' || ch == '=')
+			hasRule = true;
 		if (ch != '-' && ch != '=' && ch != '|' && ch != ':' && !isSpace(static_cast<unsigned char>(ch)))
 			return false;
 	}
-	return true;
+	return hasRule;
 }
 
 Align parseAlignment(const std::string &cell)
@@ -1130,10 +1133,34 @@ bool hasDelimitedStructure(const std::string &text)
 	const std::string value = trim(text);
 	if (value.empty())
 		return false;
+	bool inQuotes = false;
+	bool cellBlank = true;
 	for (std::size_t i = 0; i < value.size(); ++i)
 	{
-		if (value[i] == ',' || value[i] == '\t' || value[i] == '\r' || value[i] == '\n')
+		const char ch = value[i];
+		if (inQuotes)
+		{
+			if (ch == '"' && i + 1 < value.size() && value[i + 1] == '"')
+				++i;
+			else if (ch == '"')
+				inQuotes = false;
+		}
+		else if (ch == '"' && cellBlank)
+		{
+			inQuotes = true;
+		}
+		else if (ch == ',' || ch == '\t')
+		{
 			return true;
+		}
+		else if (ch == '\r' || ch == '\n')
+		{
+			cellBlank = true;
+		}
+		else if (!isSpace(static_cast<unsigned char>(ch)))
+		{
+			cellBlank = false;
+		}
 	}
 	return false;
 }

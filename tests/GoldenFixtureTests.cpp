@@ -3,13 +3,11 @@
 
 #include "GoldenFixtureTests.h"
 #include "../src/MarkdownTableCore.h"
+#include "third_party/nlohmann/json.hpp"
 
-#include <cctype>
-#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -17,242 +15,7 @@
 
 namespace
 {
-struct JsonValue
-{
-	enum Type
-	{
-		Null,
-		Boolean,
-		Number,
-		String,
-		Array,
-		Object
-	};
-
-	Type type = Null;
-	bool booleanValue = false;
-	double numberValue = 0;
-	std::string stringValue;
-	std::vector<JsonValue> arrayValue;
-	std::map<std::string, JsonValue> objectValue;
-};
-
-class JsonParser
-{
-public:
-	explicit JsonParser(const std::string &source)
-		: source_(source)
-	{
-	}
-
-	JsonValue parse()
-	{
-		JsonValue value = parseValue();
-		skipWhitespace();
-		if (offset_ != source_.size())
-			throw error("Unexpected trailing data");
-		return value;
-	}
-
-private:
-	JsonValue parseValue()
-	{
-		skipWhitespace();
-		if (offset_ >= source_.size())
-			throw error("Unexpected end of JSON");
-
-		const char ch = source_[offset_];
-		if (ch == '{')
-			return parseObject();
-		if (ch == '[')
-			return parseArray();
-		if (ch == '"')
-		{
-			JsonValue value;
-			value.type = JsonValue::String;
-			value.stringValue = parseString();
-			return value;
-		}
-		if (ch == '-' || std::isdigit(static_cast<unsigned char>(ch)) != 0)
-			return parseNumber();
-		if (source_.compare(offset_, 4, "true") == 0)
-		{
-			offset_ += 4;
-			JsonValue value;
-			value.type = JsonValue::Boolean;
-			value.booleanValue = true;
-			return value;
-		}
-		if (source_.compare(offset_, 5, "false") == 0)
-		{
-			offset_ += 5;
-			JsonValue value;
-			value.type = JsonValue::Boolean;
-			return value;
-		}
-		if (source_.compare(offset_, 4, "null") == 0)
-		{
-			offset_ += 4;
-			return JsonValue();
-		}
-		throw error("Unexpected value");
-	}
-
-	JsonValue parseObject()
-	{
-		expect('{');
-		JsonValue result;
-		result.type = JsonValue::Object;
-		skipWhitespace();
-		if (peek('}'))
-		{
-			++offset_;
-			return result;
-		}
-
-		for (;;)
-		{
-			const std::string key = parseString();
-			expect(':');
-			result.objectValue[key] = parseValue();
-			skipWhitespace();
-			if (peek('}'))
-			{
-				++offset_;
-				return result;
-			}
-			expect(',');
-		}
-	}
-
-	JsonValue parseArray()
-	{
-		expect('[');
-		JsonValue result;
-		result.type = JsonValue::Array;
-		skipWhitespace();
-		if (peek(']'))
-		{
-			++offset_;
-			return result;
-		}
-
-		for (;;)
-		{
-			result.arrayValue.push_back(parseValue());
-			skipWhitespace();
-			if (peek(']'))
-			{
-				++offset_;
-				return result;
-			}
-			expect(',');
-		}
-	}
-
-	std::string parseString()
-	{
-		expect('"');
-		std::string result;
-		while (offset_ < source_.size())
-		{
-			const char ch = source_[offset_++];
-			if (ch == '"')
-				return result;
-			if (ch != '\\')
-			{
-				result += ch;
-				continue;
-			}
-			if (offset_ >= source_.size())
-				throw error("Unterminated escape sequence");
-			const char escaped = source_[offset_++];
-			switch (escaped)
-			{
-			case '"':
-			case '\\':
-			case '/':
-				result += escaped;
-				break;
-			case 'b':
-				result += '\b';
-				break;
-			case 'f':
-				result += '\f';
-				break;
-			case 'n':
-				result += '\n';
-				break;
-			case 'r':
-				result += '\r';
-				break;
-			case 't':
-				result += '\t';
-				break;
-			default:
-				throw error("Unsupported escape sequence");
-			}
-		}
-		throw error("Unterminated string");
-	}
-
-	JsonValue parseNumber()
-	{
-		const std::size_t start = offset_;
-		if (peek('-'))
-			++offset_;
-		while (offset_ < source_.size() && std::isdigit(static_cast<unsigned char>(source_[offset_])) != 0)
-			++offset_;
-		if (peek('.'))
-		{
-			++offset_;
-			while (offset_ < source_.size() && std::isdigit(static_cast<unsigned char>(source_[offset_])) != 0)
-				++offset_;
-		}
-		if (peek('e') || peek('E'))
-		{
-			++offset_;
-			if (peek('+') || peek('-'))
-				++offset_;
-			while (offset_ < source_.size() && std::isdigit(static_cast<unsigned char>(source_[offset_])) != 0)
-				++offset_;
-		}
-
-		JsonValue result;
-		result.type = JsonValue::Number;
-		result.numberValue = std::strtod(source_.substr(start, offset_ - start).c_str(), 0);
-		return result;
-	}
-
-	void expect(char expected)
-	{
-		skipWhitespace();
-		if (offset_ >= source_.size() || source_[offset_] != expected)
-			throw error(std::string("Expected '") + expected + "'");
-		++offset_;
-	}
-
-	bool peek(char expected) const
-	{
-		return offset_ < source_.size() && source_[offset_] == expected;
-	}
-
-	void skipWhitespace()
-	{
-		while (offset_ < source_.size() && std::isspace(static_cast<unsigned char>(source_[offset_])) != 0)
-			++offset_;
-	}
-
-	std::runtime_error error(const std::string &message) const
-	{
-		std::ostringstream stream;
-		stream << message << " at offset " << offset_;
-		return std::runtime_error(stream.str());
-	}
-
-	const std::string &source_;
-	std::size_t offset_ = 0;
-};
+typedef nlohmann::json JsonValue;
 
 int g_checks = 0;
 int g_failures = 0;
@@ -298,38 +61,40 @@ void expectLines(const std::string &name, const std::vector<std::string> &actual
 
 const JsonValue &member(const JsonValue &object, const std::string &key)
 {
-	std::map<std::string, JsonValue>::const_iterator found = object.objectValue.find(key);
-	if (found == object.objectValue.end())
+	if (!object.is_object())
+		throw std::runtime_error("Expected JSON object");
+	JsonValue::const_iterator found = object.find(key);
+	if (found == object.end())
 		throw std::runtime_error("Missing JSON property: " + key);
-	return found->second;
+	return *found;
 }
 
 bool hasMember(const JsonValue &object, const std::string &key)
 {
-	return object.objectValue.find(key) != object.objectValue.end();
+	return object.is_object() && object.find(key) != object.end();
 }
 
 std::string asString(const JsonValue &value)
 {
-	if (value.type != JsonValue::String)
+	if (!value.is_string())
 		throw std::runtime_error("Expected JSON string");
-	return value.stringValue;
+	return value.get<std::string>();
 }
 
 std::size_t asSize(const JsonValue &value)
 {
-	if (value.type != JsonValue::Number)
+	if (!value.is_number_unsigned() && !value.is_number_integer())
 		throw std::runtime_error("Expected JSON number");
-	return static_cast<std::size_t>(value.numberValue);
+	return value.get<std::size_t>();
 }
 
 std::vector<std::string> asStringVector(const JsonValue &value)
 {
-	if (value.type != JsonValue::Array)
+	if (!value.is_array())
 		throw std::runtime_error("Expected JSON array");
 	std::vector<std::string> result;
-	for (std::size_t i = 0; i < value.arrayValue.size(); ++i)
-		result.push_back(asString(value.arrayValue[i]));
+	for (JsonValue::const_iterator item = value.begin(); item != value.end(); ++item)
+		result.push_back(asString(*item));
 	return result;
 }
 
@@ -392,12 +157,12 @@ std::string findFixturePath()
 
 void runConversionScenarios(const JsonValue &scenarios)
 {
-	if (scenarios.type != JsonValue::Array)
+	if (!scenarios.is_array())
 		throw std::runtime_error("conversion must be an array");
 
-	for (std::size_t i = 0; i < scenarios.arrayValue.size(); ++i)
+	for (JsonValue::const_iterator item = scenarios.begin(); item != scenarios.end(); ++item)
 	{
-		const JsonValue &scenario = scenarios.arrayValue[i];
+		const JsonValue &scenario = *item;
 		const std::string name = asString(member(scenario, "name"));
 		const MarkdownTable::EditResult result = MarkdownTable::convertDelimitedToTable(asString(member(scenario, "input")));
 		expectTrue(name, result.ok, std::string("should convert: ") + result.message);
@@ -407,12 +172,12 @@ void runConversionScenarios(const JsonValue &scenarios)
 
 void runEditScenarios(const JsonValue &scenarios)
 {
-	if (scenarios.type != JsonValue::Array)
+	if (!scenarios.is_array())
 		throw std::runtime_error("edits must be an array");
 
-	for (std::size_t i = 0; i < scenarios.arrayValue.size(); ++i)
+	for (JsonValue::const_iterator item = scenarios.begin(); item != scenarios.end(); ++item)
 	{
-		const JsonValue &scenario = scenarios.arrayValue[i];
+		const JsonValue &scenario = *item;
 		const std::string name = asString(member(scenario, "name"));
 		const MarkdownTable::EditResult result = MarkdownTable::apply(
 			asStringVector(member(scenario, "input")),
@@ -436,8 +201,7 @@ int runGoldenFixtureTests()
 	{
 		const std::string path = findFixturePath();
 		const std::string text = readFile(path);
-		JsonParser parser(text);
-		const JsonValue root = parser.parse();
+		const JsonValue root = JsonValue::parse(text);
 		runConversionScenarios(member(root, "conversion"));
 		runEditScenarios(member(root, "edits"));
 	}

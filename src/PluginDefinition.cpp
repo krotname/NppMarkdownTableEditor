@@ -55,7 +55,7 @@ const UINT tableSizeMaxRows = 200;
 
 HINSTANCE g_moduleHandle = NULL;
 
-const UINT legacySciGetTextRange = 2162;
+const UINT sciGetTextRangeLegacy = 2162;
 
 struct LegacySciCharacterRange
 {
@@ -99,13 +99,21 @@ std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
 
 	const std::size_t length = static_cast<std::size_t>(end - start);
 	std::vector<char> buffer(length + 1, '\0');
-	LegacySciTextRange range;
-	range.chrg.cpMin = static_cast<Sci_PositionCR>(start);
-	range.chrg.cpMax = static_cast<Sci_PositionCR>(end);
+	Sci_TextRangeFull range;
+	range.chrg.cpMin = start;
+	range.chrg.cpMax = end;
 	range.lpstrText = &buffer[0];
-	const LRESULT copied = ::SendMessage(scintilla, legacySciGetTextRange, 0, reinterpret_cast<LPARAM>(&range));
+	LRESULT copied = ::SendMessage(scintilla, SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
 	if (copied <= 0)
-		return std::string();
+	{
+		LegacySciTextRange legacyRange;
+		legacyRange.chrg.cpMin = static_cast<Sci_PositionCR>(start);
+		legacyRange.chrg.cpMax = static_cast<Sci_PositionCR>(end);
+		legacyRange.lpstrText = &buffer[0];
+		copied = ::SendMessage(scintilla, sciGetTextRangeLegacy, 0, reinterpret_cast<LPARAM>(&legacyRange));
+		if (copied <= 0)
+			return std::string();
+	}
 	return std::string(&buffer[0], static_cast<std::size_t>(copied));
 }
 
@@ -146,6 +154,17 @@ std::string currentEol(HWND scintilla)
 	if (mode == SC_EOL_CR)
 		return "\r";
 	return "\r\n";
+}
+
+std::string chooseEol(const std::string &text, const std::string &fallback)
+{
+	if (text.find("\r\n") != std::string::npos)
+		return "\r\n";
+	if (text.find('\r') != std::string::npos)
+		return "\r";
+	if (text.find('\n') != std::string::npos)
+		return "\n";
+	return fallback;
 }
 
 class ScintillaUndoAction
@@ -292,16 +311,16 @@ InsertText tableInsertText(HWND scintilla, Sci_Position start, Sci_Position end,
 	return insertText;
 }
 
-void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &edit)
+void replaceRangeWithEdit(HWND scintilla, Sci_Position start, Sci_Position end, const std::string &source, const MarkdownTable::EditResult &edit)
 {
-	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
-	const std::string eol = currentEol(scintilla);
+	const std::string eol = chooseEol(source, currentEol(scintilla));
 	const std::string replacement = joinLines(edit.lines, eol);
 	const std::size_t targetOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
 	ScintillaUndoAction undo(scintilla);
-	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(replacement.c_str()));
-	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
+	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(start), static_cast<LPARAM>(end));
+	::SendMessage(scintilla, SCI_REPLACETARGET, static_cast<WPARAM>(replacement.size()), reinterpret_cast<LPARAM>(replacement.c_str()));
+	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(start + static_cast<Sci_Position>(targetOffset)), 0);
 }
 
 void replaceSelectionWithInsertedTable(HWND scintilla, const MarkdownTable::EditResult &edit)
@@ -522,29 +541,101 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	return true;
 }
 
+bool isDelimitedLine(const std::string &line)
+{
+	bool inQuotes = false;
+	for (std::size_t i = 0; i < line.size(); ++i)
+	{
+		const char ch = line[i];
+		if (inQuotes)
+		{
+			if (ch == '"' && i + 1 < line.size() && line[i + 1] == '"')
+				++i;
+			else if (ch == '"')
+				inQuotes = false;
+		}
+		else if (ch == '"')
+		{
+			inQuotes = true;
+		}
+		else if (ch == ',' || ch == '\t')
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool findCurrentDelimitedBlock(HWND scintilla, Sci_Position currentPos, Sci_Position &start, Sci_Position &end)
+{
+	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
+	if (lineCountResult <= 0)
+		return false;
+
+	const std::size_t lineCount = static_cast<std::size_t>(lineCountResult);
+	LRESULT currentLineResult = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(safeLinePosition(scintilla, currentPos)), 0);
+	if (currentLineResult < 0)
+		return false;
+
+	std::size_t currentLine = static_cast<std::size_t>(currentLineResult);
+	if (currentLine >= lineCount)
+		currentLine = lineCount - 1;
+	if (!isDelimitedLine(getLineText(scintilla, currentLine)))
+		return false;
+
+	std::size_t firstLine = currentLine;
+	while (firstLine > 0 && isDelimitedLine(getLineText(scintilla, firstLine - 1)))
+		--firstLine;
+
+	std::size_t lastLine = currentLine;
+	while (lastLine + 1 < lineCount && isDelimitedLine(getLineText(scintilla, lastLine + 1)))
+		++lastLine;
+
+	if (firstLine == lastLine)
+		return false;
+
+	start = lineStartPosition(scintilla, firstLine);
+	end = lineEndPosition(scintilla, lastLine);
+	return true;
+}
+
 bool runConvertDelimitedSelection()
 {
 	HWND scintilla = currentScintilla();
 	if (!scintilla)
 		return false;
 
-	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
-	const LRESULT selectionEnd = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
-	if (selectionStart == selectionEnd)
-	{
-		showMessage(L"Select CSV or TSV text first.");
+	LRESULT selectionStartResult = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	LRESULT selectionEndResult = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
+	if (selectionStartResult < 0 || selectionEndResult < 0)
 		return false;
+
+	Sci_Position rangeStart = static_cast<Sci_Position>((std::min)(selectionStartResult, selectionEndResult));
+	Sci_Position rangeEnd = static_cast<Sci_Position>((std::max)(selectionStartResult, selectionEndResult));
+	std::string source;
+	if (rangeStart == rangeEnd)
+	{
+		const LRESULT currentPosResult = ::SendMessage(scintilla, SCI_GETCURRENTPOS, 0, 0);
+		if (currentPosResult < 0 || !findCurrentDelimitedBlock(scintilla, static_cast<Sci_Position>(currentPosResult), rangeStart, rangeEnd))
+		{
+			showMessage(L"Select CSV/TSV text or put the caret inside a CSV/TSV block first.");
+			return false;
+		}
+		source = getRangeText(scintilla, rangeStart, rangeEnd);
+	}
+	else
+	{
+		source = getSelectedText(scintilla);
 	}
 
-	const std::string selectedText = getSelectedText(scintilla);
-	MarkdownTable::EditResult edit = MarkdownTable::convertDelimitedToTable(selectedText);
+	MarkdownTable::EditResult edit = MarkdownTable::convertDelimitedToTable(source);
 	if (!edit.ok)
 	{
 		showMessage(L"Could not convert the selected CSV/TSV text.");
 		return false;
 	}
 
-	replaceSelectionWithEdit(scintilla, edit);
+	replaceRangeWithEdit(scintilla, rangeStart, rangeEnd, source, edit);
 	return true;
 }
 
@@ -566,53 +657,6 @@ bool runInsertTable()
 	return true;
 }
 
-std::string indentationText(HWND scintilla)
-{
-	const bool useTabs = ::SendMessage(scintilla, SCI_GETUSETABS, 0, 0) != 0;
-	if (useTabs)
-		return "\t";
-
-	LRESULT tabWidth = ::SendMessage(scintilla, SCI_GETTABWIDTH, 0, 0);
-	if (tabWidth <= 0)
-		tabWidth = 4;
-	return std::string(static_cast<std::size_t>(tabWidth), ' ');
-}
-
-void insertIndentation(HWND scintilla)
-{
-	const std::string indent = indentationText(scintilla);
-	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
-	const LRESULT selectionEnd = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
-	if (selectionStart < 0 || selectionEnd < 0)
-		return;
-
-	const LRESULT start = (std::min)(selectionStart, selectionEnd);
-	const LRESULT end = (std::max)(selectionStart, selectionEnd);
-	LRESULT startLine = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(start), 0);
-	LRESULT endLine = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(end), 0);
-	if (startLine < 0 || endLine < 0)
-		return;
-
-	if (start != end && endLine > startLine)
-	{
-		const LRESULT endLineStart = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(endLine), 0);
-		if (end == endLineStart)
-			--endLine;
-	}
-
-	ScintillaUndoAction undo(scintilla);
-	if (start == end || startLine == endLine)
-	{
-		::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(indent.c_str()));
-		return;
-	}
-
-	for (LRESULT line = endLine; line >= startLine; --line)
-	{
-		const LRESULT position = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(line), 0);
-		::SendMessage(scintilla, SCI_INSERTTEXT, static_cast<WPARAM>(position), reinterpret_cast<LPARAM>(indent.c_str()));
-	}
-}
 }
 
 //
@@ -659,7 +703,7 @@ void commandMenuInit()
 	setCommand(10, TEXT("Move column right"), moveColumnRight, NULL, false);
 	setCommand(11, TEXT("Sort rows ascending"), sortRowsAscending, NULL, false);
 	setCommand(12, TEXT("Sort rows descending"), sortRowsDescending, NULL, false);
-	setCommand(13, TEXT("Convert CSV/TSV selection to table"), convertCsvTsvSelectionToTable, NULL, false);
+	setCommand(13, TEXT("Convert CSV/TSV to table"), convertCsvTsvSelectionToTable, NULL, false);
 	setCommand(14, TEXT("Insert table..."), insertTable, NULL, false);
 	setCommand(15, TEXT("Tab: align table or indent"), tabOrIndent, &g_tabShortcut, false);
 }
@@ -777,5 +821,5 @@ void tabOrIndent()
 
 	HWND scintilla = currentScintilla();
 	if (scintilla)
-		insertIndentation(scintilla);
+		::SendMessage(scintilla, SCI_TAB, 0, 0);
 }

@@ -79,10 +79,26 @@ jobs:
             build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}-pluginadmin.zip
           if-no-files-found: error
 
+  compatibility-smoke:
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Notepad++ compatibility smoke
+        shell: pwsh
+        run: msbuild Package.proj /t:NppCompatibilitySmoke
+
   release:
     needs:
       - version
       - build
+      - compatibility-smoke
     runs-on: windows-latest
     steps:
       - name: Download package artifacts
@@ -109,11 +125,17 @@ jobs:
 
           - Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.
           - Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.
+          - Convert CSV/TSV directly from the current multi-line block when there is no selection.
+          - Avoid converting adjacent plain text, single comma notes, quoted comma-only cells, and plain multi-line text as CSV.
+          - Reject pipe-only separator rows while still accepting dash and equals Markdown separator rules.
+          - Use the native Notepad++ Tab action outside Markdown tables.
+          - Added compatibility smoke coverage for Notepad++ 7.5.9 x86 and 8.3.1 x64.
           - Included SHA-256 sums for Plugin Admin verification.
 
           ## Validation
 
           - GitHub Actions release build completed for Win32, x64, and ARM64.
+          - GitHub Actions compatibility smoke completed for Notepad++ 7.5.9 x86 and 8.3.1 x64.
           EOF
 
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then

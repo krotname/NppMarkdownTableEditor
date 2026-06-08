@@ -63,3 +63,18 @@ jobs:
       with:
           name: plugin_dll_arm64
           path: arm64\MarkdownTableEditor.dll
+
+  npp-ui-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v3
+
+    - name: Notepad++ compatibility smoke
+      shell: pwsh
+      run: msbuild Package.proj /t:NppCompatibilitySmoke

@@ -301,6 +301,43 @@
     </Task>
   </UsingTask>
 
+  <UsingTask TaskName="VerifyCoberturaCoverage" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputPath ParameterType="System.String" Required="true" />
+      <MinimumLineRate ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="System.Xml" />
+      <Reference Include="System.Xml.Linq" />
+      <Using Namespace="System" />
+      <Using Namespace="System.Globalization" />
+      <Using Namespace="System.Xml.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var document = XDocument.Load(InputPath);
+        var coverage = document.Root;
+        double actual;
+        double minimum;
+        if (coverage == null || !Double.TryParse((string)coverage.Attribute("line-rate"), NumberStyles.Float, CultureInfo.InvariantCulture, out actual))
+        {
+            Log.LogError("Coverage report does not contain a valid root line-rate: {0}", InputPath);
+            return false;
+        }
+        if (!Double.TryParse(MinimumLineRate, NumberStyles.Float, CultureInfo.InvariantCulture, out minimum))
+        {
+            Log.LogError("MinimumLineRate is not a valid decimal value: {0}", MinimumLineRate);
+            return false;
+        }
+        Log.LogMessage(MessageImportance.High, "C++ core line coverage: {0:P2}; required: {1:P2}", actual, minimum);
+        if (actual < minimum)
+        {
+            Log.LogError("C++ core line coverage {0:P2} is below the required {1:P2}.", actual, minimum);
+            return false;
+        }
+        return true;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
     <Platform Condition="'$(Platform)'==''">x64</Platform>
@@ -314,6 +351,7 @@
     <CoverageReportsDir>$(BuildDir)\reports\coverage</CoverageReportsDir>
     <RawCoverageReport>$(CoverageWorkDir)\coverage.raw.cobertura.xml</RawCoverageReport>
     <CoverageReport>$(CoverageReportsDir)\coverage.cobertura.xml</CoverageReport>
+    <MinimumCoreLineCoverage Condition="'$(MinimumCoreLineCoverage)'==''">0.90</MinimumCoreLineCoverage>
     <PackageRoot>$(BuildDir)\dist</PackageRoot>
     <PackageDir>$(PackageRoot)\MarkdownTableEditor</PackageDir>
     <PluginAdminPackageDir>$(BuildDir)\pluginadmin</PluginAdminPackageDir>
@@ -379,6 +417,19 @@
              Properties="Configuration=$(Configuration);Platform=$(BuildPlatform);SkipCoreScenarioTests=true;MarkdownTableEditorVersionMajor=$(PackageVersionMajor);MarkdownTableEditorVersionMinor=$(PackageVersionMinor);MarkdownTableEditorVersionPatch=$(PackageVersionPatch);MarkdownTableEditorVersionBuild=$(PackageVersionBuild)" />
   </Target>
 
+  <Target Name="BuildNppCompatibilitySmokePlugins">
+    <MSBuild Projects="$(MSBuildThisFileFullPath)"
+             Targets="BuildPlugin"
+             Properties="Configuration=Release;Platform=Win32" />
+    <MSBuild Projects="$(MSBuildThisFileFullPath)"
+             Targets="BuildPlugin"
+             Properties="Configuration=Release;Platform=x64" />
+  </Target>
+
+  <Target Name="NppCompatibilitySmoke" DependsOnTargets="BuildNppCompatibilitySmokePlugins">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)scripts\Invoke-NppCompatibilitySmoke.ps1&quot; -Win32PluginPath &quot;$(ProjectRoot)bin\MarkdownTableEditor.dll&quot; -X64PluginPath &quot;$(ProjectRoot)bin64\MarkdownTableEditor.dll&quot;" />
+  </Target>
+
   <Target Name="BuildReleaseAllPlatforms">
     <ItemGroup>
       <ReleaseBuildPlatform Include="Win32" />
@@ -416,6 +467,8 @@
                                 OutputPath="$(CoverageReport)"
                                 ProjectRoot="$(ProjectRoot)"
                                 SourceRoot="$(ProjectRoot)src" />
+    <VerifyCoberturaCoverage InputPath="$(CoverageReport)"
+                             MinimumLineRate="$(MinimumCoreLineCoverage)" />
   </Target>
 
   <Target Name="ValidateDllVersion">
@@ -457,5 +510,5 @@
     <Message Importance="high" Text="Built $(PluginAdminZipPath)" />
   </Target>
 
-  <Target Name="Package" DependsOnTargets="CleanPackage;BuildPlugin;RunCoreSmokeTests;ValidateDllVersion;PreparePackage;CreateArchives;ValidateArchives" />
+  <Target Name="Package" DependsOnTargets="CleanPackage;BuildPlugin;Coverage;ValidateDllVersion;PreparePackage;CreateArchives;ValidateArchives" />
 </Project>
