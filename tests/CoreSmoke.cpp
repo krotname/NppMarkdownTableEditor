@@ -2,6 +2,7 @@
 // Copyright (c) 2026 krotname
 
 #include "../src/MarkdownTableCore.h"
+#include "GoldenFixtureTests.h"
 #include "ScenarioTests.h"
 
 #include <iostream>
@@ -605,6 +606,7 @@ int main()
 		});
 
 	g_failures += runScenarioUnitTests();
+	g_failures += runGoldenFixtureTests();
 
 	if (g_failures != 0)
 	{

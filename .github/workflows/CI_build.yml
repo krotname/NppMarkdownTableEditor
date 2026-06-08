@@ -22,25 +22,25 @@ jobs:
     - name: Ensure ARM64 C++ build tools
       if: matrix.build_platform == 'ARM64'
       shell: pwsh
-      run: |
-        $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-        $installer = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vs_installer.exe"
-        $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
-        & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --quiet --norestart --nocache
-        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
-          throw "Visual Studio Installer failed with exit code $LASTEXITCODE"
-        }
+      run: .\scripts\Ensure-VsArm64Tools.ps1
 
     - name: MSBuild of plugin dll
       working-directory: vs.proj\
       run: msbuild MarkdownTableEditor.vcxproj /m /p:configuration="${{ matrix.build_configuration }}" /p:platform="${{ matrix.build_platform }}"
 
-    - name: Core smoke tests
+    - name: Core coverage
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
-      working-directory: tests\
-      run: |
-        msbuild CoreSmoke.vcxproj /m /p:configuration=Debug /p:platform=x64
-        .\CoreSmoke.exe
+      run: msbuild Package.proj /m /t:Coverage /p:Configuration=Debug /p:Platform=x64
+
+    - name: Upload coverage to Codecov
+      if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
+      uses: codecov/codecov-action@v7
+      with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/reports/coverage/coverage.cobertura.xml
+          flags: cpp-core
+          name: notepad-markdown-table-editor
+          fail_ci_if_error: true
 
     - name: Archive artifacts for x64
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'

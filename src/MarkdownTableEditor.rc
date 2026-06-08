@@ -21,16 +21,16 @@
 #include <windows.h>
 
 #ifndef MARKDOWN_TABLE_EDITOR_VERSION_MAJOR
-#define MARKDOWN_TABLE_EDITOR_VERSION_MAJOR 0
+#error MARKDOWN_TABLE_EDITOR_VERSION_MAJOR must be supplied by MSBuild from Version.props
 #endif
 #ifndef MARKDOWN_TABLE_EDITOR_VERSION_MINOR
-#define MARKDOWN_TABLE_EDITOR_VERSION_MINOR 6
+#error MARKDOWN_TABLE_EDITOR_VERSION_MINOR must be supplied by MSBuild from Version.props
 #endif
 #ifndef MARKDOWN_TABLE_EDITOR_VERSION_PATCH
-#define MARKDOWN_TABLE_EDITOR_VERSION_PATCH 0
+#error MARKDOWN_TABLE_EDITOR_VERSION_PATCH must be supplied by MSBuild from Version.props
 #endif
 #ifndef MARKDOWN_TABLE_EDITOR_VERSION_BUILD
-#define MARKDOWN_TABLE_EDITOR_VERSION_BUILD 0
+#error MARKDOWN_TABLE_EDITOR_VERSION_BUILD must be supplied by MSBuild from Version.props
 #endif
 
 #define STRINGIZE_VALUE(value) #value

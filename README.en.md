@@ -108,11 +108,13 @@ Default keyboard shortcuts:
 
 ## Build and Tests
 
-You need Visual Studio 2022 Build Tools. Run the commands below from Developer PowerShell/Developer Command Prompt or after adding MSBuild to `PATH`.
+You need Visual Studio 2022 Build Tools. Run the commands below from Developer Command Prompt or after adding MSBuild to `PATH`.
 
-```powershell
+```cmd
 msbuild Package.proj /t:Package /p:Configuration=Release /p:Platform=x64
 ```
+
+The plugin version is defined only in `Version.props`. `Package.proj`, the DLL version resource, and release ZIP names read that value; `/p:Version` is not a version source and is rejected when it does not match `Version.props`.
 
 The built ZIP archives appear in the `build` directory.
 
@@ -131,11 +133,13 @@ bin64\MarkdownTableEditor.dll
 Run core smoke tests:
 
 ```cmd
-msbuild tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
-tests\CoreSmoke.exe
+msbuild Package.proj /t:RunCoreSmokeTests
 ```
 
-## License
+C++ core coverage report:
 
-The main package is distributed under GPL-3.0-or-later. The full GNU GPL v3 text is in [LICENSE](LICENSE) and [license.txt](license.txt); `license.txt` is also included in the ZIP for Notepad++ Plugin Admin.
-Third-party notices and additional license texts are listed in [NOTICE.md](NOTICE.md) and [LICENSES](LICENSES).
+```cmd
+msbuild Package.proj /t:Coverage /p:Configuration=Debug /p:Platform=x64
+```
+
+Cobertura XML is written to `build/reports/coverage/coverage.cobertura.xml`.

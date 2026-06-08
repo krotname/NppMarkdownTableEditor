@@ -20,8 +20,7 @@ Markdown Table Editor для Notepad++
 `MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64`
 
 Тесты ядра:
-`MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64`
-`tests\CoreSmoke.exe`
+`MSBuild.exe Package.proj /t:RunCoreSmokeTests`
 
 Лицензии:
 Основной пакет распространяется как GPL-3.0-or-later. См. `license.txt`.

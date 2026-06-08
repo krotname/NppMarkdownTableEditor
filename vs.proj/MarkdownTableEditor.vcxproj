@@ -120,14 +120,29 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <Import Project="$(MSBuildThisFileDirectory)..\Version.props" Condition="Exists('$(MSBuildThisFileDirectory)..\Version.props')" />
+  <Import Project="$(MSBuildThisFileDirectory)..\Version.props" />
   <PropertyGroup>
     <TargetName>MarkdownTableEditor</TargetName>
-    <MarkdownTableEditorVersionMajor Condition="'$(MarkdownTableEditorVersionMajor)'==''">0</MarkdownTableEditorVersionMajor>
-    <MarkdownTableEditorVersionMinor Condition="'$(MarkdownTableEditorVersionMinor)'==''">7</MarkdownTableEditorVersionMinor>
-    <MarkdownTableEditorVersionPatch Condition="'$(MarkdownTableEditorVersionPatch)'==''">0</MarkdownTableEditorVersionPatch>
-    <MarkdownTableEditorVersionBuild Condition="'$(MarkdownTableEditorVersionBuild)'==''">0</MarkdownTableEditorVersionBuild>
   </PropertyGroup>
+  <Target Name="ValidateVersionProps" BeforeTargets="PrepareForBuild">
+    <XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionMajor/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionMajor" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionMinor/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionMinor" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionPatch/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionPatch" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionBuild/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionBuild" />
+    </XmlPeek>
+    <PropertyGroup>
+      <VersionPropsCanonicalVersion>$(CanonicalVersionMajor).$(CanonicalVersionMinor).$(CanonicalVersionPatch)</VersionPropsCanonicalVersion>
+    </PropertyGroup>
+    <Error Condition="'$(CanonicalVersionMajor)'=='' Or '$(CanonicalVersionMinor)'=='' Or '$(CanonicalVersionPatch)'=='' Or '$(CanonicalVersionBuild)'==''" Text="Version.props must define MarkdownTableEditorVersionMajor, MarkdownTableEditorVersionMinor, MarkdownTableEditorVersionPatch, and MarkdownTableEditorVersionBuild." />
+    <Error Condition="'$(MarkdownTableEditorVersion)'!='$(VersionPropsCanonicalVersion)' Or '$(MarkdownTableEditorVersionMajor)'!='$(CanonicalVersionMajor)' Or '$(MarkdownTableEditorVersionMinor)'!='$(CanonicalVersionMinor)' Or '$(MarkdownTableEditorVersionPatch)'!='$(CanonicalVersionPatch)' Or '$(MarkdownTableEditorVersionBuild)'!='$(CanonicalVersionBuild)'" Text="MarkdownTableEditor version must come from Version.props. Do not override version MSBuild properties directly." />
+  </Target>
   <ItemDefinitionGroup>
     <ResourceCompile>
       <PreprocessorDefinitions>MARKDOWN_TABLE_EDITOR_VERSION_MAJOR=$(MarkdownTableEditorVersionMajor);MARKDOWN_TABLE_EDITOR_VERSION_MINOR=$(MarkdownTableEditorVersionMinor);MARKDOWN_TABLE_EDITOR_VERSION_PATCH=$(MarkdownTableEditorVersionPatch);MARKDOWN_TABLE_EDITOR_VERSION_BUILD=$(MarkdownTableEditorVersionBuild);%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -220,10 +235,6 @@
       <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(TargetName).lib</ImportLibrary>
     </Link>
-    <PostBuildEvent>
-      <Command>copy ..\license.txt ..\bin\license.txt
-copy ..\readme.FIRST ..\bin\readme.FIRST</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -243,10 +254,6 @@ copy ..\readme.FIRST ..\bin\readme.FIRST</Command>
       <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(TargetName).lib</ImportLibrary>
     </Link>
-    <PostBuildEvent>
-      <Command>copy ..\license.txt ..\bin64\license.txt
-copy ..\readme.FIRST ..\bin64\readme.FIRST</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
@@ -266,12 +273,15 @@ copy ..\readme.FIRST ..\bin64\readme.FIRST</Command>
       <AdditionalDependencies>shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary>$(TargetName).lib</ImportLibrary>
     </Link>
-    <PostBuildEvent>
-      <Command>copy ..\license.txt ..\arm64\license.txt
-copy ..\readme.FIRST ..\arm64\readme.FIRST</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyReleaseMetadata" AfterTargets="Build" Condition="'$(Configuration)'=='Release'">
+    <ItemGroup>
+      <ReleaseMetadataFile Include="$(MSBuildThisFileDirectory)..\license.txt" />
+      <ReleaseMetadataFile Include="$(MSBuildThisFileDirectory)..\readme.FIRST" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ReleaseMetadataFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="RunCoreScenarioUnitTests" AfterTargets="Build" Condition="'$(Platform)'=='x64' and '$(SkipCoreScenarioTests)'!='true'">
     <MSBuild Projects="$(MSBuildThisFileDirectory)..\tests\CoreSmoke.vcxproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64" />
     <Exec Command="&quot;$(MSBuildThisFileDirectory)..\tests\CoreSmoke.exe&quot;" />

@@ -108,11 +108,13 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 
 ## Сборка и тесты
 
-Нужны Visual Studio 2022 Build Tools. Команды ниже запускайте из Developer PowerShell/Developer Command Prompt или после добавления MSBuild в `PATH`.
+Нужны Visual Studio 2022 Build Tools. Команды ниже запускайте из Developer Command Prompt или после добавления MSBuild в `PATH`.
 
-```powershell
+```cmd
 msbuild Package.proj /t:Package /p:Configuration=Release /p:Platform=x64
 ```
+
+Версия плагина задается только в `Version.props`. `Package.proj`, DLL version resource и release ZIP-имена читают это значение; `/p:Version` не является источником версии и при несовпадении с `Version.props` считается ошибкой.
 
 Готовые ZIP-архивы появятся в папке `build`.
 
@@ -131,11 +133,13 @@ bin64\MarkdownTableEditor.dll
 Запуск smoke-тестов ядра:
 
 ```cmd
-msbuild tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
-tests\CoreSmoke.exe
+msbuild Package.proj /t:RunCoreSmokeTests
 ```
 
-## Лицензия
+Отчет покрытия C++ core:
 
-Основной пакет распространяется как GPL-3.0-or-later. Полный текст GNU GPL v3 находится в [LICENSE](LICENSE) и [license.txt](license.txt); `license.txt` также включается в ZIP для Notepad++ Plugin Admin.
-Сторонние уведомления и дополнительные тексты лицензий находятся в [NOTICE.md](NOTICE.md) и [LICENSES](LICENSES).
+```cmd
+msbuild Package.proj /t:Coverage /p:Configuration=Debug /p:Platform=x64
+```
+
+Cobertura XML появится в `build/reports/coverage/coverage.cobertura.xml`.

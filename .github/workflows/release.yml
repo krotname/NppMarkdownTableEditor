@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without the leading v. Defaults to Version.props.
+        description: Optional release version guard without leading v; must match Version.props.
         required: false
   push:
     tags:
@@ -27,17 +27,20 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "${{ github.event.inputs.version }}"
-          if (-not $version -and "${{ github.ref_type }}" -eq "tag") {
-            $version = "${{ github.ref_name }}".TrimStart("v")
+          [xml]$versionProps = Get-Content -LiteralPath "Version.props"
+          $versionParts = $versionProps.Project.PropertyGroup
+          $canonicalVersion = "$($versionParts.MarkdownTableEditorVersionMajor.InnerText).$($versionParts.MarkdownTableEditorVersionMinor.InnerText).$($versionParts.MarkdownTableEditorVersionPatch.InnerText)"
+
+          $requestedVersion = "${{ github.event.inputs.version }}"
+          if (-not $requestedVersion -and "${{ github.ref_type }}" -eq "tag") {
+            $requestedVersion = "${{ github.ref_name }}".TrimStart("v")
           }
-          if (-not $version) {
-            [xml]$versionProps = Get-Content -LiteralPath "Version.props"
-            $versionParts = $versionProps.Project.PropertyGroup
-            $version = "$($versionParts.MarkdownTableEditorVersionMajor.InnerText).$($versionParts.MarkdownTableEditorVersionMinor.InnerText).$($versionParts.MarkdownTableEditorVersionPatch.InnerText)"
+          if ($requestedVersion -and $requestedVersion -ne $canonicalVersion) {
+            throw "Release version '$requestedVersion' does not match Version.props '$canonicalVersion'. Update Version.props first."
           }
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          "version=$canonicalVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag=v$canonicalVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   build:
     needs: version
@@ -62,18 +65,10 @@ jobs:
       - name: Ensure ARM64 C++ build tools
         if: matrix.platform == 'ARM64'
         shell: pwsh
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-          $installer = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vs_installer.exe"
-          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
-          & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --quiet --norestart --nocache
-          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
-            throw "Visual Studio Installer failed with exit code $LASTEXITCODE"
-          }
+        run: .\scripts\Ensure-VsArm64Tools.ps1
 
       - name: Build package
-        shell: pwsh
-        run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}" /p:Version="${{ needs.version.outputs.version }}"
+        run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
@@ -96,47 +91,34 @@ jobs:
           path: release-assets
 
       - name: Publish GitHub release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          $files = Get-ChildItem -LiteralPath release-assets -Recurse -File -Filter "*.zip" | Sort-Object Name
-          if (-not $files) {
-            throw "No release ZIP files were downloaded."
-          }
+          mapfile -t files < <(find release-assets -type f -name '*.zip' | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release ZIP files were downloaded." >&2
+            exit 1
+          fi
 
-          $hashPath = Join-Path $PWD "SHA256SUMS.txt"
-          $hashLines = foreach ($file in $files) {
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
-            "$hash  $($file.Name)"
-          }
-          [IO.File]::WriteAllLines($hashPath, $hashLines, [Text.UTF8Encoding]::new($false))
+          sha256sum "${files[@]}" > SHA256SUMS.txt
+          cat > release-notes.md <<EOF
+          ## What's Changed
 
-          $notesPath = Join-Path $PWD "release-notes.md"
-          $notes = @(
-            "## What's Changed",
-            "",
-            "- Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.",
-            "- Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.",
-            "- Included SHA-256 sums for Plugin Admin verification.",
-            "",
-            "## Validation",
-            "",
-            "- GitHub Actions release build completed for Win32, x64, and ARM64."
-          )
-          [IO.File]::WriteAllLines($notesPath, $notes, [Text.UTF8Encoding]::new($false))
+          - Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.
+          - Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.
+          - Included SHA-256 sums for Plugin Admin verification.
 
-          $assetPaths = @($files.FullName) + @($hashPath)
-          gh release view $env:TAG_NAME --repo $env:GITHUB_REPOSITORY *> $null
-          $releaseExists = $LASTEXITCODE -eq 0
-          if ($releaseExists) {
-            $uploadArgs = @("release", "upload", $env:TAG_NAME) + $assetPaths + @("--repo", $env:GITHUB_REPOSITORY, "--clobber")
-            & gh @uploadArgs
-            gh release edit $env:TAG_NAME --repo $env:GITHUB_REPOSITORY --title "Markdown Table Editor $env:VERSION" --notes-file $notesPath --latest
-          }
-          else {
-            $createArgs = @("release", "create", $env:TAG_NAME) + $assetPaths + @("--repo", $env:GITHUB_REPOSITORY, "--target", $env:GITHUB_SHA, "--title", "Markdown Table Editor $env:VERSION", "--notes-file", $notesPath, "--latest")
-            & gh @createArgs
-          }
+          ## Validation
+
+          - GitHub Actions release build completed for Win32, x64, and ARM64.
+          EOF
+
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "${files[@]}" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --title "Markdown Table Editor $VERSION" --notes-file release-notes.md --latest
+          else
+            gh release create "$TAG_NAME" "${files[@]}" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Markdown Table Editor $VERSION" --notes-file release-notes.md --latest
+          fi

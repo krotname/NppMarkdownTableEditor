@@ -15,7 +15,7 @@
         var match = Regex.Match(Version ?? "", @"^(\d+)\.(\d+)\.(\d+)$");
         if (!match.Success)
         {
-            Log.LogError("Version must use major.minor.patch numeric format, for example 0.6.0. Got: {0}", Version);
+            Log.LogError("Version must use numeric major.minor.patch format. Got: {0}", Version);
             return false;
         }
 
@@ -105,15 +105,215 @@
     </Task>
   </UsingTask>
 
+  <UsingTask TaskName="ResolveCoverageConsole" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <CoverageConsole ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.Diagnostics" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var installRoots = new List<string>();
+        var vsInstallDir = Environment.GetEnvironmentVariable("VSINSTALLDIR");
+        if (!String.IsNullOrWhiteSpace(vsInstallDir))
+        {
+            installRoots.Add(vsInstallDir.TrimEnd('\\', '/'));
+        }
+
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        var vswhere = Path.Combine(programFilesX86, "Microsoft Visual Studio", "Installer", "vswhere.exe");
+        if (File.Exists(vswhere))
+        {
+            var info = new ProcessStartInfo(vswhere, "-latest -products * -requires Microsoft.Component.MSBuild -property installationPath")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+            using (var process = Process.Start(info))
+            {
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                installRoots.AddRange(output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+            }
+        }
+
+        installRoots.Add(Path.Combine(programFilesX86, "Microsoft Visual Studio", "2022", "BuildTools"));
+        installRoots.Add(Path.Combine(programFilesX86, "Microsoft Visual Studio", "2022", "Enterprise"));
+        installRoots.Add(Path.Combine(programFilesX86, "Microsoft Visual Studio", "2022", "Community"));
+        installRoots.Add(Path.Combine(programFilesX86, "Microsoft Visual Studio", "2022", "Professional"));
+
+        foreach (var root in installRoots.Where(p => !String.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var candidate = Path.Combine(root.TrimEnd('\\', '/'), "Common7", "IDE", "Extensions", "Microsoft", "CodeCoverage.Console", "Microsoft.CodeCoverage.Console.exe");
+            if (File.Exists(candidate))
+            {
+                CoverageConsole = candidate;
+                Log.LogMessage(MessageImportance.High, "Using coverage console: {0}", CoverageConsole);
+                return true;
+            }
+        }
+
+        Log.LogError("Microsoft.CodeCoverage.Console.exe was not found in the current Visual Studio installation.");
+        return false;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="NormalizeCoberturaCoverage" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputPath ParameterType="System.String" Required="true" />
+      <OutputPath ParameterType="System.String" Required="true" />
+      <ProjectRoot ParameterType="System.String" Required="true" />
+      <SourceRoot ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="System.Xml" />
+      <Reference Include="System.Xml.Linq" />
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.Globalization" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Xml" />
+      <Using Namespace="System.Xml.Linq" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var projectRoot = Path.GetFullPath(ProjectRoot).TrimEnd('\\', '/');
+        var sourceRoot = Path.GetFullPath(SourceRoot).TrimEnd('\\', '/');
+        Func<string, string> fullPath = path => Path.GetFullPath(path).TrimEnd('\\', '/');
+        Func<string, bool> isUnderSourceRoot = path =>
+        {
+            var candidate = fullPath(path);
+            return candidate.Equals(sourceRoot, StringComparison.OrdinalIgnoreCase) ||
+                candidate.StartsWith(sourceRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        };
+        Func<double, string> formatDecimal = value => value.ToString("0.###############", CultureInfo.InvariantCulture);
+        Action<XElement, int, int> setLineRate = (node, covered, valid) =>
+        {
+            var rate = valid == 0 ? 1.0 : (double)covered / valid;
+            node.SetAttributeValue("line-rate", formatDecimal(rate));
+        };
+        Func<string, string> relativePath = path =>
+        {
+            var rootUri = new Uri(projectRoot + Path.DirectorySeparatorChar);
+            var pathUri = new Uri(Path.GetFullPath(path));
+            return Uri.UnescapeDataString(rootUri.MakeRelativeUri(pathUri).ToString()).Replace('\\', '/');
+        };
+        Func<IEnumerable<XElement>, Dictionary<int, int>> collectLineHits = classes =>
+        {
+            var hitsByLine = new Dictionary<int, int>();
+            foreach (var line in classes.Descendants("line"))
+            {
+                int number;
+                int hits;
+                if (!Int32.TryParse((string)line.Attribute("number"), out number))
+                {
+                    continue;
+                }
+                if (!Int32.TryParse((string)line.Attribute("hits"), out hits))
+                {
+                    hits = 0;
+                }
+                int existing;
+                if (!hitsByLine.TryGetValue(number, out existing) || hits > existing)
+                {
+                    hitsByLine[number] = hits;
+                }
+            }
+            return hitsByLine;
+        };
+
+        var document = XDocument.Load(InputPath);
+        foreach (var classNode in document.Descendants("class").ToList())
+        {
+            var filename = (string)classNode.Attribute("filename");
+            if (String.IsNullOrWhiteSpace(filename) || !isUnderSourceRoot(filename))
+            {
+                classNode.Remove();
+            }
+        }
+
+        var classesByFile = document.Descendants("class")
+            .GroupBy(node => Path.GetFullPath((string)node.Attribute("filename")), StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var fileGroup in classesByFile)
+        {
+            var lineHits = collectLineHits(fileGroup);
+            var keptClass = fileGroup.First();
+            foreach (var duplicate in fileGroup.Skip(1).ToList())
+            {
+                duplicate.Remove();
+            }
+
+            keptClass.Elements("methods").Remove();
+            keptClass.Elements("lines").Remove();
+            keptClass.Add(new XElement("lines",
+                lineHits.OrderBy(pair => pair.Key).Select(pair =>
+                    new XElement("line",
+                        new XAttribute("number", pair.Key.ToString(CultureInfo.InvariantCulture)),
+                        new XAttribute("hits", pair.Value.ToString(CultureInfo.InvariantCulture)),
+                        new XAttribute("branch", "False")))));
+
+            var covered = lineHits.Values.Count(value => value > 0);
+            var valid = lineHits.Count;
+            setLineRate(keptClass, covered, valid);
+            keptClass.SetAttributeValue("filename", relativePath(fileGroup.Key));
+            keptClass.SetAttributeValue("name", Path.GetFileNameWithoutExtension(fileGroup.Key));
+        }
+
+        foreach (var package in document.Descendants("package").ToList())
+        {
+            var packageClasses = package.Descendants("class").ToList();
+            if (packageClasses.Count == 0)
+            {
+                package.Remove();
+                continue;
+            }
+
+            var valid = packageClasses.Sum(node => node.Element("lines").Elements("line").Count());
+            var covered = packageClasses.Sum(node => node.Element("lines").Elements("line").Count(line => ((int?)line.Attribute("hits") ?? 0) > 0));
+            setLineRate(package, covered, valid);
+        }
+
+        var allClasses = document.Descendants("class").ToList();
+        var linesValid = allClasses.Sum(node => node.Element("lines").Elements("line").Count());
+        var linesCovered = allClasses.Sum(node => node.Element("lines").Elements("line").Count(line => ((int?)line.Attribute("hits") ?? 0) > 0));
+        var coverage = document.Root;
+        setLineRate(coverage, linesCovered, linesValid);
+        coverage.SetAttributeValue("lines-covered", linesCovered.ToString(CultureInfo.InvariantCulture));
+        coverage.SetAttributeValue("lines-valid", linesValid.ToString(CultureInfo.InvariantCulture));
+
+        Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
+        var settings = new XmlWriterSettings { Encoding = new UTF8Encoding(false), Indent = true };
+        using (var writer = XmlWriter.Create(OutputPath, settings))
+        {
+            document.Save(writer);
+        }
+
+        Log.LogMessage(MessageImportance.High, "Normalized Cobertura line coverage: {0} / {1}", linesCovered, linesValid);
+        Log.LogMessage(MessageImportance.High, "Cobertura report: {0}", OutputPath);
+        return true;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
     <Platform Condition="'$(Platform)'==''">x64</Platform>
-    <Version Condition="'$(Version)'==''">$(MarkdownTableEditorVersion)</Version>
+    <ResolvedPackageVersion>$(MarkdownTableEditorVersion)</ResolvedPackageVersion>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
     <PluginProject>$(ProjectRoot)vs.proj\MarkdownTableEditor.vcxproj</PluginProject>
     <TestProject>$(ProjectRoot)tests\CoreSmoke.vcxproj</TestProject>
     <TestExe>$(ProjectRoot)tests\CoreSmoke.exe</TestExe>
     <BuildDir>$(ProjectRoot)build</BuildDir>
+    <CoverageWorkDir>$(BuildDir)\coverage</CoverageWorkDir>
+    <CoverageReportsDir>$(BuildDir)\reports\coverage</CoverageReportsDir>
+    <RawCoverageReport>$(CoverageWorkDir)\coverage.raw.cobertura.xml</RawCoverageReport>
+    <CoverageReport>$(CoverageReportsDir)\coverage.cobertura.xml</CoverageReport>
     <PackageRoot>$(BuildDir)\dist</PackageRoot>
     <PackageDir>$(PackageRoot)\MarkdownTableEditor</PackageDir>
     <PluginAdminPackageDir>$(BuildDir)\pluginadmin</PluginAdminPackageDir>
@@ -130,13 +330,36 @@
     <OutputDir Condition="'$(BuildPlatform)'=='x64'">$(ProjectRoot)bin64</OutputDir>
     <OutputDir Condition="'$(BuildPlatform)'=='ARM64'">$(ProjectRoot)arm64</OutputDir>
     <DllPath>$(OutputDir)\MarkdownTableEditor.dll</DllPath>
-    <ZipPath>$(BuildDir)\MarkdownTableEditor-$(Version)-$(PackagePlatform).zip</ZipPath>
-    <PluginAdminZipPath>$(BuildDir)\MarkdownTableEditor-$(Version)-$(PackagePlatform)-pluginadmin.zip</PluginAdminZipPath>
+    <ZipPath>$(BuildDir)\MarkdownTableEditor-$(ResolvedPackageVersion)-$(PackagePlatform).zip</ZipPath>
+    <PluginAdminZipPath>$(BuildDir)\MarkdownTableEditor-$(ResolvedPackageVersion)-$(PackagePlatform)-pluginadmin.zip</PluginAdminZipPath>
   </PropertyGroup>
 
-  <Target Name="ResolvePackageInputs">
+  <Target Name="VerifyCanonicalVersion">
+    <XmlPeek XmlInputPath="$(ProjectRoot)Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionMajor/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionMajor" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(ProjectRoot)Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionMinor/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionMinor" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(ProjectRoot)Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionPatch/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionPatch" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(ProjectRoot)Version.props" Query="/Project/PropertyGroup/MarkdownTableEditorVersionBuild/text()">
+      <Output TaskParameter="Result" PropertyName="CanonicalVersionBuild" />
+    </XmlPeek>
+    <PropertyGroup>
+      <VersionPropsCanonicalVersion>$(CanonicalVersionMajor).$(CanonicalVersionMinor).$(CanonicalVersionPatch)</VersionPropsCanonicalVersion>
+    </PropertyGroup>
+    <Error Condition="'$(CanonicalVersionMajor)'=='' Or '$(CanonicalVersionMinor)'=='' Or '$(CanonicalVersionPatch)'=='' Or '$(CanonicalVersionBuild)'==''" Text="Version.props must define MarkdownTableEditorVersionMajor, MarkdownTableEditorVersionMinor, MarkdownTableEditorVersionPatch, and MarkdownTableEditorVersionBuild." />
+    <Error Condition="'$(ResolvedPackageVersion)'!='$(VersionPropsCanonicalVersion)'" Text="Package version must come from Version.props. Expected $(VersionPropsCanonicalVersion), got $(ResolvedPackageVersion)." />
+    <Error Condition="'$(MarkdownTableEditorVersionBuild)'!='$(CanonicalVersionBuild)'" Text="Package version build component must come from Version.props. Expected build $(CanonicalVersionBuild), got $(MarkdownTableEditorVersionBuild)." />
+    <Error Condition="'$(Version)'!='' And '$(Version)'!='$(VersionPropsCanonicalVersion)'" Text="/p:Version is not a source of truth. Update Version.props to $(Version), or build with the current Version.props value $(VersionPropsCanonicalVersion)." />
+    <Message Importance="high" Text="Resolved MarkdownTableEditor version from Version.props: $(VersionPropsCanonicalVersion)" />
+  </Target>
+
+  <Target Name="ResolvePackageInputs" DependsOnTargets="VerifyCanonicalVersion">
     <Error Condition="'$(BuildPlatform)'!='Win32' And '$(BuildPlatform)'!='x64' And '$(BuildPlatform)'!='ARM64'" Text="Platform must be x86, Win32, x64, arm64, or ARM64. Got: $(Platform)" />
-    <ParsePackageVersion Version="$(Version)">
+    <ParsePackageVersion Version="$(ResolvedPackageVersion)">
       <Output TaskParameter="Major" PropertyName="PackageVersionMajor" />
       <Output TaskParameter="Minor" PropertyName="PackageVersionMinor" />
       <Output TaskParameter="Patch" PropertyName="PackageVersionPatch" />
@@ -150,19 +373,53 @@
   </Target>
 
   <Target Name="BuildPlugin" DependsOnTargets="ResolvePackageInputs">
-    <Message Importance="high" Text="Building MarkdownTableEditor $(Version) $(Configuration)|$(BuildPlatform)" />
+    <Message Importance="high" Text="Building MarkdownTableEditor $(ResolvedPackageVersion) $(Configuration)|$(BuildPlatform)" />
     <MSBuild Projects="$(PluginProject)"
              Targets="Rebuild"
              Properties="Configuration=$(Configuration);Platform=$(BuildPlatform);SkipCoreScenarioTests=true;MarkdownTableEditorVersionMajor=$(PackageVersionMajor);MarkdownTableEditorVersionMinor=$(PackageVersionMinor);MarkdownTableEditorVersionPatch=$(PackageVersionPatch);MarkdownTableEditorVersionBuild=$(PackageVersionBuild)" />
   </Target>
 
-  <Target Name="RunCoreSmokeTests">
+  <Target Name="BuildReleaseAllPlatforms">
+    <ItemGroup>
+      <ReleaseBuildPlatform Include="Win32" />
+      <ReleaseBuildPlatform Include="x64" />
+      <ReleaseBuildPlatform Include="ARM64" />
+    </ItemGroup>
+    <Message Importance="high" Text="Building MarkdownTableEditor Release|%(ReleaseBuildPlatform.Identity)" />
+    <MSBuild Projects="$(PluginProject)"
+             Targets="Build"
+             Properties="Configuration=Release;Platform=%(ReleaseBuildPlatform.Identity)" />
+  </Target>
+
+  <Target Name="BuildCoreSmokeTests">
     <MSBuild Projects="$(TestProject)" Targets="Rebuild" Properties="Configuration=Debug;Platform=x64" />
+  </Target>
+
+  <Target Name="RunCoreSmokeTests" DependsOnTargets="BuildCoreSmokeTests">
     <Exec Command="&quot;$(TestExe)&quot;" />
   </Target>
 
+  <Target Name="CleanCoverage">
+    <RemoveDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" Condition="Exists('$(CoverageWorkDir)') Or Exists('$(CoverageReportsDir)')" />
+    <MakeDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" />
+  </Target>
+
+  <Target Name="ResolveCoverageInputs">
+    <ResolveCoverageConsole>
+      <Output TaskParameter="CoverageConsole" PropertyName="CoverageConsole" />
+    </ResolveCoverageConsole>
+  </Target>
+
+  <Target Name="Coverage" DependsOnTargets="CleanCoverage;BuildCoreSmokeTests;ResolveCoverageInputs">
+    <Exec Command="&quot;$(CoverageConsole)&quot; collect --nologo --output &quot;$(RawCoverageReport)&quot; --output-format cobertura --include-files &quot;$(ProjectRoot)src\MarkdownTableCore.cpp&quot; &quot;$(TestExe)&quot;" />
+    <NormalizeCoberturaCoverage InputPath="$(RawCoverageReport)"
+                                OutputPath="$(CoverageReport)"
+                                ProjectRoot="$(ProjectRoot)"
+                                SourceRoot="$(ProjectRoot)src" />
+  </Target>
+
   <Target Name="ValidateDllVersion">
-    <ValidateNativeDllVersion DllPath="$(DllPath)" ExpectedVersion="$(Version)" />
+    <ValidateNativeDllVersion DllPath="$(DllPath)" ExpectedVersion="$(ResolvedPackageVersion)" />
   </Target>
 
   <Target Name="PreparePackage">

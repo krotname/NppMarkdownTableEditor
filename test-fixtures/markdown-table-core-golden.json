@@ -1,0 +1,186 @@
+{
+  "conversion": [
+    {
+      "name": "quoted csv to markdown table",
+      "input": "Name,Note\nAnna,\"A, B\"\nBob,\"said \"\"hi\"\"\"",
+      "lines": [
+        "| Name | Note      |",
+        "| ---- | --------- |",
+        "| Anna | A, B      |",
+        "| Bob  | said \"hi\" |"
+      ]
+    },
+    {
+      "name": "tsv escapes pipes",
+      "input": "Name\tNote\nAnna\tA|B",
+      "lines": [
+        "| Name | Note |",
+        "| ---- | ---- |",
+        "| Anna | A\\|B |"
+      ]
+    },
+    {
+      "name": "csv crlf and multiline quoted cell",
+      "input": "Name,Note\r\nAnna,\"line 1\r\nline 2\"\r\nBob,done\r\n",
+      "lines": [
+        "| Name | Note          |",
+        "| ---- | ------------- |",
+        "| Anna | line 1 line 2 |",
+        "| Bob  | done          |"
+      ]
+    }
+  ],
+  "edits": [
+    {
+      "name": "unicode width align",
+      "action": "ALIGN",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Word | Value |",
+        "| --- | --- |",
+        "| тест | 1 |",
+        "| 表 | 22 |"
+      ],
+      "lines": [
+        "| Word | Value |",
+        "| ---- | ----- |",
+        "| тест | 1     |",
+        "| 表   | 22    |"
+      ]
+    },
+    {
+      "name": "emoji cluster width align",
+      "action": "ALIGN",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Symbol | Note |",
+        "| --- | --- |",
+        "| ©️ | copyright |",
+        "| 1️⃣ | keycap |",
+        "| 🇺🇸 | flag |",
+        "| 👩‍💻 | zwj |",
+        "| á | combining |"
+      ],
+      "lines": [
+        "| Symbol | Note      |",
+        "| ------ | --------- |",
+        "| ©️     | copyright |",
+        "| 1️⃣     | keycap    |",
+        "| 🇺🇸     | flag      |",
+        "| 👩‍💻     | zwj       |",
+        "| á      | combining |"
+      ]
+    },
+    {
+      "name": "sort rows ascending decimal numbers",
+      "action": "SORT_ASCENDING",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "| Item | Value |",
+        "| --- | ---: |",
+        "| A | -1.5 |",
+        "| B | 10 |",
+        "| C | 2.25 |"
+      ],
+      "lines": [
+        "| Item | Value |",
+        "| ---- | ----: |",
+        "| A    |  -1.5 |",
+        "| C    |  2.25 |",
+        "| B    |    10 |"
+      ]
+    },
+    {
+      "name": "sort rows ascending cyrillic case fold",
+      "action": "SORT_ASCENDING",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Name |",
+        "| --- |",
+        "| Яна |",
+        "| борис |",
+        "| Анна |"
+      ],
+      "lines": [
+        "| Name  |",
+        "| ----- |",
+        "| Анна  |",
+        "| борис |",
+        "| Яна   |"
+      ]
+    },
+    {
+      "name": "sort rows ascending accent fold",
+      "action": "SORT_ASCENDING",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Name |",
+        "| --- |",
+        "| Éclair |",
+        "| apple |",
+        "| Älg |",
+        "| æther |",
+        "| Ángel |",
+        "| ßeta |",
+        "| Þorn |"
+      ],
+      "lines": [
+        "| Name   |",
+        "| ------ |",
+        "| æther  |",
+        "| Älg    |",
+        "| Ángel  |",
+        "| apple  |",
+        "| Éclair |",
+        "| ßeta   |",
+        "| Þorn   |"
+      ]
+    },
+    {
+      "name": "next cell appends row",
+      "action": "NEXT_CELL",
+      "row": 3,
+      "column": 1,
+      "input": [
+        "| Name | Age |",
+        "| --- | ---: |",
+        "| Anna | 20 |",
+        "| Alexander | 7 |"
+      ],
+      "lines": [
+        "| Name      | Age |",
+        "| --------- | --: |",
+        "| Anna      |  20 |",
+        "| Alexander |   7 |",
+        "|           |     |"
+      ],
+      "targetRow": 4,
+      "targetColumn": 0
+    },
+    {
+      "name": "previous cell wraps to header",
+      "action": "PREVIOUS_CELL",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Name | Age |",
+        "| --- | ---: |",
+        "| Anna | 20 |",
+        "| Alexander | 7 |"
+      ],
+      "lines": [
+        "| Name      | Age |",
+        "| --------- | --: |",
+        "| Anna      |  20 |",
+        "| Alexander |   7 |"
+      ],
+      "targetRow": 0,
+      "targetColumn": 1
+    }
+  ]
+}
