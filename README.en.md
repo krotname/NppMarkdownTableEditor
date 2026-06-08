@@ -4,6 +4,10 @@ Markdown Table Editor turns Notepad++ into a convenient Markdown table editor.
 Paste a messy table from someone else or from an AI tool, press `Tab`, and the plugin aligns the columns, preserves Markdown formatting,
 and helps you quickly rearrange rows, columns, and data.
 
+## Related Projects
+
+- JetBrains IDEs version: [IdeaMarkdownTableEditor](https://github.com/krotname/IdeaMarkdownTableEditor)
+
 ## Demo
 
 ![Markdown table alignment example in Notepad++](docs/demo.gif)
@@ -50,6 +54,10 @@ If Windows does not allow writing to `Program Files`, install the plugin in the 
 ```text
 %LOCALAPPDATA%\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 ```
+
+## Publication
+
+- Official Notepad++ Plugin List pull request: https://github.com/notepad-plus-plus/nppPluginList/pull/1111
 
 ## Compatibility
 
@@ -121,3 +129,8 @@ Run core smoke tests:
 MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
 tests\CoreSmoke.exe
 ```
+
+## License
+
+The main package is distributed under GPL-3.0-or-later. The full GNU GPL v3 text is in [LICENSE](LICENSE) and [license.txt](license.txt); `license.txt` is also included in the ZIP for Notepad++ Plugin Admin.
+Third-party notices and additional license texts are listed in [NOTICE.md](NOTICE.md) and [LICENSES](LICENSES).
