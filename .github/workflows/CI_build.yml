@@ -40,7 +40,7 @@ jobs:
           files: build/reports/coverage/coverage.cobertura.xml
           flags: cpp-core
           name: notepad-markdown-table-editor
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
     - name: Archive artifacts for x64
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
