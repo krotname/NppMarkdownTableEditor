@@ -102,6 +102,16 @@ int main()
 	expectSize("adjacent pipe range end", adjacentTable.lastRow, 3);
 	expectTrue("adjacent pipe text before rejected", !MarkdownTable::findTableRange(adjacentPipeText, 0).found);
 	expectTrue("adjacent pipe text after rejected", !MarkdownTable::findTableRange(adjacentPipeText, 4).found);
+	const MarkdownTable::EditResult adjacentApply = MarkdownTable::apply(adjacentPipeText, 3, 0, MarkdownTable::Action::Align);
+	expectTrue("adjacent pipe apply ok", adjacentApply.ok);
+	expectLines("adjacent pipe apply excludes text", adjacentApply.lines,
+		{
+			"| H   | V   |",
+			"| --- | --- |",
+			"| a   | b   |"
+		});
+	expectTrue("adjacent pipe text before apply rejected", !MarkdownTable::apply(adjacentPipeText, 0, 0, MarkdownTable::Action::Align).ok);
+	expectTrue("adjacent pipe text after apply rejected", !MarkdownTable::apply(adjacentPipeText, 4, 0, MarkdownTable::Action::Align).ok);
 
 	const MarkdownTable::EditResult next = MarkdownTable::apply(input, 3, 1, MarkdownTable::Action::NextCell);
 	expectTrue("next cell ok", next.ok);

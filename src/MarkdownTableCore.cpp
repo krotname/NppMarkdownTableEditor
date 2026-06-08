@@ -1038,7 +1038,22 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 		return result;
 	}
 
-	Table table = parseTable(lines);
+	if (row >= lines.size())
+		row = lines.size() - 1;
+
+	const TableRange tableRange = findTableRange(lines, row);
+	if (!tableRange.found)
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
+	const std::vector<std::string> tableLines(
+		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.firstRow),
+		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.lastRow + 1));
+	row -= tableRange.firstRow;
+
+	Table table = parseTable(tableLines);
 	if (!isMarkdownTable(table))
 	{
 		result.message = "No Markdown table found";

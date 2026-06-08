@@ -103,18 +103,18 @@ Default keyboard shortcuts:
 
 ## Build and Tests
 
-You need Visual Studio 2022 Build Tools.
+You need Visual Studio 2022 Build Tools. Run the commands below from Developer PowerShell/Developer Command Prompt or after adding MSBuild to `PATH`.
 
 ```powershell
-.\build.ps1
+msbuild Package.proj /t:Package /p:Configuration=Release /p:Platform=x64
 ```
 
-The built ZIP appears in the `build` directory.
+The built ZIP archives appear in the `build` directory.
 
 Manual build through MSBuild:
 
 ```cmd
-MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
+msbuild vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
 The DLL is created here:
@@ -126,7 +126,7 @@ bin64\MarkdownTableEditor.dll
 Run core smoke tests:
 
 ```cmd
-MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
+msbuild tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
 tests\CoreSmoke.exe
 ```
 

@@ -1,0 +1,204 @@
+<Project DefaultTargets="Package">
+  <Import Project="Version.props" />
+
+  <UsingTask TaskName="ParsePackageVersion" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Version ParameterType="System.String" Required="true" />
+      <Major ParameterType="System.String" Output="true" />
+      <Minor ParameterType="System.String" Output="true" />
+      <Patch ParameterType="System.String" Output="true" />
+      <Build ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var match = Regex.Match(Version ?? "", @"^(\d+)\.(\d+)\.(\d+)$");
+        if (!match.Success)
+        {
+            Log.LogError("Version must use major.minor.patch numeric format, for example 0.6.0. Got: {0}", Version);
+            return false;
+        }
+
+        Major = match.Groups[1].Value;
+        Minor = match.Groups[2].Value;
+        Patch = match.Groups[3].Value;
+        Build = "0";
+        return true;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="ValidateNativeDllVersion" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <DllPath ParameterType="System.String" Required="true" />
+      <ExpectedVersion ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Diagnostics" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        if (!File.Exists(DllPath))
+        {
+            Log.LogError("Plugin DLL not found: {0}", DllPath);
+            return false;
+        }
+
+        var versionInfo = FileVersionInfo.GetVersionInfo(DllPath);
+        if (!String.Equals(versionInfo.FileVersion, ExpectedVersion, StringComparison.Ordinal))
+        {
+            Log.LogError("DLL FileVersion mismatch. Expected {0}, got {1}", ExpectedVersion, versionInfo.FileVersion);
+            return false;
+        }
+
+        if (!String.Equals(versionInfo.ProductVersion, ExpectedVersion, StringComparison.Ordinal))
+        {
+            Log.LogError("DLL ProductVersion mismatch. Expected {0}, got {1}", ExpectedVersion, versionInfo.ProductVersion);
+            return false;
+        }
+
+        return true;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="ValidateZipEntries" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ZipPath ParameterType="System.String" Required="true" />
+      <Entries ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="System.IO.Compression" />
+      <Reference Include="System.IO.Compression.FileSystem" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.IO.Compression" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        if (!File.Exists(ZipPath))
+        {
+            Log.LogError("ZIP package not found: {0}", ZipPath);
+            return false;
+        }
+
+        var actualEntries = new HashSet<string>(System.StringComparer.Ordinal);
+        using (var zip = ZipFile.OpenRead(ZipPath))
+        {
+            foreach (var entry in zip.Entries)
+            {
+                actualEntries.Add(entry.FullName.Replace('\\', '/'));
+            }
+        }
+
+        var ok = true;
+        foreach (var entry in Entries)
+        {
+            var required = entry.ItemSpec.Replace('\\', '/');
+            if (!actualEntries.Contains(required))
+            {
+                Log.LogError("ZIP package is missing required entry '{0}': {1}", required, ZipPath);
+                ok = false;
+            }
+        }
+
+        return ok;
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <Platform Condition="'$(Platform)'==''">x64</Platform>
+    <Version Condition="'$(Version)'==''">$(MarkdownTableEditorVersion)</Version>
+    <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
+    <PluginProject>$(ProjectRoot)vs.proj\MarkdownTableEditor.vcxproj</PluginProject>
+    <TestProject>$(ProjectRoot)tests\CoreSmoke.vcxproj</TestProject>
+    <TestExe>$(ProjectRoot)tests\CoreSmoke.exe</TestExe>
+    <BuildDir>$(ProjectRoot)build</BuildDir>
+    <PackageRoot>$(BuildDir)\dist</PackageRoot>
+    <PackageDir>$(PackageRoot)\MarkdownTableEditor</PackageDir>
+    <PluginAdminPackageDir>$(BuildDir)\pluginadmin</PluginAdminPackageDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BuildPlatform Condition="'$(Platform)'=='x86'">Win32</BuildPlatform>
+    <BuildPlatform Condition="'$(Platform)'=='arm' Or '$(Platform)'=='arm64'">ARM64</BuildPlatform>
+    <BuildPlatform Condition="'$(BuildPlatform)'==''">$(Platform)</BuildPlatform>
+    <PackagePlatform Condition="'$(BuildPlatform)'=='Win32'">x86</PackagePlatform>
+    <PackagePlatform Condition="'$(BuildPlatform)'=='ARM64'">arm64</PackagePlatform>
+    <PackagePlatform Condition="'$(PackagePlatform)'==''">$(BuildPlatform)</PackagePlatform>
+    <OutputDir Condition="'$(BuildPlatform)'=='Win32'">$(ProjectRoot)bin</OutputDir>
+    <OutputDir Condition="'$(BuildPlatform)'=='x64'">$(ProjectRoot)bin64</OutputDir>
+    <OutputDir Condition="'$(BuildPlatform)'=='ARM64'">$(ProjectRoot)arm64</OutputDir>
+    <DllPath>$(OutputDir)\MarkdownTableEditor.dll</DllPath>
+    <ZipPath>$(BuildDir)\MarkdownTableEditor-$(Version)-$(PackagePlatform).zip</ZipPath>
+    <PluginAdminZipPath>$(BuildDir)\MarkdownTableEditor-$(Version)-$(PackagePlatform)-pluginadmin.zip</PluginAdminZipPath>
+  </PropertyGroup>
+
+  <Target Name="ResolvePackageInputs">
+    <Error Condition="'$(BuildPlatform)'!='Win32' And '$(BuildPlatform)'!='x64' And '$(BuildPlatform)'!='ARM64'" Text="Platform must be x86, Win32, x64, arm64, or ARM64. Got: $(Platform)" />
+    <ParsePackageVersion Version="$(Version)">
+      <Output TaskParameter="Major" PropertyName="PackageVersionMajor" />
+      <Output TaskParameter="Minor" PropertyName="PackageVersionMinor" />
+      <Output TaskParameter="Patch" PropertyName="PackageVersionPatch" />
+      <Output TaskParameter="Build" PropertyName="PackageVersionBuild" />
+    </ParsePackageVersion>
+  </Target>
+
+  <Target Name="CleanPackage">
+    <RemoveDir Directories="$(PackageRoot);$(PluginAdminPackageDir)" Condition="Exists('$(PackageRoot)') Or Exists('$(PluginAdminPackageDir)')" />
+    <MakeDir Directories="$(PackageDir);$(PluginAdminPackageDir)" />
+  </Target>
+
+  <Target Name="BuildPlugin" DependsOnTargets="ResolvePackageInputs">
+    <Message Importance="high" Text="Building MarkdownTableEditor $(Version) $(Configuration)|$(BuildPlatform)" />
+    <MSBuild Projects="$(PluginProject)"
+             Targets="Rebuild"
+             Properties="Configuration=$(Configuration);Platform=$(BuildPlatform);SkipCoreScenarioTests=true;MarkdownTableEditorVersionMajor=$(PackageVersionMajor);MarkdownTableEditorVersionMinor=$(PackageVersionMinor);MarkdownTableEditorVersionPatch=$(PackageVersionPatch);MarkdownTableEditorVersionBuild=$(PackageVersionBuild)" />
+  </Target>
+
+  <Target Name="RunCoreSmokeTests">
+    <MSBuild Projects="$(TestProject)" Targets="Rebuild" Properties="Configuration=Debug;Platform=x64" />
+    <Exec Command="&quot;$(TestExe)&quot;" />
+  </Target>
+
+  <Target Name="ValidateDllVersion">
+    <ValidateNativeDllVersion DllPath="$(DllPath)" ExpectedVersion="$(Version)" />
+  </Target>
+
+  <Target Name="PreparePackage">
+    <ItemGroup>
+      <PackageRootFile Include="$(DllPath)" />
+      <PackageRootFile Include="$(ProjectRoot)license.txt" />
+      <PackageRootFile Include="$(ProjectRoot)readme.FIRST" />
+      <PackageRootFile Include="$(ProjectRoot)NOTICE.md" />
+      <PackageLicenseFile Include="$(ProjectRoot)LICENSES\**\*.*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(PackageRootFile)" DestinationFolder="$(PackageDir)" />
+    <Copy SourceFiles="@(PackageLicenseFile)" DestinationFiles="@(PackageLicenseFile->'$(PackageDir)\LICENSES\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(PackageRootFile)" DestinationFolder="$(PluginAdminPackageDir)" />
+    <Copy SourceFiles="@(PackageLicenseFile)" DestinationFiles="@(PackageLicenseFile->'$(PluginAdminPackageDir)\LICENSES\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
+  <Target Name="CreateArchives">
+    <ZipDirectory SourceDirectory="$(PackageRoot)" DestinationFile="$(ZipPath)" Overwrite="true" />
+    <ZipDirectory SourceDirectory="$(PluginAdminPackageDir)" DestinationFile="$(PluginAdminZipPath)" Overwrite="true" />
+  </Target>
+
+  <Target Name="ValidateArchives">
+    <ItemGroup>
+      <RequiredPluginAdminZipEntry Include="MarkdownTableEditor.dll" />
+      <RequiredPluginAdminZipEntry Include="license.txt" />
+      <RequiredPluginAdminZipEntry Include="readme.FIRST" />
+      <RequiredPluginAdminZipEntry Include="NOTICE.md" />
+      <RequiredPluginAdminZipEntry Include="LICENSES/GPL-3.0-or-later.txt" />
+      <RequiredPluginAdminZipEntry Include="LICENSES/LGPL-3.0-or-later.txt" />
+      <RequiredPluginAdminZipEntry Include="LICENSES/Scintilla.txt" />
+    </ItemGroup>
+    <ValidateZipEntries ZipPath="$(PluginAdminZipPath)" Entries="@(RequiredPluginAdminZipEntry)" />
+    <Message Importance="high" Text="Built $(ZipPath)" />
+    <Message Importance="high" Text="Built $(PluginAdminZipPath)" />
+  </Target>
+
+  <Target Name="Package" DependsOnTargets="CleanPackage;BuildPlugin;RunCoreSmokeTests;ValidateDllVersion;PreparePackage;CreateArchives;ValidateArchives" />
+</Project>

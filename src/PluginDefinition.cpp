@@ -42,6 +42,12 @@ struct TableSizeDialogState
 	bool accepted = false;
 };
 
+struct InsertText
+{
+	std::string text;
+	std::size_t caretDelta = 0;
+};
+
 const int tableSizeColumnsId = 1001;
 const int tableSizeRowsId = 1002;
 const UINT tableSizeMaxColumns = 50;
@@ -210,6 +216,82 @@ std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const s
 	return static_cast<std::size_t>(lineStartPosition(scintilla, firstLine)) + offsetForLineColumn(replacementLines, eol, row, columnOffset);
 }
 
+Sci_Position documentLength(HWND scintilla)
+{
+	const LRESULT length = ::SendMessage(scintilla, SCI_GETLENGTH, 0, 0);
+	return length < 0 ? 0 : static_cast<Sci_Position>(length);
+}
+
+Sci_Position safeLinePosition(HWND scintilla, Sci_Position position)
+{
+	const Sci_Position length = documentLength(scintilla);
+	if (length <= 0 || position < 0)
+		return 0;
+	if (position > length)
+		return length;
+	return position;
+}
+
+bool isLineStart(HWND scintilla, Sci_Position position)
+{
+	if (position <= 0)
+		return true;
+
+	const LRESULT line = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(safeLinePosition(scintilla, position)), 0);
+	if (line < 0)
+		return true;
+	return lineStartPosition(scintilla, static_cast<std::size_t>(line)) == position;
+}
+
+bool isLineEnd(HWND scintilla, Sci_Position position)
+{
+	const Sci_Position length = documentLength(scintilla);
+	if (position >= length)
+		return true;
+
+	const LRESULT line = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(safeLinePosition(scintilla, position)), 0);
+	if (line < 0)
+		return true;
+	return lineEndPosition(scintilla, static_cast<std::size_t>(line)) == position;
+}
+
+std::string chooseEolForInsertion(HWND scintilla, Sci_Position start, Sci_Position end)
+{
+	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
+	if (lineCountResult <= 0)
+		return currentEol(scintilla);
+
+	const std::size_t lineCount = static_cast<std::size_t>(lineCountResult);
+	const LRESULT startLineResult = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(safeLinePosition(scintilla, start)), 0);
+	const LRESULT endLineResult = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(safeLinePosition(scintilla, end)), 0);
+	if (startLineResult < 0 || endLineResult < 0)
+		return currentEol(scintilla);
+
+	std::size_t firstLine = static_cast<std::size_t>((std::min)(startLineResult, endLineResult));
+	std::size_t lastLine = static_cast<std::size_t>((std::max)(startLineResult, endLineResult));
+	if (firstLine >= lineCount)
+		firstLine = lineCount - 1;
+	if (lastLine >= lineCount)
+		lastLine = lineCount - 1;
+	if (start != end && lastLine > firstLine && end == lineStartPosition(scintilla, lastLine))
+		--lastLine;
+	return chooseEol(scintilla, firstLine, lastLine, lineCount);
+}
+
+InsertText tableInsertText(HWND scintilla, Sci_Position start, Sci_Position end, const std::string &table, const std::string &eol)
+{
+	InsertText insertText;
+	if (start > 0 && !isLineStart(scintilla, start))
+	{
+		insertText.text += eol;
+		insertText.caretDelta += eol.size();
+	}
+	insertText.text += table;
+	if (end < documentLength(scintilla) && !isLineEnd(scintilla, end))
+		insertText.text += eol;
+	return insertText;
+}
+
 void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &edit)
 {
 	const LRESULT selectionStart = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
@@ -219,6 +301,25 @@ void replaceSelectionWithEdit(HWND scintilla, const MarkdownTable::EditResult &e
 
 	ScintillaUndoAction undo(scintilla);
 	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(replacement.c_str()));
+	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
+}
+
+void replaceSelectionWithInsertedTable(HWND scintilla, const MarkdownTable::EditResult &edit)
+{
+	const LRESULT selectionStartResult = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	const LRESULT selectionEndResult = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
+	if (selectionStartResult < 0 || selectionEndResult < 0)
+		return;
+
+	const Sci_Position selectionStart = static_cast<Sci_Position>((std::min)(selectionStartResult, selectionEndResult));
+	const Sci_Position selectionEnd = static_cast<Sci_Position>((std::max)(selectionStartResult, selectionEndResult));
+	const std::string eol = chooseEolForInsertion(scintilla, selectionStart, selectionEnd);
+	const std::string table = joinLines(edit.lines, eol);
+	const InsertText insertText = tableInsertText(scintilla, selectionStart, selectionEnd, table, eol);
+	const std::size_t targetOffset = insertText.caretDelta + offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+
+	ScintillaUndoAction undo(scintilla);
+	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(insertText.text.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
 }
 
@@ -461,7 +562,7 @@ bool runInsertTable()
 	if (!edit.ok)
 		return false;
 
-	replaceSelectionWithEdit(scintilla, edit);
+	replaceSelectionWithInsertedTable(scintilla, edit);
 	return true;
 }
 
@@ -583,7 +684,7 @@ bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey 
     if (!pFunc)
         return false;
 
-    lstrcpy(funcItem[index]._itemName, cmdName);
+    lstrcpyn(funcItem[index]._itemName, cmdName, menuItemSize);
     funcItem[index]._pFunc = pFunc;
     funcItem[index]._init2Check = check0nInit;
     funcItem[index]._pShKey = sk;

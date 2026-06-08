@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without the leading v
-        required: true
-        default: 0.6.0
+        description: Release version without the leading v. Defaults to Version.props.
+        required: false
   push:
     tags:
       - 'v*'
@@ -21,13 +20,21 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Resolve version
         id: version
         shell: pwsh
         run: |
           $version = "${{ github.event.inputs.version }}"
-          if (-not $version) {
+          if (-not $version -and "${{ github.ref_type }}" -eq "tag") {
             $version = "${{ github.ref_name }}".TrimStart("v")
+          }
+          if (-not $version) {
+            [xml]$versionProps = Get-Content -LiteralPath "Version.props"
+            $versionParts = $versionProps.Project.PropertyGroup
+            $version = "$($versionParts.MarkdownTableEditorVersionMajor.InnerText).$($versionParts.MarkdownTableEditorVersionMinor.InnerText).$($versionParts.MarkdownTableEditorVersionPatch.InnerText)"
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -49,6 +56,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v3
+
       - name: Ensure ARM64 C++ build tools
         if: matrix.platform == 'ARM64'
         shell: pwsh
@@ -63,7 +73,7 @@ jobs:
 
       - name: Build package
         shell: pwsh
-        run: .\build.ps1 -Version '${{ needs.version.outputs.version }}' -Platform '${{ matrix.platform }}'
+        run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}" /p:Version="${{ needs.version.outputs.version }}"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4

@@ -103,18 +103,18 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 
 ## Сборка и тесты
 
-Нужны Visual Studio 2022 Build Tools.
+Нужны Visual Studio 2022 Build Tools. Команды ниже запускайте из Developer PowerShell/Developer Command Prompt или после добавления MSBuild в `PATH`.
 
 ```powershell
-.\build.ps1
+msbuild Package.proj /t:Package /p:Configuration=Release /p:Platform=x64
 ```
 
-Готовый ZIP появится в папке `build`.
+Готовые ZIP-архивы появятся в папке `build`.
 
 Ручная сборка через MSBuild:
 
 ```cmd
-MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
+msbuild vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
 DLL будет создана здесь:
@@ -126,7 +126,7 @@ bin64\MarkdownTableEditor.dll
 Запуск smoke-тестов ядра:
 
 ```cmd
-MSBuild.exe tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
+msbuild tests\CoreSmoke.vcxproj /p:Configuration=Debug /p:Platform=x64
 tests\CoreSmoke.exe
 ```
 
