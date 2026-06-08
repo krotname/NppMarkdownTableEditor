@@ -70,6 +70,23 @@ function Assert-DllVersion([string]$DllPath, [string]$Version) {
 	}
 }
 
+function Assert-ZipContains([string]$ZipPath, [string[]]$Entries) {
+	Add-Type -AssemblyName System.IO.Compression.FileSystem
+	$zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+	try {
+		$actualEntries = @($zip.Entries | ForEach-Object { $_.FullName })
+
+		foreach ($entry in $Entries) {
+			if ($actualEntries -notcontains $entry) {
+				throw "ZIP package is missing required license/readme entry '$entry': $ZipPath"
+			}
+		}
+	}
+	finally {
+		$zip.Dispose()
+	}
+}
+
 function Get-OutputDirectory([string]$ProjectRoot, [string]$Platform) {
 	if ($Platform -eq "x64") {
 		return Join-Path $ProjectRoot "bin64"
@@ -159,6 +176,16 @@ Compress-Archive -LiteralPath @(
 	(Join-Path $PackageDir "NOTICE.md"),
 	(Join-Path $PackageDir "LICENSES")
 ) -DestinationPath $PluginAdminZipPath -CompressionLevel Optimal
+
+Assert-ZipContains $PluginAdminZipPath @(
+	"MarkdownTableEditor.dll",
+	"license.txt",
+	"readme.FIRST",
+	"NOTICE.md",
+	"LICENSES/GPL-3.0-or-later.txt",
+	"LICENSES/LGPL-3.0-or-later.txt",
+	"LICENSES/Scintilla.txt"
+)
 
 Write-Output "Built $ZipPath"
 Write-Output "Built $PluginAdminZipPath"
