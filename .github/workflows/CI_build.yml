@@ -38,6 +38,7 @@ jobs:
       with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: build/reports/coverage/coverage.cobertura.xml
+          disable_search: true
           flags: cpp-core
           name: notepad-markdown-table-editor
           fail_ci_if_error: false
