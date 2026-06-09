@@ -66,6 +66,8 @@ struct CodePointRange
 };
 
 const std::size_t hardWrapCellWidth = 32;
+const std::size_t preferredWrappedColumnWidth = 18;
+const std::size_t minimumWrappedColumnWidth = 10;
 
 std::size_t nextRowId(const Table &table);
 
@@ -824,6 +826,212 @@ std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
 		for (std::size_t column = 0; column < table.columns; ++column)
 		{
 			cellSegments.push_back(wrapCellSegments(row.cells[column], hardWrapCellWidth));
+			segmentCount = (std::max)(segmentCount, cellSegments.back().size());
+		}
+
+		if (rowIndex == originalTargetRow)
+			wrappedTargetRow = wrappedRows.size();
+
+		for (std::size_t segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex)
+		{
+			Row wrapped;
+			wrapped.id = segmentIndex == 0 ? row.id : nextId++;
+			wrapped.cells.reserve(table.columns);
+			for (std::size_t column = 0; column < table.columns; ++column)
+			{
+				const std::vector<std::string> &segments = cellSegments[column];
+				wrapped.cells.push_back(segmentIndex < segments.size() ? segments[segmentIndex] : "");
+			}
+			wrappedRows.push_back(std::move(wrapped));
+		}
+	}
+
+	table.rows = std::move(wrappedRows);
+	return wrappedTargetRow;
+}
+
+std::vector<std::size_t> naturalColumnWidths(const Table &table)
+{
+	std::vector<std::size_t> widths(table.columns, 3);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator)
+			continue;
+
+		for (std::size_t column = 0; column < table.columns; ++column)
+			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+	}
+	return widths;
+}
+
+std::size_t formattedTableOverhead(const Table &table)
+{
+	std::size_t overhead = table.leadingPipe ? 1 : 0;
+	for (std::size_t column = 0; column < table.columns; ++column)
+	{
+		if (column > 0)
+			overhead += 2;
+		if (table.leadingPipe || column > 0)
+			++overhead;
+		if (table.trailingPipe && column + 1 == table.columns)
+			overhead += 2;
+	}
+	return overhead;
+}
+
+std::size_t widthSum(const std::vector<std::size_t> &widths)
+{
+	std::size_t sum = 0;
+	for (std::size_t i = 0; i < widths.size(); ++i)
+		sum += widths[i];
+	return sum;
+}
+
+bool containsSpace(const std::string &value)
+{
+	for (std::size_t i = 0; i < value.size(); ++i)
+	{
+		if (isSpace(static_cast<unsigned char>(value[i])))
+			return true;
+	}
+	return false;
+}
+
+std::vector<bool> textColumns(const Table &table)
+{
+	std::vector<bool> result(table.columns, false);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator)
+			continue;
+
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			if (displayWidth(row.cells[column]) > preferredWrappedColumnWidth && containsSpace(row.cells[column]))
+				result[column] = true;
+		}
+	}
+	return result;
+}
+
+std::size_t largestShrinkableColumn(const std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed)
+{
+	std::size_t best = static_cast<std::size_t>(-1);
+	std::size_t bestWidth = 0;
+	std::size_t bestSlack = 0;
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!allowed[column] || widths[column] <= minimums[column])
+			continue;
+
+		const std::size_t slack = widths[column] - minimums[column];
+		if (best == static_cast<std::size_t>(-1) || widths[column] > bestWidth || (widths[column] == bestWidth && slack > bestSlack))
+		{
+			best = column;
+			bestWidth = widths[column];
+			bestSlack = slack;
+		}
+	}
+	return best;
+}
+
+void shrinkColumnsToBudget(std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed, std::size_t budget)
+{
+	while (widthSum(widths) > budget)
+	{
+		const std::size_t column = largestShrinkableColumn(widths, minimums, allowed);
+		if (column == static_cast<std::size_t>(-1))
+			return;
+		--widths[column];
+	}
+}
+
+std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std::size_t maxTableWidth)
+{
+	std::vector<std::size_t> widths = naturalColumnWidths(table);
+	if (widths.empty())
+		return widths;
+
+	const std::size_t overhead = formattedTableOverhead(table);
+	if (maxTableWidth <= overhead + widths.size() * 3)
+		maxTableWidth = overhead + widths.size() * 3;
+
+	const std::size_t budget = maxTableWidth - overhead;
+	if (widthSum(widths) <= budget)
+		return widths;
+
+	const std::vector<bool> textColumn = textColumns(table);
+	std::vector<std::size_t> minimums(widths.size(), 3);
+	std::vector<bool> allowed(widths.size(), false);
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!textColumn[column])
+			continue;
+		minimums[column] = (std::min)(widths[column], preferredWrappedColumnWidth);
+		allowed[column] = widths[column] > minimums[column];
+	}
+	shrinkColumnsToBudget(widths, minimums, allowed, budget);
+	if (widthSum(widths) <= budget)
+		return widths;
+
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!textColumn[column])
+			continue;
+		minimums[column] = (std::min)(widths[column], minimumWrappedColumnWidth);
+		allowed[column] = widths[column] > minimums[column];
+	}
+	shrinkColumnsToBudget(widths, minimums, allowed, budget);
+	if (widthSum(widths) <= budget)
+		return widths;
+
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		minimums[column] = (std::min)(widths[column], minimumWrappedColumnWidth);
+		allowed[column] = widths[column] > minimums[column];
+	}
+	shrinkColumnsToBudget(widths, minimums, allowed, budget);
+	if (widthSum(widths) <= budget)
+		return widths;
+
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		minimums[column] = 3;
+		allowed[column] = widths[column] > minimums[column];
+	}
+	shrinkColumnsToBudget(widths, minimums, allowed, budget);
+	return widths;
+}
+
+std::size_t wrapCellsToColumnWidths(Table &table, std::size_t originalTargetRow, const std::vector<std::size_t> &columnWidths)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1) || columnWidths.size() < table.columns)
+		return originalTargetRow;
+
+	std::vector<Row> wrappedRows;
+	wrappedRows.reserve(table.rows.size());
+	std::size_t wrappedTargetRow = originalTargetRow;
+	std::size_t nextId = nextRowId(table);
+
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex <= table.separatorRow)
+		{
+			if (rowIndex == originalTargetRow)
+				wrappedTargetRow = wrappedRows.size();
+			wrappedRows.push_back(row);
+			continue;
+		}
+
+		std::vector<std::vector<std::string>> cellSegments;
+		cellSegments.reserve(table.columns);
+		std::size_t segmentCount = 1;
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			cellSegments.push_back(wrapCellSegments(row.cells[column], columnWidths[column]));
 			segmentCount = (std::max)(segmentCount, cellSegments.back().size());
 		}
 
@@ -1836,6 +2044,49 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 	}
 
 	FormatResult formatted = formatTable(table, targetRow, targetColumn);
+	setResultFromFormat(result, formatted);
+	result.ok = true;
+	result.changed = true;
+	return result;
+}
+
+EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, int column, std::size_t maxTableWidth)
+{
+	EditResult result;
+	if (lines.empty())
+	{
+		result.message = "No table found";
+		return result;
+	}
+
+	std::size_t sourceRow = row < 0 ? 0 : static_cast<std::size_t>(row);
+	if (sourceRow >= lines.size())
+		sourceRow = lines.size() - 1;
+
+	const TableRange tableRange = findTableRange(lines, static_cast<int>(sourceRow));
+	if (!tableRange.found)
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
+	std::size_t tableRow = sourceRow - tableRange.firstRow;
+	Table table = parseTable(lines, tableRange.firstRow, tableRange.lastRow);
+	if (!isMarkdownTable(table))
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
+	if (tableRow >= table.rows.size())
+		tableRow = table.rows.size() - 1;
+	std::size_t tableColumn = column < 0 ? 0 : static_cast<std::size_t>(column);
+	if (tableColumn >= table.columns)
+		tableColumn = table.columns - 1;
+
+	const std::vector<std::size_t> columnWidths = targetColumnWidthsForTableWidth(table, maxTableWidth);
+	const std::size_t targetRow = wrapCellsToColumnWidths(table, tableRow, columnWidths);
+	FormatResult formatted = formatTable(table, targetRow, tableColumn);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;

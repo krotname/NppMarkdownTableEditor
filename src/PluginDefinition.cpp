@@ -1156,17 +1156,23 @@ bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
 	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
 }
 
-bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
+int availableTextPixelWidth(HWND scintilla)
 {
 	if (!scintilla)
-		return true;
+		return 0;
 
 	RECT client;
 	if (!::GetClientRect(scintilla, &client))
-		return true;
+		return 0;
 
 	const int safeMargin = 6;
 	const int availableWidth = (client.right - client.left) - safeMargin;
+	return availableWidth > 0 ? availableWidth : 0;
+}
+
+bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
+{
+	const int availableWidth = availableTextPixelWidth(scintilla);
 	if (availableWidth <= 0)
 		return false;
 
@@ -1177,6 +1183,21 @@ bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lin
 			return false;
 	}
 	return true;
+}
+
+std::size_t availableDisplayColumns(HWND scintilla)
+{
+	const int availableWidth = availableTextPixelWidth(scintilla);
+	if (availableWidth <= 0)
+		return 80;
+
+	const std::string sample(80, '0');
+	const LRESULT sampleWidth = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(sample.c_str()));
+	if (sampleWidth <= 0)
+		return 80;
+
+	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
+	return (std::max)(columns, static_cast<std::size_t>(20));
 }
 
 bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action, HWND scintilla, const std::vector<std::string> &previewLines)
@@ -1630,7 +1651,11 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	}
 	if (shouldApplyAutoWrapAfterAction(action, scintilla, edit.lines))
 	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::apply(edit.lines, coreIndex(edit.targetRow), coreIndex(column), MarkdownTable::Action::WrapLongCells);
+		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
+			edit.lines,
+			coreIndex(edit.targetRow),
+			coreIndex(edit.targetColumn),
+			availableDisplayColumns(scintilla));
 		if (wrapped.ok)
 			edit = wrapped;
 	}
