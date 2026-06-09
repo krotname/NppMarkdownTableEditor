@@ -24,6 +24,8 @@
 #include <cctype>
 #include <cstdint>
 #include <cwchar>
+#include <cstdlib>
+#include <fstream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -93,13 +95,19 @@ ShortcutKey g_insertTableShortcut = { true, true, true, VK_OEM_5 };
 ShortcutKey g_tabShortcut = { false, false, false, VK_TAB };
 ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
 
+const std::size_t tabCommandIndex = 15;
 const std::size_t wrapLongCellsCommandIndex = 16;
 const std::size_t autoWrapLongCellsCommandIndex = 17;
 
-bool g_autoWrapLongCells = false;
+bool g_autoWrapLongCells = true;
+HBITMAP g_tabToolbarBmp = NULL;
+HICON g_tabToolbarIcon = NULL;
+HICON g_tabToolbarIconDarkMode = NULL;
 HBITMAP g_autoWrapToolbarBmp = NULL;
 HICON g_autoWrapToolbarIcon = NULL;
 HICON g_autoWrapToolbarIconDarkMode = NULL;
+
+int coreIndex(std::size_t value);
 
 enum class UiLanguage
 {
@@ -144,7 +152,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, L"Auto wrap on Tab (MD)" }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -176,9 +184,9 @@ const UiText englishUiText =
 		L"Sort rows descending",
 		L"Convert CSV/TSV to table",
 		L"Insert table...",
-		L"Tab: align table or indent",
+		L"Tab: align table or indent (MD)",
 		L"Wrap long cells",
-		L"Auto wrap long cells"
+		L"Auto wrap on Tab (MD)"
 	},
 	L"Insert Markdown table",
 	L"Columns:",
@@ -411,9 +419,9 @@ const UiText russianUiText =
 		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E",
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
-		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F",
+		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438 \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u044F\u0447\u0435\u0439\u043A\u0438",
-		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0434\u043B\u0438\u043D\u043D\u044B\u0445 \u044F\u0447\u0435\u0435\u043A"
+		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u043F\u0440\u0438 Tab (MD)"
 	},
 	L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 	L"\u0421\u0442\u043E\u043B\u0431\u0446\u044B:",
@@ -759,6 +767,60 @@ std::string nativeLangFileName()
 	return std::string(&buffer[0], static_cast<std::size_t>(copied));
 }
 
+std::string extractNativeLangFileName(const std::string &text)
+{
+	const std::string marker = "filename=\"";
+	const std::size_t start = text.find(marker);
+	if (start == std::string::npos)
+		return std::string();
+
+	const std::size_t valueStart = start + marker.size();
+	const std::size_t valueEnd = text.find('"', valueStart);
+	if (valueEnd == std::string::npos || valueEnd <= valueStart)
+		return std::string();
+
+	return text.substr(valueStart, valueEnd - valueStart);
+}
+
+std::string nativeLangFileNameFromDisk()
+{
+#ifdef MARKDOWN_TABLE_PLUGIN_TESTING
+	return std::string();
+#else
+	const char *appData = std::getenv("APPDATA");
+	if (!appData || !*appData)
+		return std::string();
+
+	const std::string path = std::string(appData) + "\\Notepad++\\nativeLang.xml";
+	std::ifstream input(path.c_str(), std::ios::in | std::ios::binary);
+	if (!input)
+		return std::string();
+
+	std::string text;
+	text.reserve(4096);
+	char buffer[1024];
+	while (input && text.size() < 4096)
+	{
+		input.read(buffer, sizeof(buffer));
+		text.append(buffer, static_cast<std::size_t>(input.gcount()));
+	}
+	return extractNativeLangFileName(text);
+#endif
+}
+
+std::string resolvedNativeLangFileName()
+{
+	const std::string fromNotepad = nativeLangFileName();
+	if (!fromNotepad.empty())
+		return fromNotepad;
+	return nativeLangFileNameFromDisk();
+}
+
+void refreshUiLanguageState()
+{
+	setUiLanguage(languageFromNativeLangFileName(resolvedNativeLangFileName()));
+}
+
 bool isPluginCommandId(UINT menuId)
 {
 	if (menuId == static_cast<UINT>(-1))
@@ -881,34 +943,85 @@ void drawIconVerticalLine(std::uint32_t *pixels, int x, int y1, int y2, std::uin
 		setIconPixel(pixels, x, y, color);
 }
 
-void drawAutoWrapIcon(std::uint32_t *pixels, bool darkMode)
+enum class ToolbarIconKind
 {
-	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
-	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
-	const std::uint32_t accent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
+	TabAction,
+	AutoWrap
+};
 
+void clearIcon(std::uint32_t *pixels)
+{
 	for (int y = 0; y < 16; ++y)
 		for (int x = 0; x < 16; ++x)
 			pixels[y * 16 + x] = argb(0, 0, 0, 0);
-
-	drawIconHorizontalLine(pixels, 2, 13, 2, grid);
-	drawIconHorizontalLine(pixels, 2, 13, 5, muted);
-	drawIconHorizontalLine(pixels, 2, 13, 8, muted);
-	drawIconHorizontalLine(pixels, 2, 13, 11, grid);
-	drawIconVerticalLine(pixels, 2, 2, 11, grid);
-	drawIconVerticalLine(pixels, 6, 2, 11, muted);
-	drawIconVerticalLine(pixels, 10, 2, 11, muted);
-	drawIconVerticalLine(pixels, 13, 2, 11, grid);
-
-	drawIconHorizontalLine(pixels, 9, 13, 13, accent);
-	drawIconVerticalLine(pixels, 13, 10, 13, accent);
-	drawIconHorizontalLine(pixels, 4, 13, 10, accent);
-	setIconPixel(pixels, 4, 10, accent);
-	setIconPixel(pixels, 5, 9, accent);
-	setIconPixel(pixels, 5, 11, accent);
 }
 
-HBITMAP createAutoWrapBitmap(bool darkMode)
+void drawMdBadge(std::uint32_t *pixels, std::uint32_t color)
+{
+	drawIconVerticalLine(pixels, 1, 1, 5, color);
+	drawIconVerticalLine(pixels, 5, 1, 5, color);
+	setIconPixel(pixels, 2, 2, color);
+	setIconPixel(pixels, 3, 3, color);
+	setIconPixel(pixels, 4, 2, color);
+
+	drawIconVerticalLine(pixels, 7, 1, 5, color);
+	drawIconHorizontalLine(pixels, 7, 10, 1, color);
+	drawIconHorizontalLine(pixels, 7, 10, 5, color);
+	drawIconVerticalLine(pixels, 11, 2, 4, color);
+}
+
+void drawMiniTable(std::uint32_t *pixels, std::uint32_t grid, std::uint32_t muted)
+{
+	drawIconHorizontalLine(pixels, 1, 14, 8, grid);
+	drawIconHorizontalLine(pixels, 1, 14, 11, muted);
+	drawIconHorizontalLine(pixels, 1, 14, 14, grid);
+	drawIconVerticalLine(pixels, 1, 8, 14, grid);
+	drawIconVerticalLine(pixels, 7, 8, 14, muted);
+	drawIconVerticalLine(pixels, 14, 8, 14, grid);
+}
+
+void drawTabActionArrow(std::uint32_t *pixels, std::uint32_t accent)
+{
+	drawIconHorizontalLine(pixels, 1, 5, 8, accent);
+	drawIconHorizontalLine(pixels, 1, 9, 10, accent);
+	drawIconHorizontalLine(pixels, 3, 12, 13, accent);
+	setIconPixel(pixels, 12, 11, accent);
+	setIconPixel(pixels, 13, 12, accent);
+	setIconPixel(pixels, 12, 14, accent);
+	drawIconVerticalLine(pixels, 14, 8, 14, accent);
+}
+
+void drawAutoWrapArrow(std::uint32_t *pixels, std::uint32_t accent)
+{
+	drawIconHorizontalLine(pixels, 8, 13, 9, accent);
+	drawIconVerticalLine(pixels, 13, 9, 12, accent);
+	drawIconHorizontalLine(pixels, 5, 13, 12, accent);
+	setIconPixel(pixels, 5, 12, accent);
+	setIconPixel(pixels, 6, 11, accent);
+	setIconPixel(pixels, 6, 13, accent);
+}
+
+void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
+{
+	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
+	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
+	const std::uint32_t tabAccent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
+	const std::uint32_t wrapAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
+
+	clearIcon(pixels);
+	drawMdBadge(pixels, grid);
+	if (kind == ToolbarIconKind::TabAction)
+	{
+		drawTabActionArrow(pixels, tabAccent);
+	}
+	else
+	{
+		drawMiniTable(pixels, grid, muted);
+		drawAutoWrapArrow(pixels, wrapAccent);
+	}
+}
+
+HBITMAP createToolbarBitmap(ToolbarIconKind kind, bool darkMode)
 {
 	BITMAPINFO info;
 	ZeroMemory(&info, sizeof(info));
@@ -924,13 +1037,13 @@ HBITMAP createAutoWrapBitmap(bool darkMode)
 	if (!bitmap || !bits)
 		return bitmap;
 
-	drawAutoWrapIcon(reinterpret_cast<std::uint32_t *>(bits), darkMode);
+	drawMarkdownToolbarIcon(reinterpret_cast<std::uint32_t *>(bits), darkMode, kind);
 	return bitmap;
 }
 
-HICON createAutoWrapIcon(bool darkMode)
+HICON createToolbarIcon(ToolbarIconKind kind, bool darkMode)
 {
-	HBITMAP color = createAutoWrapBitmap(darkMode);
+	HBITMAP color = createToolbarBitmap(kind, darkMode);
 	if (!color)
 		return NULL;
 
@@ -954,34 +1067,54 @@ HICON createAutoWrapIcon(bool darkMode)
 	return icon;
 }
 
+bool ensureToolbarIconHandles(HBITMAP &bitmap, HICON &icon, HICON &darkModeIcon, ToolbarIconKind kind)
+{
+	if (!bitmap)
+		bitmap = createToolbarBitmap(kind, false);
+	if (!icon)
+		icon = createToolbarIcon(kind, false);
+	if (!darkModeIcon)
+		darkModeIcon = createToolbarIcon(kind, true);
+	return bitmap && icon && darkModeIcon;
+}
+
+void destroyToolbarIconHandles(HBITMAP &bitmap, HICON &icon, HICON &darkModeIcon)
+{
+	if (bitmap)
+	{
+		::DeleteObject(bitmap);
+		bitmap = NULL;
+	}
+	if (icon)
+	{
+		::DestroyIcon(icon);
+		icon = NULL;
+	}
+	if (darkModeIcon)
+	{
+		::DestroyIcon(darkModeIcon);
+		darkModeIcon = NULL;
+	}
+}
+
+bool ensureTabToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode, ToolbarIconKind::TabAction);
+}
+
 bool ensureAutoWrapToolbarIconHandles()
 {
-	if (!g_autoWrapToolbarBmp)
-		g_autoWrapToolbarBmp = createAutoWrapBitmap(false);
-	if (!g_autoWrapToolbarIcon)
-		g_autoWrapToolbarIcon = createAutoWrapIcon(false);
-	if (!g_autoWrapToolbarIconDarkMode)
-		g_autoWrapToolbarIconDarkMode = createAutoWrapIcon(true);
-	return g_autoWrapToolbarBmp && g_autoWrapToolbarIcon && g_autoWrapToolbarIconDarkMode;
+	return ensureToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode, ToolbarIconKind::AutoWrap);
+}
+
+void destroyTabToolbarIconHandles()
+{
+	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
 }
 
 void destroyAutoWrapToolbarIconHandles()
 {
-	if (g_autoWrapToolbarBmp)
-	{
-		::DeleteObject(g_autoWrapToolbarBmp);
-		g_autoWrapToolbarBmp = NULL;
-	}
-	if (g_autoWrapToolbarIcon)
-	{
-		::DestroyIcon(g_autoWrapToolbarIcon);
-		g_autoWrapToolbarIcon = NULL;
-	}
-	if (g_autoWrapToolbarIconDarkMode)
-	{
-		::DestroyIcon(g_autoWrapToolbarIconDarkMode);
-		g_autoWrapToolbarIconDarkMode = NULL;
-	}
+	destroyToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -1018,6 +1151,132 @@ void setAutoWrapToolbarCheckState()
 		TB_CHECKBUTTON,
 		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
 		MAKELPARAM(g_autoWrapLongCells ? TRUE : FALSE, 0));
+}
+
+bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
+{
+	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
+}
+
+int visibleTextWidth(HWND scintilla)
+{
+	if (!scintilla)
+		return 0;
+
+	RECT client;
+	if (!::GetClientRect(scintilla, &client))
+		return 0;
+
+	int availableWidth = client.right - client.left;
+	const LRESULT marginCountResult = ::SendMessage(scintilla, SCI_GETMARGINS, 0, 0);
+	const int marginCount = marginCountResult > 0 ? static_cast<int>(marginCountResult) : 0;
+	for (int margin = 0; margin < marginCount && margin < 8; ++margin)
+		availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINWIDTHN, static_cast<WPARAM>(margin), 0));
+	availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINLEFT, 0, 0));
+	availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINRIGHT, 0, 0));
+	availableWidth -= 12;
+	return availableWidth > 0 ? availableWidth : 0;
+}
+
+bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
+{
+	const int availableWidth = visibleTextWidth(scintilla);
+	if (availableWidth <= 0)
+		return false;
+
+	for (const auto &line : lines)
+	{
+		const LRESULT width = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(line.c_str()));
+		if (width > availableWidth)
+			return false;
+	}
+	return true;
+}
+
+std::size_t estimatedVisibleColumns(HWND scintilla)
+{
+	const int availableWidth = visibleTextWidth(scintilla);
+	if (availableWidth <= 0)
+		return MarkdownTable::defaultWrapCellWidth;
+
+	const std::string sample(64, '0');
+	const LRESULT sampleWidth = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(sample.c_str()));
+	if (sampleWidth <= 0)
+		return MarkdownTable::defaultWrapCellWidth;
+
+	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
+	return (std::max)(columns, MarkdownTable::defaultWrapCellWidth);
+}
+
+MarkdownTable::EditResult wrapEditToAvailableWidth(HWND scintilla, const MarkdownTable::EditResult &expanded)
+{
+	const std::size_t minWrapWidth = 12;
+	std::size_t high = (std::max)(minWrapWidth, estimatedVisibleColumns(scintilla));
+	std::size_t low = minWrapWidth;
+	std::size_t best = minWrapWidth;
+	bool foundFittingWidth = false;
+	MarkdownTable::EditResult bestEdit;
+
+	while (low <= high)
+	{
+		const std::size_t mid = low + (high - low) / 2;
+		MarkdownTable::EditOptions options;
+		options.wrapCellWidth = mid;
+		const MarkdownTable::EditResult candidate = MarkdownTable::applyWithOptions(
+			expanded.lines,
+			coreIndex(expanded.targetRow),
+			coreIndex(expanded.targetColumn),
+			MarkdownTable::Action::WrapLongCells,
+			options);
+		if (!candidate.ok)
+			break;
+
+		if (tableFitsAvailableWidth(scintilla, candidate.lines))
+		{
+			foundFittingWidth = true;
+			best = mid;
+			bestEdit = candidate;
+			low = mid + 1;
+		}
+		else
+		{
+			if (mid == 0)
+				break;
+			high = mid - 1;
+		}
+	}
+
+	if (foundFittingWidth)
+		return bestEdit;
+
+	MarkdownTable::EditOptions options;
+	options.wrapCellWidth = best;
+	const MarkdownTable::EditResult fallback = MarkdownTable::applyWithOptions(
+		expanded.lines,
+		coreIndex(expanded.targetRow),
+		coreIndex(expanded.targetColumn),
+		MarkdownTable::Action::WrapLongCells,
+		options);
+	return fallback.ok ? fallback : expanded;
+}
+
+MarkdownTable::EditResult autoWrapEditForAvailableWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
+{
+	MarkdownTable::EditOptions expandOptions;
+	expandOptions.unwrapWrappedRowsBeforeFormat = true;
+	MarkdownTable::EditResult expanded = MarkdownTable::applyWithOptions(
+		edit.lines,
+		coreIndex(edit.targetRow),
+		coreIndex(edit.targetColumn),
+		MarkdownTable::Action::Align,
+		expandOptions);
+	if (!expanded.ok)
+		expanded = edit;
+
+	if (tableFitsAvailableWidth(scintilla, expanded.lines))
+		return expanded;
+
+	return wrapEditToAvailableWidth(scintilla, expanded);
 }
 
 int coreIndex(std::size_t value)
@@ -1464,12 +1723,8 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
-	if (g_autoWrapLongCells && action != MarkdownTable::Action::WrapLongCells)
-	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::apply(edit.lines, coreIndex(edit.targetRow), coreIndex(column), MarkdownTable::Action::WrapLongCells);
-		if (wrapped.ok)
-			edit = wrapped;
-	}
+	if (shouldApplyAutoWrapAfterAction(action))
+		edit = autoWrapEditForAvailableWidth(scintilla, edit);
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
@@ -1641,6 +1896,21 @@ void setAutoWrapLongCellsEnabledForTests(bool enabled)
 	g_autoWrapLongCells = enabled;
 }
 
+bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action)
+{
+	return shouldApplyAutoWrapAfterAction(action);
+}
+
+bool ensureTabToolbarIconsForTests()
+{
+	return ensureTabToolbarIconHandles();
+}
+
+void destroyTabToolbarIconsForTests()
+{
+	destroyTabToolbarIconHandles();
+}
+
 bool ensureAutoWrapToolbarIconsForTests()
 {
 	return ensureAutoWrapToolbarIconHandles();
@@ -1666,6 +1936,7 @@ void pluginInit(HANDLE hModule)
 //
 void pluginCleanUp()
 {
+	destroyTabToolbarIconHandles();
 	destroyAutoWrapToolbarIconHandles();
 }
 
@@ -1685,6 +1956,7 @@ void commandMenuInit()
     //            ShortcutKey *shortcut,          // optional. Define a shortcut to trigger this command
     //            bool check0nInit                // optional. Make this menu item be checked visually
     //            );
+	refreshUiLanguageState();
 	setCommand(0, commandText(0), alignTable, &g_alignShortcut, false);
 	setCommand(1, commandText(1), nextCell, &g_nextCellShortcut, false);
 	setCommand(2, commandText(2), previousCell, &g_previousCellShortcut, false);
@@ -1700,14 +1972,14 @@ void commandMenuInit()
 	setCommand(12, commandText(12), sortRowsDescending, &g_sortRowsDescendingShortcut, false);
 	setCommand(13, commandText(13), convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
 	setCommand(14, commandText(14), insertTable, &g_insertTableShortcut, false);
-	setCommand(15, commandText(15), tabOrIndent, &g_tabShortcut, false);
+	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
 	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
-	setCommand(autoWrapLongCellsCommandIndex, commandText(autoWrapLongCellsCommandIndex), toggleAutoWrapLongCells, NULL, false);
+	setCommand(autoWrapLongCellsCommandIndex, commandText(autoWrapLongCellsCommandIndex), toggleAutoWrapLongCells, NULL, g_autoWrapLongCells);
 }
 
 void refreshUiLanguageFromNotepad()
 {
-	setUiLanguage(languageFromNativeLangFileName(nativeLangFileName()));
+	refreshUiLanguageState();
 	updateNotepadPluginMenu();
 	refreshAutoWrapLongCellsUi();
 }
@@ -1725,33 +1997,47 @@ void refreshAutoWrapLongCellsUi()
 	setAutoWrapToolbarCheckState();
 }
 
-void registerToolbarIcons()
+void registerToolbarIcon(std::size_t commandIndex, HBITMAP bitmap, HICON icon, HICON darkModeIcon)
 {
-	if (!nppData._nppHandle || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0 || !ensureAutoWrapToolbarIconHandles())
+	if (!nppData._nppHandle || funcItem[commandIndex]._cmdID == 0)
 		return;
 
 	toolbarIconsWithDarkMode icons;
 	ZeroMemory(&icons, sizeof(icons));
-	icons.hToolbarBmp = g_autoWrapToolbarBmp;
-	icons.hToolbarIcon = g_autoWrapToolbarIcon;
-	icons.hToolbarIconDarkMode = g_autoWrapToolbarIconDarkMode;
+	icons.hToolbarBmp = bitmap;
+	icons.hToolbarIcon = icon;
+	icons.hToolbarIconDarkMode = darkModeIcon;
 	const LRESULT darkModeResult = ::SendMessage(
 		nppData._nppHandle,
 		NPPM_ADDTOOLBARICON_FORDARKMODE,
-		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+		static_cast<WPARAM>(funcItem[commandIndex]._cmdID),
 		reinterpret_cast<LPARAM>(&icons));
 	if (!darkModeResult)
 	{
 		toolbarIcons legacyIcons;
 		ZeroMemory(&legacyIcons, sizeof(legacyIcons));
-		legacyIcons.hToolbarBmp = g_autoWrapToolbarBmp;
-		legacyIcons.hToolbarIcon = g_autoWrapToolbarIcon;
+		legacyIcons.hToolbarBmp = bitmap;
+		legacyIcons.hToolbarIcon = icon;
 		::SendMessage(
 			nppData._nppHandle,
 			NPPM_ADDTOOLBARICON_DEPRECATED,
-			static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+			static_cast<WPARAM>(funcItem[commandIndex]._cmdID),
 			reinterpret_cast<LPARAM>(&legacyIcons));
 	}
+}
+
+void registerToolbarIcons()
+{
+	if (!nppData._nppHandle)
+		return;
+
+	refreshUiLanguageState();
+	if (funcItem[tabCommandIndex]._cmdID != 0 && ensureTabToolbarIconHandles())
+		registerToolbarIcon(tabCommandIndex, g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
+
+	if (funcItem[autoWrapLongCellsCommandIndex]._cmdID != 0 && ensureAutoWrapToolbarIconHandles())
+		registerToolbarIcon(autoWrapLongCellsCommandIndex, g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
+
 	refreshAutoWrapLongCellsUi();
 }
 
@@ -1880,6 +2166,4 @@ void toggleAutoWrapLongCells()
 {
 	g_autoWrapLongCells = !g_autoWrapLongCells;
 	refreshAutoWrapLongCellsUi();
-	if (g_autoWrapLongCells)
-		runTableAction(MarkdownTable::Action::WrapLongCells, true);
 }

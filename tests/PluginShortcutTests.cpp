@@ -20,6 +20,7 @@ struct ExpectedCommand
 	const char *label;
 	const wchar_t *itemName;
 	PFUNCPLUGINCMD function;
+	bool checkedOnInit;
 	bool hasShortcut;
 	bool ctrl;
 	bool alt;
@@ -101,24 +102,24 @@ int runPluginShortcutTests()
 
 	const ExpectedCommand expected[] =
 	{
-		{ 0, "align", L"Align table", alignTable, true, true, true, true, static_cast<UCHAR>('1') },
-		{ 1, "next cell", L"Next cell", nextCell, true, true, true, true, static_cast<UCHAR>('2') },
-		{ 2, "previous cell", L"Previous cell", previousCell, true, true, true, true, static_cast<UCHAR>('3') },
-		{ 3, "insert row", L"Insert row below", insertRowBelow, true, true, true, true, static_cast<UCHAR>('4') },
-		{ 4, "delete row", L"Delete row", deleteRow, true, true, true, true, static_cast<UCHAR>('5') },
-		{ 5, "insert column", L"Insert column right", insertColumnRight, true, true, true, true, static_cast<UCHAR>('6') },
-		{ 6, "delete column", L"Delete column", deleteColumn, true, true, true, true, static_cast<UCHAR>('7') },
-		{ 7, "move row up", L"Move row up", moveRowUp, true, true, true, true, static_cast<UCHAR>('8') },
-		{ 8, "move row down", L"Move row down", moveRowDown, true, true, true, true, static_cast<UCHAR>('9') },
-		{ 9, "move column left", L"Move column left", moveColumnLeft, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
-		{ 10, "move column right", L"Move column right", moveColumnRight, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
-		{ 11, "sort ascending", L"Sort rows ascending", sortRowsAscending, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
-		{ 12, "sort descending", L"Sort rows descending", sortRowsDescending, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
-		{ 13, "convert csv tsv", L"Convert CSV/TSV to table", convertCsvTsvSelectionToTable, true, true, true, true, static_cast<UCHAR>('0') },
-		{ 14, "insert table", L"Insert table...", insertTable, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) },
-		{ 15, "tab", L"Tab: align table or indent", tabOrIndent, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
-		{ 16, "wrap long cells", L"Wrap long cells", wrapLongCells, true, true, true, true, static_cast<UCHAR>('W') },
-		{ 17, "auto wrap long cells", L"Auto wrap long cells", toggleAutoWrapLongCells, false, false, false, false, 0 }
+		{ 0, "align", L"Align table", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
+		{ 1, "next cell", L"Next cell", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
+		{ 2, "previous cell", L"Previous cell", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
+		{ 3, "insert row", L"Insert row below", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
+		{ 4, "delete row", L"Delete row", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
+		{ 5, "insert column", L"Insert column right", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
+		{ 6, "delete column", L"Delete column", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
+		{ 7, "move row up", L"Move row up", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
+		{ 8, "move row down", L"Move row down", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
+		{ 9, "move column left", L"Move column left", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
+		{ 10, "move column right", L"Move column right", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
+		{ 11, "sort ascending", L"Sort rows ascending", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
+		{ 12, "sort descending", L"Sort rows descending", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
+		{ 13, "convert csv tsv", L"Convert CSV/TSV to table", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
+		{ 14, "insert table", L"Insert table...", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) },
+		{ 15, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
+		{ 16, "wrap long cells", L"Wrap long cells", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
+		{ 17, "auto wrap on tab", L"Auto wrap on Tab (MD)", toggleAutoWrapLongCells, true, false, false, false, false, 0 }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -132,7 +133,7 @@ int runPluginShortcutTests()
 		expectCommandName(failures, expectedCommand, actual);
 		expectTrue(failures, std::string(expectedCommand.label) + " function binding", actual._pFunc == expectedCommand.function);
 		expectTrue(failures, std::string(expectedCommand.label) + " shortcut state", expectedCommand.hasShortcut ? actual._pShKey != nullptr : actual._pShKey == nullptr);
-		expectTrue(failures, std::string(expectedCommand.label) + " is unchecked by default", !actual._init2Check);
+		expectTrue(failures, std::string(expectedCommand.label) + " initial checked state", actual._init2Check == expectedCommand.checkedOnInit);
 		if (actual._pShKey == nullptr)
 			continue;
 
@@ -158,9 +159,9 @@ int runPluginShortcutTests()
 		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E",
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
-		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F",
+		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438 \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u044F\u0447\u0435\u0439\u043A\u0438",
-		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0434\u043B\u0438\u043D\u043D\u044B\u0445 \u044F\u0447\u0435\u0435\u043A"
+		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u043F\u0440\u0438 Tab (MD)"
 	};
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
 	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
@@ -206,13 +207,22 @@ int runPluginShortcutTests()
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
+	expectTrue(failures, "auto wrap starts enabled by default", MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	expectTrue(failures, "auto wrap default wraps align", MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
 	MarkdownTablePluginTesting::setAutoWrapLongCellsEnabledForTests(false);
 	expectTrue(failures, "auto wrap starts disabled in test", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	expectTrue(failures, "auto wrap disabled does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
 	toggleAutoWrapLongCells();
 	expectTrue(failures, "auto wrap toggles on", MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	expectTrue(failures, "auto wrap enabled wraps align", MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto wrap enabled does not wrap row insert", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
+	expectTrue(failures, "auto wrap does not wrap explicit wrap command", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::WrapLongCells));
 	toggleAutoWrapLongCells();
 	expectTrue(failures, "auto wrap toggles off", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	expectTrue(failures, "auto wrap off after unpress does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "tab toolbar icons are created", MarkdownTablePluginTesting::ensureTabToolbarIconsForTests());
 	expectTrue(failures, "auto wrap toolbar icons are created", MarkdownTablePluginTesting::ensureAutoWrapToolbarIconsForTests());
+	MarkdownTablePluginTesting::destroyTabToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoWrapToolbarIconsForTests();
 
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");

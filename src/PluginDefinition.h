@@ -115,6 +115,9 @@ void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
 bool autoWrapLongCellsEnabledForTests();
 void setAutoWrapLongCellsEnabledForTests(bool enabled);
+bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action);
+bool ensureTabToolbarIconsForTests();
+void destroyTabToolbarIconsForTests();
 bool ensureAutoWrapToolbarIconsForTests();
 void destroyAutoWrapToolbarIconsForTests();
 }

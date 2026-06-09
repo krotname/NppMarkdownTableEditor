@@ -65,9 +65,11 @@ struct CodePointRange
 	unsigned int last;
 };
 
-const std::size_t hardWrapCellWidth = 32;
+const std::size_t minValidationWrapCellWidth = 8;
+const std::size_t maxValidationWrapCellWidth = 512;
 
 std::size_t nextRowId(const Table &table);
+FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn);
 
 bool isSpace(unsigned char ch)
 {
@@ -797,11 +799,12 @@ std::vector<std::string> wrapCellSegments(const std::string &cell, std::size_t w
 	return segments;
 }
 
-std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
+std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow, std::size_t width)
 {
 	if (table.separatorRow == static_cast<std::size_t>(-1))
 		return originalTargetRow;
 
+	const std::size_t wrapWidth = (std::max)(static_cast<std::size_t>(1), width);
 	std::vector<Row> wrappedRows;
 	wrappedRows.reserve(table.rows.size());
 	std::size_t wrappedTargetRow = originalTargetRow;
@@ -823,7 +826,7 @@ std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
 		std::size_t segmentCount = 1;
 		for (std::size_t column = 0; column < table.columns; ++column)
 		{
-			cellSegments.push_back(wrapCellSegments(row.cells[column], hardWrapCellWidth));
+			cellSegments.push_back(wrapCellSegments(row.cells[column], wrapWidth));
 			segmentCount = (std::max)(segmentCount, cellSegments.back().size());
 		}
 
@@ -846,6 +849,193 @@ std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
 
 	table.rows = std::move(wrappedRows);
 	return wrappedTargetRow;
+}
+
+bool isEmptyCell(const std::string &cell)
+{
+	return trim(cell).empty();
+}
+
+std::size_t nonEmptyCellCount(const Row &row)
+{
+	std::size_t count = 0;
+	for (std::size_t i = 0; i < row.cells.size(); ++i)
+		if (!isEmptyCell(row.cells[i]))
+			++count;
+	return count;
+}
+
+std::size_t leadingEmptyCellCount(const Row &row)
+{
+	std::size_t count = 0;
+	while (count < row.cells.size() && isEmptyCell(row.cells[count]))
+		++count;
+	return count;
+}
+
+bool isLikelyWrappedContinuationRow(const Row &row, std::size_t columns)
+{
+	if (row.separator || columns < 2)
+		return false;
+
+	const std::size_t nonEmpty = nonEmptyCellCount(row);
+	if (nonEmpty == 0 || nonEmpty >= columns)
+		return false;
+
+	const std::size_t sparseLimit = (std::max)(static_cast<std::size_t>(1), (columns + 1) / 2);
+	return nonEmpty <= sparseLimit || leadingEmptyCellCount(row) > 0;
+}
+
+bool startsWithJoinPunctuation(char ch)
+{
+	switch (ch)
+	{
+		case ')':
+		case ']':
+		case '}':
+		case '>':
+		case '/':
+		case '\\':
+		case '.':
+		case ',':
+		case ':':
+		case ';':
+		case '?':
+		case '&':
+		case '=':
+		case '#':
+		case '-':
+		case '_':
+		case '`':
+			return true;
+		default:
+			return false;
+	}
+}
+
+bool endsWithJoinPunctuation(char ch)
+{
+	switch (ch)
+	{
+		case '(':
+		case '[':
+		case '{':
+		case '<':
+		case '/':
+		case '\\':
+		case '.':
+		case ':':
+		case '&':
+		case '=':
+		case '#':
+		case '-':
+		case '_':
+		case '`':
+			return true;
+		default:
+			return false;
+	}
+}
+
+bool shouldJoinContinuationWithoutSpace(const std::string &target, const std::string &segment)
+{
+	if (target.empty() || segment.empty())
+		return true;
+	if (endsWithJoinPunctuation(target[target.size() - 1]) || startsWithJoinPunctuation(segment[0]))
+		return true;
+	if (target.find(' ') == std::string::npos && segment.find(' ') == std::string::npos)
+		return true;
+	return false;
+}
+
+void appendContinuationCell(std::string &target, const std::string &segment)
+{
+	if (segment.empty())
+		return;
+	if (target.empty())
+	{
+		target = segment;
+		return;
+	}
+	if (!shouldJoinContinuationWithoutSpace(target, segment))
+		target.push_back(' ');
+	target += segment;
+}
+
+std::vector<std::string> formattedLines(const Table &table)
+{
+	FormatResult formatted = formatTable(table, 0, 0);
+	return formatted.lines;
+}
+
+std::size_t maxCellDisplayWidth(const Table &table)
+{
+	std::size_t result = defaultWrapCellWidth;
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator)
+			continue;
+		for (std::size_t column = 0; column < row.cells.size(); ++column)
+			result = (std::max)(result, displayWidth(row.cells[column]));
+	}
+	return result;
+}
+
+bool validatesAsPreviouslyWrapped(const Table &original, const Table &candidate)
+{
+	const std::vector<std::string> originalLines = formattedLines(original);
+	const std::size_t maxWidth = (std::min)(maxValidationWrapCellWidth, maxCellDisplayWidth(candidate));
+	for (std::size_t width = minValidationWrapCellWidth; width <= maxWidth; ++width)
+	{
+		Table wrapped = candidate;
+		wrapLongCells(wrapped, 0, width);
+		if (formattedLines(wrapped) == originalLines)
+			return true;
+	}
+	return false;
+}
+
+std::size_t unwrapWrappedRows(Table &table, std::size_t originalTargetRow)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1) || table.columns < 2)
+		return originalTargetRow;
+
+	Table candidate = table;
+	candidate.rows.clear();
+	candidate.rows.reserve(table.rows.size());
+
+	std::vector<std::size_t> rowMap(table.rows.size(), 0);
+	std::size_t mergedRows = 0;
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		const bool canMerge =
+			rowIndex > table.separatorRow + 1 &&
+			!candidate.rows.empty() &&
+			!candidate.rows.back().separator &&
+			isLikelyWrappedContinuationRow(row, table.columns);
+
+		if (!canMerge)
+		{
+			rowMap[rowIndex] = candidate.rows.size();
+			candidate.rows.push_back(row);
+			continue;
+		}
+
+		Row &base = candidate.rows.back();
+		for (std::size_t column = 0; column < table.columns; ++column)
+			appendContinuationCell(base.cells[column], row.cells[column]);
+		rowMap[rowIndex] = candidate.rows.size() - 1;
+		++mergedRows;
+	}
+
+	if (mergedRows < 2 || !validatesAsPreviouslyWrapped(table, candidate))
+		return originalTargetRow;
+
+	const std::size_t targetRow = originalTargetRow < rowMap.size() ? rowMap[originalTargetRow] : originalTargetRow;
+	table.rows = std::move(candidate.rows);
+	return targetRow < table.rows.size() ? targetRow : 0;
 }
 
 void appendSeparatorCell(std::string &line, Align align, std::size_t width)
@@ -1695,7 +1885,7 @@ TableRange findTableRange(const std::vector<std::string> &lines, int row)
 	return result;
 }
 
-EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action)
+EditResult applyWithOptions(const std::vector<std::string> &lines, int row, int column, Action action, const EditOptions &options)
 {
 	EditResult result;
 	if (lines.empty())
@@ -1828,18 +2018,26 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 			break;
 
 		case Action::WrapLongCells:
-			targetRow = wrapLongCells(table, tableRow);
+			targetRow = wrapLongCells(table, tableRow, options.wrapCellWidth);
 			break;
 
 		case Action::Align:
 			break;
 	}
 
+	if (options.unwrapWrappedRowsBeforeFormat && action == Action::Align)
+		targetRow = unwrapWrappedRows(table, targetRow);
+
 	FormatResult formatted = formatTable(table, targetRow, targetColumn);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;
 	return result;
+}
+
+EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action)
+{
+	return applyWithOptions(lines, row, column, action, EditOptions());
 }
 
 EditResult convertDelimitedToTable(const std::string &text)

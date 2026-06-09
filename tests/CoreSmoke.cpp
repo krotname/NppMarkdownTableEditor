@@ -202,11 +202,39 @@ int main()
 	expectSize("wrap long cells target column", wrappedLongCells.targetColumn, 1);
 	expectLines("wrap long cells", wrappedLongCells.lines,
 		{
-			"| Key | Value                          |",
-			"| --- | ------------------------------ |",
-			"| row | alpha beta gamma delta epsilon |",
-			"|     | zeta eta theta                 |"
+			"| Key | Value                  |",
+			"| --- | ---------------------- |",
+			"| row | alpha beta gamma delta |",
+			"|     | epsilon zeta eta theta |"
 		});
+
+	const std::vector<std::string> reflowSource =
+	{
+		"| Summary | Type | Why |",
+		"| --- | --- | --- |",
+		"| alpha beta gamma delta epsilon | Task | one two three four five |",
+		"| short item | Bug | small note |"
+	};
+	MarkdownTable::EditOptions narrowWrapOptions;
+	narrowWrapOptions.wrapCellWidth = 12;
+	const MarkdownTable::EditResult narrowWrapped = MarkdownTable::applyWithOptions(
+		reflowSource,
+		2,
+		0,
+		MarkdownTable::Action::WrapLongCells,
+		narrowWrapOptions);
+	expectTrue("narrow wrap for reflow ok", narrowWrapped.ok);
+	expectTrue("narrow wrap for reflow expands rows", narrowWrapped.lines.size() > reflowSource.size());
+	MarkdownTable::EditOptions expandWrappedOptions;
+	expandWrappedOptions.unwrapWrappedRowsBeforeFormat = true;
+	const MarkdownTable::EditResult expandedWrapped = MarkdownTable::applyWithOptions(
+		narrowWrapped.lines,
+		static_cast<int>(narrowWrapped.targetRow),
+		static_cast<int>(narrowWrapped.targetColumn),
+		MarkdownTable::Action::Align,
+		expandWrappedOptions);
+	expectTrue("expand previously wrapped rows ok", expandedWrapped.ok);
+	expectLines("expand previously wrapped rows", expandedWrapped.lines, MarkdownTable::apply(reflowSource, 2, 0, MarkdownTable::Action::Align).lines);
 
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{
@@ -223,7 +251,7 @@ int main()
 	std::string wrappedProtectedText;
 	for (std::size_t i = 0; i < wrappedProtectedTokens.lines.size(); ++i)
 		wrappedProtectedText += wrappedProtectedTokens.lines[i] + "\n";
-	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp") != std::string::npos);
+	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](") != std::string::npos);
 	expectTrue("wrap keeps markdown link remainder", wrappedProtectedText.find("/patch registry.md>)") != std::string::npos);
 	expectTrue("wrap no longer keeps overwide markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp/patch registry.md>)") == std::string::npos);
 	expectTrue("wrap keeps code span token", wrappedProtectedText.find("``code span with spaces``") != std::string::npos);
