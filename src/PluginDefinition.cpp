@@ -1156,6 +1156,35 @@ bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
 	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
 }
 
+int availableTextPixelWidth(HWND scintilla)
+{
+	if (!scintilla)
+		return 0;
+
+	RECT client;
+	if (!::GetClientRect(scintilla, &client))
+		return 0;
+
+	const int safeMargin = 6;
+	const int availableWidth = (client.right - client.left) - safeMargin;
+	return availableWidth > 0 ? availableWidth : 0;
+}
+
+std::size_t availableDisplayColumns(HWND scintilla)
+{
+	const int availableWidth = availableTextPixelWidth(scintilla);
+	if (availableWidth <= 0)
+		return 120;
+
+	const std::string sample(120, '0');
+	const LRESULT sampleWidth = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(sample.c_str()));
+	if (sampleWidth <= 0)
+		return 120;
+
+	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
+	return (std::max)(columns, static_cast<std::size_t>(40));
+}
+
 int coreIndex(std::size_t value)
 {
 	const std::size_t maxInt = static_cast<std::size_t>((std::numeric_limits<int>::max)());
@@ -1602,11 +1631,11 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	}
 	if (shouldApplyAutoWrapAfterAction(action))
 	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::apply(
+		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
 			edit.lines,
 			coreIndex(edit.targetRow),
 			coreIndex(edit.targetColumn),
-			MarkdownTable::Action::WrapLongCells);
+			availableDisplayColumns(scintilla));
 		if (wrapped.ok)
 			edit = wrapped;
 	}

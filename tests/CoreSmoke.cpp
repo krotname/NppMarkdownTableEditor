@@ -58,6 +58,19 @@ void expectLines(const char *name, const std::vector<std::string> &actual, const
 		std::cerr << actual[i] << "\n";
 }
 
+void expectLineLengthAtMost(const char *name, const std::vector<std::string> &lines, std::size_t maximum)
+{
+	for (std::size_t i = 0; i < lines.size(); ++i)
+	{
+		if (lines[i].size() <= maximum)
+			continue;
+
+		++g_failures;
+		std::cerr << name << " failed: line " << i << " is " << lines[i].size() << " chars, expected at most " << maximum << "\n";
+		std::cerr << lines[i] << "\n";
+	}
+}
+
 }
 
 int main()
@@ -207,6 +220,21 @@ int main()
 			"| row | alpha beta gamma delta epsilon |",
 			"|     | zeta eta theta                 |"
 		});
+
+	const MarkdownTable::EditResult autoWrapped = MarkdownTable::applyWrappedToWidth(
+		{
+			"| Summary | Type | Priority | Reason | Id |",
+			"| --- | --- | --- | --- | --- |",
+			"| alpha beta gamma delta epsilon zeta eta theta | Task | High | one two three four five six seven | `abcdef0123456789` |"
+		},
+		2,
+		0,
+		90);
+	expectTrue("auto wrap to table width ok", autoWrapped.ok);
+	expectTrue("auto wrap creates inner cell continuation lines", autoWrapped.lines.size() > 3);
+	expectLineLengthAtMost("auto wrap keeps physical lines inside width", autoWrapped.lines, 90);
+	expectTrue("auto wrap keeps following columns on first segment", autoWrapped.lines[2].find("| Task | High") != std::string::npos);
+	expectTrue("auto wrap moves text continuation inside the table", autoWrapped.lines[3].find('|') != std::string::npos);
 
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{

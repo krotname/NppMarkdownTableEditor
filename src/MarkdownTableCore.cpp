@@ -66,6 +66,7 @@ struct CodePointRange
 };
 
 const std::size_t hardWrapCellWidth = 32;
+const std::size_t minimumAutoWrapCellWidth = 10;
 
 std::size_t nextRowId(const Table &table);
 
@@ -848,6 +849,245 @@ std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
 	return wrappedTargetRow;
 }
 
+std::vector<std::size_t> naturalColumnWidths(const Table &table)
+{
+	std::vector<std::size_t> widths(table.columns, 3);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator)
+			continue;
+
+		for (std::size_t column = 0; column < table.columns; ++column)
+			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+	}
+	return widths;
+}
+
+std::vector<std::size_t> headerColumnWidths(const Table &table)
+{
+	std::vector<std::size_t> widths(table.columns, 3);
+	const std::size_t headerEnd = table.separatorRow == static_cast<std::size_t>(-1)
+		? table.rows.size()
+		: table.separatorRow;
+	for (std::size_t rowIndex = 0; rowIndex < headerEnd && rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		for (std::size_t column = 0; column < table.columns; ++column)
+			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+	}
+	return widths;
+}
+
+std::size_t formattedTableOverhead(const Table &table)
+{
+	std::size_t overhead = table.leadingPipe ? 1 : 0;
+	for (std::size_t column = 0; column < table.columns; ++column)
+	{
+		if (column > 0)
+			overhead += 2;
+		if (table.leadingPipe || column > 0)
+			++overhead;
+		if (table.trailingPipe && column + 1 == table.columns)
+			overhead += 2;
+	}
+	return overhead;
+}
+
+std::size_t widthSum(const std::vector<std::size_t> &widths)
+{
+	std::size_t sum = 0;
+	for (std::size_t i = 0; i < widths.size(); ++i)
+		sum += widths[i];
+	return sum;
+}
+
+bool containsSpace(const std::string &value)
+{
+	for (std::size_t i = 0; i < value.size(); ++i)
+	{
+		if (isSpace(static_cast<unsigned char>(value[i])))
+			return true;
+	}
+	return false;
+}
+
+std::vector<bool> wrappableColumns(const Table &table, const std::vector<std::size_t> &headerWidths)
+{
+	std::vector<bool> result(table.columns, false);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex < table.separatorRow)
+			continue;
+
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			const std::size_t width = displayWidth(row.cells[column]);
+			const std::size_t minimum = column < headerWidths.size() ? headerWidths[column] : static_cast<std::size_t>(3);
+			if (width > minimum && containsSpace(row.cells[column]))
+				result[column] = true;
+		}
+	}
+	return result;
+}
+
+std::size_t largestShrinkableColumn(const std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed)
+{
+	std::size_t best = static_cast<std::size_t>(-1);
+	std::size_t bestSlack = 0;
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!allowed[column] || widths[column] <= minimums[column])
+			continue;
+
+		const std::size_t slack = widths[column] - minimums[column];
+		if (best == static_cast<std::size_t>(-1) || slack > bestSlack)
+		{
+			best = column;
+			bestSlack = slack;
+		}
+	}
+	return best;
+}
+
+void shrinkColumnsToBudget(std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed, std::size_t budget)
+{
+	while (widthSum(widths) > budget)
+	{
+		const std::size_t column = largestShrinkableColumn(widths, minimums, allowed);
+		if (column == static_cast<std::size_t>(-1))
+			return;
+		--widths[column];
+	}
+}
+
+std::size_t bestGrowableColumn(const std::vector<std::size_t> &widths, const std::vector<std::size_t> &naturalWidths, const std::vector<bool> &allowed)
+{
+	std::size_t best = static_cast<std::size_t>(-1);
+	std::size_t bestSlack = 0;
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!allowed[column] || widths[column] >= naturalWidths[column])
+			continue;
+
+		const std::size_t slack = naturalWidths[column] - widths[column];
+		if (best == static_cast<std::size_t>(-1) || slack > bestSlack)
+		{
+			best = column;
+			bestSlack = slack;
+		}
+	}
+	return best;
+}
+
+std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std::size_t maxTableWidth)
+{
+	std::vector<std::size_t> naturalWidths = naturalColumnWidths(table);
+	if (naturalWidths.empty())
+		return naturalWidths;
+
+	const std::size_t overhead = formattedTableOverhead(table);
+	if (maxTableWidth <= overhead + naturalWidths.size() * 3)
+		maxTableWidth = overhead + naturalWidths.size() * 3;
+	const std::size_t budget = maxTableWidth - overhead;
+	if (widthSum(naturalWidths) <= budget)
+		return naturalWidths;
+
+	const std::vector<std::size_t> headerWidths = headerColumnWidths(table);
+	const std::vector<bool> canWrap = wrappableColumns(table, headerWidths);
+	std::vector<std::size_t> widths(naturalWidths.size(), 3);
+	std::vector<std::size_t> minimums(naturalWidths.size(), 3);
+
+	for (std::size_t column = 0; column < naturalWidths.size(); ++column)
+	{
+		const std::size_t headerWidth = column < headerWidths.size() ? headerWidths[column] : static_cast<std::size_t>(3);
+		if (canWrap[column])
+		{
+			minimums[column] = (std::min)(naturalWidths[column], (std::max)(headerWidth, minimumAutoWrapCellWidth));
+			widths[column] = minimums[column];
+		}
+		else
+		{
+			minimums[column] = (std::min)(naturalWidths[column], (std::max)(headerWidth, static_cast<std::size_t>(3)));
+			widths[column] = naturalWidths[column];
+		}
+	}
+
+	if (widthSum(widths) > budget)
+		shrinkColumnsToBudget(widths, minimums, canWrap, budget);
+
+	if (widthSum(widths) > budget)
+	{
+		std::vector<bool> allColumns(widths.size(), true);
+		std::vector<std::size_t> hardMinimums(widths.size(), 3);
+		for (std::size_t column = 0; column < widths.size(); ++column)
+			hardMinimums[column] = (std::min)(widths[column], static_cast<std::size_t>(3));
+		shrinkColumnsToBudget(widths, hardMinimums, allColumns, budget);
+	}
+
+	while (widthSum(widths) < budget)
+	{
+		const std::size_t column = bestGrowableColumn(widths, naturalWidths, canWrap);
+		if (column == static_cast<std::size_t>(-1))
+			break;
+		++widths[column];
+	}
+
+	return widths;
+}
+
+std::size_t wrapCellsToColumnWidths(Table &table, std::size_t originalTargetRow, const std::vector<std::size_t> &columnWidths)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1) || columnWidths.size() < table.columns)
+		return originalTargetRow;
+
+	std::vector<Row> wrappedRows;
+	wrappedRows.reserve(table.rows.size());
+	std::size_t wrappedTargetRow = originalTargetRow;
+	std::size_t nextId = nextRowId(table);
+
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex <= table.separatorRow)
+		{
+			if (rowIndex == originalTargetRow)
+				wrappedTargetRow = wrappedRows.size();
+			wrappedRows.push_back(row);
+			continue;
+		}
+
+		std::vector<std::vector<std::string>> cellSegments;
+		cellSegments.reserve(table.columns);
+		std::size_t segmentCount = 1;
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			cellSegments.push_back(wrapCellSegments(row.cells[column], columnWidths[column]));
+			segmentCount = (std::max)(segmentCount, cellSegments.back().size());
+		}
+
+		if (rowIndex == originalTargetRow)
+			wrappedTargetRow = wrappedRows.size();
+
+		for (std::size_t segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex)
+		{
+			Row wrapped;
+			wrapped.id = segmentIndex == 0 ? row.id : nextId++;
+			wrapped.cells.reserve(table.columns);
+			for (std::size_t column = 0; column < table.columns; ++column)
+			{
+				const std::vector<std::string> &segments = cellSegments[column];
+				wrapped.cells.push_back(segmentIndex < segments.size() ? segments[segmentIndex] : "");
+			}
+			wrappedRows.push_back(std::move(wrapped));
+		}
+	}
+
+	table.rows = std::move(wrappedRows);
+	return wrappedTargetRow;
+}
+
 void appendSeparatorCell(std::string &line, Align align, std::size_t width)
 {
 	const std::size_t target = (std::max)(width, static_cast<std::size_t>(3));
@@ -897,7 +1137,7 @@ void appendPaddedCell(std::string &line, const std::string &cell, Align align, s
 	line.append(rightPad, ' ');
 }
 
-FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn)
+FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn, const std::vector<std::size_t> *minimumWidths)
 {
 	std::vector<std::size_t> widths(table.columns, 3);
 	std::vector<std::size_t> cellWidths(table.rows.size() * table.columns, 0);
@@ -913,6 +1153,11 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 			cellWidths[rowIndex * table.columns + column] = currentWidth;
 			widths[column] = (std::max)(widths[column], currentWidth);
 		}
+	}
+	if (minimumWidths)
+	{
+		for (std::size_t column = 0; column < table.columns && column < minimumWidths->size(); ++column)
+			widths[column] = (std::max)(widths[column], (*minimumWidths)[column]);
 	}
 
 	FormatResult result;
@@ -976,6 +1221,11 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 	}
 
 	return result;
+}
+
+FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn)
+{
+	return formatTable(table, targetRow, targetColumn, NULL);
 }
 
 std::size_t nextEditableRow(const Table &table, std::size_t row)
@@ -1836,6 +2086,49 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 	}
 
 	FormatResult formatted = formatTable(table, targetRow, targetColumn);
+	setResultFromFormat(result, formatted);
+	result.ok = true;
+	result.changed = true;
+	return result;
+}
+
+EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, int column, std::size_t maxTableWidth)
+{
+	EditResult result;
+	if (lines.empty())
+	{
+		result.message = "No table found";
+		return result;
+	}
+
+	std::size_t sourceRow = row < 0 ? 0 : static_cast<std::size_t>(row);
+	if (sourceRow >= lines.size())
+		sourceRow = lines.size() - 1;
+
+	const TableRange tableRange = findTableRange(lines, static_cast<int>(sourceRow));
+	if (!tableRange.found)
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
+	std::size_t tableRow = sourceRow - tableRange.firstRow;
+	Table table = parseTable(lines, tableRange.firstRow, tableRange.lastRow);
+	if (!isMarkdownTable(table))
+	{
+		result.message = "No Markdown table found";
+		return result;
+	}
+
+	if (tableRow >= table.rows.size())
+		tableRow = table.rows.size() - 1;
+	std::size_t tableColumn = column < 0 ? 0 : static_cast<std::size_t>(column);
+	if (tableColumn >= table.columns)
+		tableColumn = table.columns - 1;
+
+	const std::vector<std::size_t> columnWidths = targetColumnWidthsForTableWidth(table, maxTableWidth);
+	const std::size_t targetRow = wrapCellsToColumnWidths(table, tableRow, columnWidths);
+	FormatResult formatted = formatTable(table, targetRow, tableColumn, &columnWidths);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;

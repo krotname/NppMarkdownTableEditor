@@ -50,6 +50,7 @@ bool isPotentialTableLine(const std::string &line);
 std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn);
 TableRange findTableRange(const std::vector<std::string> &lines, int row);
 EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action);
+EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, int column, std::size_t maxTableWidth);
 EditResult convertDelimitedToTable(const std::string &text);
 EditResult createTable(int columns, int dataRows);
 }
