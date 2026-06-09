@@ -10,8 +10,6 @@
 
 namespace MarkdownTable
 {
-constexpr std::size_t defaultWrapCellWidth = 26;
-
 enum class Action
 {
 	Align,
@@ -48,17 +46,10 @@ struct TableRange
 	std::size_t lastRow = 0;
 };
 
-struct EditOptions
-{
-	std::size_t wrapCellWidth = defaultWrapCellWidth;
-	bool unwrapWrappedRowsBeforeFormat = false;
-};
-
 bool isPotentialTableLine(const std::string &line);
 std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn);
 TableRange findTableRange(const std::vector<std::string> &lines, int row);
 EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action);
-EditResult applyWithOptions(const std::vector<std::string> &lines, int row, int column, Action action, const EditOptions &options);
 EditResult convertDelimitedToTable(const std::string &text);
 EditResult createTable(int columns, int dataRows);
 }

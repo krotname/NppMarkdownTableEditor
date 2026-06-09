@@ -107,8 +107,6 @@ HBITMAP g_autoWrapToolbarBmp = NULL;
 HICON g_autoWrapToolbarIcon = NULL;
 HICON g_autoWrapToolbarIconDarkMode = NULL;
 
-int coreIndex(std::size_t value);
-
 enum class UiLanguage
 {
 	English,
@@ -1158,29 +1156,17 @@ bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
 	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
 }
 
-int visibleTextWidth(HWND scintilla)
+bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
 {
 	if (!scintilla)
-		return 0;
+		return true;
 
 	RECT client;
 	if (!::GetClientRect(scintilla, &client))
-		return 0;
+		return true;
 
-	int availableWidth = client.right - client.left;
-	const LRESULT marginCountResult = ::SendMessage(scintilla, SCI_GETMARGINS, 0, 0);
-	const int marginCount = marginCountResult > 0 ? static_cast<int>(marginCountResult) : 0;
-	for (int margin = 0; margin < marginCount && margin < 8; ++margin)
-		availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINWIDTHN, static_cast<WPARAM>(margin), 0));
-	availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINLEFT, 0, 0));
-	availableWidth -= static_cast<int>(::SendMessage(scintilla, SCI_GETMARGINRIGHT, 0, 0));
-	availableWidth -= 12;
-	return availableWidth > 0 ? availableWidth : 0;
-}
-
-bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
-{
-	const int availableWidth = visibleTextWidth(scintilla);
+	const int safeMargin = 6;
+	const int availableWidth = (client.right - client.left) - safeMargin;
 	if (availableWidth <= 0)
 		return false;
 
@@ -1193,90 +1179,9 @@ bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lin
 	return true;
 }
 
-std::size_t estimatedVisibleColumns(HWND scintilla)
+bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action, HWND scintilla, const std::vector<std::string> &previewLines)
 {
-	const int availableWidth = visibleTextWidth(scintilla);
-	if (availableWidth <= 0)
-		return MarkdownTable::defaultWrapCellWidth;
-
-	const std::string sample(64, '0');
-	const LRESULT sampleWidth = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(sample.c_str()));
-	if (sampleWidth <= 0)
-		return MarkdownTable::defaultWrapCellWidth;
-
-	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
-	return (std::max)(columns, MarkdownTable::defaultWrapCellWidth);
-}
-
-MarkdownTable::EditResult wrapEditToAvailableWidth(HWND scintilla, const MarkdownTable::EditResult &expanded)
-{
-	const std::size_t minWrapWidth = 12;
-	std::size_t high = (std::max)(minWrapWidth, estimatedVisibleColumns(scintilla));
-	std::size_t low = minWrapWidth;
-	std::size_t best = minWrapWidth;
-	bool foundFittingWidth = false;
-	MarkdownTable::EditResult bestEdit;
-
-	while (low <= high)
-	{
-		const std::size_t mid = low + (high - low) / 2;
-		MarkdownTable::EditOptions options;
-		options.wrapCellWidth = mid;
-		const MarkdownTable::EditResult candidate = MarkdownTable::applyWithOptions(
-			expanded.lines,
-			coreIndex(expanded.targetRow),
-			coreIndex(expanded.targetColumn),
-			MarkdownTable::Action::WrapLongCells,
-			options);
-		if (!candidate.ok)
-			break;
-
-		if (tableFitsAvailableWidth(scintilla, candidate.lines))
-		{
-			foundFittingWidth = true;
-			best = mid;
-			bestEdit = candidate;
-			low = mid + 1;
-		}
-		else
-		{
-			if (mid == 0)
-				break;
-			high = mid - 1;
-		}
-	}
-
-	if (foundFittingWidth)
-		return bestEdit;
-
-	MarkdownTable::EditOptions options;
-	options.wrapCellWidth = best;
-	const MarkdownTable::EditResult fallback = MarkdownTable::applyWithOptions(
-		expanded.lines,
-		coreIndex(expanded.targetRow),
-		coreIndex(expanded.targetColumn),
-		MarkdownTable::Action::WrapLongCells,
-		options);
-	return fallback.ok ? fallback : expanded;
-}
-
-MarkdownTable::EditResult autoWrapEditForAvailableWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
-{
-	MarkdownTable::EditOptions expandOptions;
-	expandOptions.unwrapWrappedRowsBeforeFormat = true;
-	MarkdownTable::EditResult expanded = MarkdownTable::applyWithOptions(
-		edit.lines,
-		coreIndex(edit.targetRow),
-		coreIndex(edit.targetColumn),
-		MarkdownTable::Action::Align,
-		expandOptions);
-	if (!expanded.ok)
-		expanded = edit;
-
-	if (tableFitsAvailableWidth(scintilla, expanded.lines))
-		return expanded;
-
-	return wrapEditToAvailableWidth(scintilla, expanded);
+	return shouldApplyAutoWrapAfterAction(action) && !tableFitsAvailableWidth(scintilla, previewLines);
 }
 
 int coreIndex(std::size_t value)
@@ -1723,8 +1628,12 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
-	if (shouldApplyAutoWrapAfterAction(action))
-		edit = autoWrapEditForAvailableWidth(scintilla, edit);
+	if (shouldApplyAutoWrapAfterAction(action, scintilla, edit.lines))
+	{
+		MarkdownTable::EditResult wrapped = MarkdownTable::apply(edit.lines, coreIndex(edit.targetRow), coreIndex(column), MarkdownTable::Action::WrapLongCells);
+		if (wrapped.ok)
+			edit = wrapped;
+	}
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);

@@ -208,34 +208,6 @@ int main()
 			"|     | epsilon zeta eta theta |"
 		});
 
-	const std::vector<std::string> reflowSource =
-	{
-		"| Summary | Type | Why |",
-		"| --- | --- | --- |",
-		"| alpha beta gamma delta epsilon | Task | one two three four five |",
-		"| short item | Bug | small note |"
-	};
-	MarkdownTable::EditOptions narrowWrapOptions;
-	narrowWrapOptions.wrapCellWidth = 12;
-	const MarkdownTable::EditResult narrowWrapped = MarkdownTable::applyWithOptions(
-		reflowSource,
-		2,
-		0,
-		MarkdownTable::Action::WrapLongCells,
-		narrowWrapOptions);
-	expectTrue("narrow wrap for reflow ok", narrowWrapped.ok);
-	expectTrue("narrow wrap for reflow expands rows", narrowWrapped.lines.size() > reflowSource.size());
-	MarkdownTable::EditOptions expandWrappedOptions;
-	expandWrappedOptions.unwrapWrappedRowsBeforeFormat = true;
-	const MarkdownTable::EditResult expandedWrapped = MarkdownTable::applyWithOptions(
-		narrowWrapped.lines,
-		static_cast<int>(narrowWrapped.targetRow),
-		static_cast<int>(narrowWrapped.targetColumn),
-		MarkdownTable::Action::Align,
-		expandWrappedOptions);
-	expectTrue("expand previously wrapped rows ok", expandedWrapped.ok);
-	expectLines("expand previously wrapped rows", expandedWrapped.lines, MarkdownTable::apply(reflowSource, 2, 0, MarkdownTable::Action::Align).lines);
-
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{
 			"| Key | Value | Other |",
