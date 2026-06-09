@@ -68,7 +68,12 @@ jobs:
         run: .\scripts\Ensure-VsArm64Tools.ps1
 
       - name: Build package
+        run: msbuild Package.proj /m "/t:Package;CorePerformance" /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
+        if: matrix.platform == 'x64'
+
+      - name: Build package
         run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
+        if: matrix.platform != 'x64'
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
@@ -123,20 +128,21 @@ jobs:
           cat > release-notes.md <<EOF
           ## What's Changed
 
-          - Supersedes 8.5.0 as the current stable release.
-          - Use one non-conflicting default shortcut scheme across JetBrains IDEs and Notepad++: Tab plus Ctrl+Alt+Shift command shortcuts.
+          - Supersedes 9.0.0 as the current stable release.
+          - Added localized plugin menu, command, dialog, and message text for 20 popular Notepad++ locales.
+          - Improved large-table performance by reducing table parsing, display-width, formatting, sorting, and row/column edit overhead.
+          - Added release-blocking Java/C++ core performance benchmarks to CI.
+          - Preserved Java/C++ core parity for trimmed pipe rows, escaped pipes, Unicode/CJK width, CSV/TSV conversion, sorting, and row/column edits.
+          - Kept the non-conflicting Tab plus Ctrl+Alt+Shift shortcut scheme from 9.0.0.
           - Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.
           - Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.
-          - Convert CSV/TSV directly from the current multi-line block when there is no selection.
-          - Avoid converting adjacent plain text, single comma notes, quoted comma-only cells, and plain multi-line text as CSV.
-          - Reject pipe-only separator rows while still accepting dash and equals Markdown separator rules.
           - Use the native Notepad++ Tab action outside Markdown tables.
           - Added compatibility smoke coverage for Notepad++ 7.5.9 x86 and 8.3.1 x64.
           - Included SHA-256 sums for Plugin Admin verification.
 
           ## Validation
 
-          - GitHub Actions release build completed for Win32, x64, and ARM64.
+          - GitHub Actions release build completed for Win32, x64, and ARM64 with coverage and performance checks.
           - GitHub Actions compatibility smoke completed for Notepad++ 7.5.9 x86 and 8.3.1 x64.
           EOF
 

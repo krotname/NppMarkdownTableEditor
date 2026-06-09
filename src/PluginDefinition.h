@@ -62,6 +62,8 @@ void pluginCleanUp();
 //
 void commandMenuInit();
 
+void refreshUiLanguageFromNotepad();
+
 //
 //Clean up your plugin commands allocation (if any)
 //
@@ -70,7 +72,7 @@ void commandMenuCleanUp();
 //
 // Function which sets your command 
 //
-bool setCommand(size_t index, TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey *sk = NULL, bool check0nInit = false);
+bool setCommand(size_t index, const TCHAR *cmdName, PFUNCPLUGINCMD pFunc, ShortcutKey *sk = NULL, bool check0nInit = false);
 
 
 //
@@ -105,6 +107,8 @@ struct ReplacementPreview
 std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback);
 ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &edit, const std::string &eol);
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
+void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
+const wchar_t *pluginMenuNameForTests();
 }
 #endif
 

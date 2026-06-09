@@ -28,6 +28,7 @@ GIF собран из реальных скриншотов Notepad++ под Win
 - `Tab`, сортировка и операции со строками/колонками экономят ручное выравнивание.
 - CSV/TSV можно быстро превратить в аккуратную Markdown-таблицу.
 - UTF-8 и CJK-символы учитываются при расчете ширины колонок.
+- Меню, команды, диалоги и сообщения плагина следуют локализации Notepad++ для популярных языков.
 
 ## Возможности
 
@@ -43,6 +44,7 @@ GIF собран из реальных скриншотов Notepad++ под Win
 - Вставка новой таблицы с выбранным числом колонок и строк.
 - Сохранение Markdown-маркеров выравнивания: `---`, `:---`, `---:`, `:---:`.
 - Корректная обработка escaped pipes: `\|`.
+- Оптимизирована работа с большими таблицами; отдельные performance benchmarks входят в CI.
 
 ## Установка
 
@@ -157,3 +159,9 @@ msbuild Package.proj /t:Coverage /p:Configuration=Debug /p:Platform=x64
 ```
 
 Cobertura XML появится в `build/reports/coverage/coverage.cobertura.xml`.
+
+Performance benchmarks ядра:
+
+```cmd
+msbuild Package.proj /t:CorePerformance /p:Configuration=Release /p:Platform=x64
+```

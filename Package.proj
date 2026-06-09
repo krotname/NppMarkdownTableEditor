@@ -346,6 +346,8 @@
     <PluginProject>$(ProjectRoot)vs.proj\MarkdownTableEditor.vcxproj</PluginProject>
     <TestProject>$(ProjectRoot)tests\CoreSmoke.vcxproj</TestProject>
     <TestExe>$(ProjectRoot)tests\CoreSmoke.exe</TestExe>
+    <PerformanceProject>$(ProjectRoot)tests\CorePerformance.vcxproj</PerformanceProject>
+    <PerformanceExe>$(ProjectRoot)tests\CorePerformance.exe</PerformanceExe>
     <PluginShortcutTestProject>$(ProjectRoot)tests\PluginShortcutSmoke.vcxproj</PluginShortcutTestProject>
     <PluginShortcutTestExe>$(ProjectRoot)tests\PluginShortcutSmoke.exe</PluginShortcutTestExe>
     <BuildDir>$(ProjectRoot)build</BuildDir>
@@ -451,6 +453,16 @@
   <Target Name="RunCoreSmokeTests" DependsOnTargets="BuildCoreSmokeTests">
     <Exec Command="&quot;$(TestExe)&quot;" />
   </Target>
+
+  <Target Name="BuildCorePerformanceBenchmarks">
+    <MSBuild Projects="$(PerformanceProject)" Targets="Rebuild" Properties="Configuration=Release;Platform=x64" />
+  </Target>
+
+  <Target Name="RunCorePerformanceBenchmarks" DependsOnTargets="BuildCorePerformanceBenchmarks">
+    <Exec Command="&quot;$(PerformanceExe)&quot;" />
+  </Target>
+
+  <Target Name="CorePerformance" DependsOnTargets="RunCorePerformanceBenchmarks" />
 
   <Target Name="BuildPluginShortcutSmokeTests">
     <MSBuild Projects="$(PluginShortcutTestProject)" Targets="Rebuild" Properties="Configuration=Debug;Platform=x64" />

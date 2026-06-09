@@ -70,6 +70,13 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 {
 	switch (notifyCode->nmhdr.code) 
 	{
+		case NPPN_READY:
+		case NPPN_NATIVELANGCHANGED:
+		{
+			refreshUiLanguageFromNotepad();
+		}
+		break;
+
 		case NPPN_SHUTDOWN:
 		{
 			commandMenuCleanUp();

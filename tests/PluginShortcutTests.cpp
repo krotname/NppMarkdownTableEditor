@@ -64,6 +64,14 @@ void expectCommandName(int &failures, const ExpectedCommand &expected, const Fun
 	fail(failures, std::string(expected.label) + " name", "unexpected menu item name");
 }
 
+void expectWideString(int &failures, const std::string &name, const wchar_t *actual, const wchar_t *expected)
+{
+	if (std::wcscmp(actual, expected) == 0)
+		return;
+
+	fail(failures, name, "unexpected localized text");
+}
+
 std::string shortcutId(const ShortcutKey &shortcut)
 {
 	std::ostringstream id;
@@ -129,6 +137,69 @@ int runPluginShortcutTests()
 		const std::string id = shortcutId(*actual._pShKey);
 		expectTrue(failures, std::string(expectedCommand.label) + " shortcut is unique", shortcuts.insert(id).second);
 	}
+
+	const wchar_t *russianNames[] =
+	{
+		L"\u0412\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
+		L"\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
+		L"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
+		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u043D\u0438\u0436\u0435",
+		L"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443",
+		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446 \u0441\u043F\u0440\u0430\u0432\u0430",
+		L"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
+		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u0432\u0435\u0440\u0445",
+		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u043D\u0438\u0437",
+		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446 \u0432\u043B\u0435\u0432\u043E",
+		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446 \u0432\u043F\u0440\u0430\u0432\u043E",
+		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0432\u043E\u0437\u0440\u0430\u0441\u0442\u0430\u043D\u0438\u044E",
+		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E",
+		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
+		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
+		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F"
+	};
+	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
+	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
+	for (std::size_t index = 0; index < expectedCount; ++index)
+		expectWideString(failures, std::string("russian ") + expected[index].label + " name", funcItem[expected[index].index]._itemName, russianNames[index]);
+
+	struct LocalizedCommandSample
+	{
+		const char *nativeLangFileName;
+		const char *label;
+		const wchar_t *alignName;
+	};
+	const LocalizedCommandSample localizedSamples[] =
+	{
+		{ "chineseSimplified.xml", "mandarin chinese", L"\u5BF9\u9F50\u8868\u683C" },
+		{ "hindi.xml", "hindi", L"\u0924\u093E\u0932\u093F\u0915\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902" },
+		{ "spanish.xml", "spanish", L"Alinear tabla" },
+		{ "arabic.xml", "arabic", L"\u0645\u062D\u0627\u0630\u0627\u0629 \u0627\u0644\u062C\u062F\u0648\u0644" },
+		{ "french.xml", "french", L"Aligner le tableau" },
+		{ "bengali.xml", "bengali", L"\u099F\u09C7\u09AC\u09BF\u09B2 \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7 \u0995\u09B0\u09C1\u09A8" },
+		{ "portuguese.xml", "portuguese", L"Alinhar tabela" },
+		{ "indonesian.xml", "indonesian", L"Ratakan tabel" },
+		{ "urdu.xml", "urdu", L"\u062C\u062F\u0648\u0644 \u0633\u06CC\u062F\u06BE\u0627 \u06A9\u0631\u06CC\u06BA" },
+		{ "german.xml", "german", L"Tabelle ausrichten" },
+		{ "japanese.xml", "japanese", L"\u30C6\u30FC\u30D6\u30EB\u3092\u6574\u5217" },
+		{ "pidgin.xml", "nigerian pidgin", L"Arrange table" },
+		{ "marathi.xml", "marathi", L"\u0924\u0915\u094D\u0924\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u093E" },
+		{ "telugu.xml", "telugu", L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15\u0C28\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41" },
+		{ "turkish.xml", "turkish", L"Tabloyu hizala" },
+		{ "tamil.xml", "tamil", L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8\u0BAF\u0BC8 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1" },
+		{ "chineseTraditional.xml", "yue chinese", L"\u5C0D\u9F4A\u8868\u683C" },
+		{ "vietnamese.xml", "vietnamese", L"C\u0103n ch\u1EC9nh b\u1EA3ng" }
+	};
+	expectSize(failures, "additional localized command samples", sizeof(localizedSamples) / sizeof(localizedSamples[0]), static_cast<std::size_t>(18));
+	for (const LocalizedCommandSample &sample : localizedSamples)
+	{
+		MarkdownTablePluginTesting::applyNativeLangFileNameForTests(sample.nativeLangFileName);
+		expectWideString(failures, std::string(sample.label) + " align name", funcItem[0]._itemName, sample.alignName);
+	}
+
+	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("");
+	expectWideString(failures, "english plugin menu fallback", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"Markdown Table Editor");
+	for (std::size_t index = 0; index < expectedCount; ++index)
+		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");
 	expectString(failures, "plugin eol keeps cr source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r1,2", "\n"), "\r");

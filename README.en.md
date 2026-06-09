@@ -28,6 +28,7 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 - `Tab`, sorting, and row or column operations save manual spacing work.
 - CSV/TSV text can be converted into a clean Markdown table quickly.
 - UTF-8 and CJK characters are considered when calculating column width.
+- Plugin menus, commands, dialogs, and messages follow the Notepad++ localization for popular languages.
 
 ## Features
 
@@ -43,6 +44,7 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 - Insert a new table with a selected number of columns and rows.
 - Preserve Markdown alignment markers: `---`, `:---`, `---:`, `:---:`.
 - Correctly handle escaped pipes: `\|`.
+- Large-table operations are optimized and guarded by dedicated CI performance benchmarks.
 
 ## Installation
 
@@ -157,3 +159,9 @@ msbuild Package.proj /t:Coverage /p:Configuration=Debug /p:Platform=x64
 ```
 
 Cobertura XML is written to `build/reports/coverage/coverage.cobertura.xml`.
+
+Core performance benchmarks:
+
+```cmd
+msbuild Package.proj /t:CorePerformance /p:Configuration=Release /p:Platform=x64
+```

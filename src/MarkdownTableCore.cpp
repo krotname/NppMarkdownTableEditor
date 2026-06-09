@@ -83,6 +83,15 @@ std::string trim(const std::string &value)
 	return value.substr(first, last - first);
 }
 
+std::string trimRange(const std::string &value, std::size_t first, std::size_t last)
+{
+	while (first < last && isSpace(static_cast<unsigned char>(value[first])))
+		++first;
+	while (last > first && isSpace(static_cast<unsigned char>(value[last - 1])))
+		--last;
+	return value.substr(first, last - first);
+}
+
 bool isEscaped(const std::string &line, std::size_t pos)
 {
 	std::size_t slashCount = 0;
@@ -98,6 +107,14 @@ bool endsWithUnescapedPipe(const std::string &line)
 	return !isEscaped(line, line.size() - 1);
 }
 
+bool endsWithUnescapedPipeTrimmed(const std::string &line)
+{
+	std::size_t last = line.size();
+	while (last > 0 && isSpace(static_cast<unsigned char>(line[last - 1])))
+		--last;
+	return last > 0 && line[last - 1] == '|' && !isEscaped(line, last - 1);
+}
+
 bool startsWithUnescapedPipe(const std::string &line)
 {
 	std::size_t pos = 0;
@@ -108,23 +125,31 @@ bool startsWithUnescapedPipe(const std::string &line)
 
 std::vector<std::string> splitCells(const std::string &line)
 {
-	std::string body = trim(line);
-	if (!body.empty() && body[0] == '|')
-		body.erase(body.begin());
-	if (endsWithUnescapedPipe(body))
-		body.erase(body.end() - 1);
+	std::size_t first = 0;
+	while (first < line.size() && isSpace(static_cast<unsigned char>(line[first])))
+		++first;
+
+	std::size_t last = line.size();
+	while (last > first && isSpace(static_cast<unsigned char>(line[last - 1])))
+		--last;
+
+	if (first < last && line[first] == '|')
+		++first;
+	if (last > first && line[last - 1] == '|' && !isEscaped(line, last - 1))
+		--last;
 
 	std::vector<std::string> cells;
-	std::size_t start = 0;
-	for (std::size_t i = 0; i < body.size(); ++i)
+	cells.reserve(8);
+	std::size_t start = first;
+	for (std::size_t i = first; i < last; ++i)
 	{
-		if (body[i] == '|' && !isEscaped(body, i))
+		if (line[i] == '|' && !isEscaped(line, i))
 		{
-			cells.push_back(trim(body.substr(start, i - start)));
+			cells.push_back(trimRange(line, start, i));
 			start = i + 1;
 		}
 	}
-	cells.push_back(trim(body.substr(start)));
+	cells.push_back(trimRange(line, start, last));
 	return cells;
 }
 
@@ -210,33 +235,41 @@ std::size_t tableRangeEnd(const std::vector<std::string> &lines, std::size_t fir
 	return lastRow;
 }
 
-Table parseTable(const std::vector<std::string> &lines)
+Table parseTable(const std::vector<std::string> &lines, std::size_t firstRow, std::size_t lastRow)
 {
 	Table table;
+	if (lines.empty() || firstRow >= lines.size() || lastRow < firstRow)
+		return table;
+	if (lastRow >= lines.size())
+		lastRow = lines.size() - 1;
+
+	const std::size_t rowCount = lastRow - firstRow + 1;
+	table.rows.reserve(rowCount);
 	std::size_t leadingPipeRows = 0;
 	std::size_t trailingPipeRows = 0;
-	for (std::size_t i = 0; i < lines.size(); ++i)
+	for (std::size_t rowOffset = 0; rowOffset < rowCount; ++rowOffset)
 	{
+		const std::string &line = lines[firstRow + rowOffset];
 		Row row;
-		row.id = i;
-		row.cells = splitCells(lines[i]);
+		row.id = rowOffset;
+		row.cells = splitCells(line);
 		table.columns = (std::max)(table.columns, row.cells.size());
-		table.rows.push_back(row);
-		if (startsWithUnescapedPipe(lines[i]))
+		table.rows.push_back(std::move(row));
+		if (startsWithUnescapedPipe(line))
 			++leadingPipeRows;
-		if (endsWithUnescapedPipe(trim(lines[i])))
+		if (endsWithUnescapedPipeTrimmed(line))
 			++trailingPipeRows;
 	}
 
-	if (!lines.empty())
+	if (rowCount > 0)
 	{
-		table.leadingPipe = leadingPipeRows * 2 >= lines.size();
-		table.trailingPipe = trailingPipeRows * 2 >= lines.size();
+		table.leadingPipe = leadingPipeRows * 2 >= rowCount;
+		table.trailingPipe = trailingPipeRows * 2 >= rowCount;
 	}
 
 	for (std::size_t i = 0; i < table.rows.size(); ++i)
 	{
-		if (isSeparatorRow(table.rows[i]) || (i == 1 && isShortSeparatorLine(lines[i])))
+		if (isSeparatorRow(table.rows[i]) || (i == 1 && isShortSeparatorLine(lines[firstRow + i])))
 		{
 			table.separatorRow = i;
 			table.rows[i].separator = true;
@@ -363,7 +396,9 @@ bool inCodePointRanges(unsigned int cp, const CodePointRange *ranges, std::size_
 {
 	for (std::size_t i = 0; i < count; ++i)
 	{
-		if (cp >= ranges[i].first && cp <= ranges[i].last)
+		if (cp < ranges[i].first)
+			return false;
+		if (cp <= ranges[i].last)
 			return true;
 	}
 	return false;
@@ -476,6 +511,8 @@ std::size_t codePointDisplayWidth(unsigned int cp)
 {
 	if (isZeroWidthCodePoint(cp))
 		return 0;
+	if (cp < 0x1100)
+		return 1;
 	return isWideCodePoint(cp) || isEmojiPresentationCodePoint(cp) ? 2 : 1;
 }
 
@@ -574,26 +611,33 @@ std::size_t displayWidth(const std::string &text)
 	return width;
 }
 
-std::string spaces(std::size_t count)
-{
-	return std::string(count, ' ');
-}
-
-std::string separatorCell(Align align, std::size_t width)
+void appendSeparatorCell(std::string &line, Align align, std::size_t width)
 {
 	const std::size_t target = (std::max)(width, static_cast<std::size_t>(3));
 	if (align == Align::Center)
-		return std::string(":") + std::string(target - 2, '-') + ":";
-	if (align == Align::Left)
-		return std::string(":") + std::string(target - 1, '-');
-	if (align == Align::Right)
-		return std::string(target - 1, '-') + ":";
-	return std::string(target, '-');
+	{
+		line.push_back(':');
+		line.append(target - 2, '-');
+		line.push_back(':');
+	}
+	else if (align == Align::Left)
+	{
+		line.push_back(':');
+		line.append(target - 1, '-');
+	}
+	else if (align == Align::Right)
+	{
+		line.append(target - 1, '-');
+		line.push_back(':');
+	}
+	else
+	{
+		line.append(target, '-');
+	}
 }
 
-std::string paddedCell(const std::string &cell, Align align, std::size_t width, std::size_t *contentOffset)
+void appendPaddedCell(std::string &line, const std::string &cell, Align align, std::size_t width, std::size_t current, std::size_t *contentOffset)
 {
-	const std::size_t current = displayWidth(cell);
 	const std::size_t pad = width > current ? width - current : 0;
 	std::size_t leftPad = 0;
 	std::size_t rightPad = pad;
@@ -611,12 +655,15 @@ std::string paddedCell(const std::string &cell, Align align, std::size_t width, 
 
 	if (contentOffset)
 		*contentOffset = leftPad;
-	return spaces(leftPad) + cell + spaces(rightPad);
+	line.append(leftPad, ' ');
+	line += cell;
+	line.append(rightPad, ' ');
 }
 
 FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn)
 {
 	std::vector<std::size_t> widths(table.columns, 3);
+	std::vector<std::size_t> cellWidths(table.rows.size() * table.columns, 0);
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
@@ -624,7 +671,11 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 			continue;
 
 		for (std::size_t column = 0; column < table.columns; ++column)
-			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+		{
+			const std::size_t currentWidth = displayWidth(row.cells[column]);
+			cellWidths[rowIndex * table.columns + column] = currentWidth;
+			widths[column] = (std::max)(widths[column], currentWidth);
+		}
 	}
 
 	FormatResult result;
@@ -636,6 +687,26 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 	{
 		const Row &row = table.rows[rowIndex];
 		std::string line = table.leadingPipe ? "|" : "";
+		std::size_t lineCapacity = table.leadingPipe ? 1 : 0;
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			if (column > 0)
+				lineCapacity += 2;
+			if (table.leadingPipe || column > 0)
+				++lineCapacity;
+			if (row.separator)
+			{
+				lineCapacity += (std::max)(widths[column], static_cast<std::size_t>(3));
+			}
+			else
+			{
+				const std::size_t currentWidth = cellWidths[rowIndex * table.columns + column];
+				lineCapacity += row.cells[column].size() + (widths[column] > currentWidth ? widths[column] - currentWidth : 0);
+			}
+			if (table.trailingPipe && column + 1 == table.columns)
+				lineCapacity += 2;
+		}
+		line.reserve(lineCapacity);
 
 		for (std::size_t column = 0; column < table.columns; ++column)
 		{
@@ -646,18 +717,16 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 
 			if (row.separator)
 			{
-				const std::string value = separatorCell(table.alignments[column], widths[column]);
 				const std::size_t valueStart = line.size();
-				line += value;
+				appendSeparatorCell(line, table.alignments[column], widths[column]);
 				if (rowIndex == result.targetRow && column == result.targetColumn)
 					result.targetColumnOffset = valueStart;
 			}
 			else
 			{
 				std::size_t contentOffset = 0;
-				const std::string value = paddedCell(row.cells[column], table.alignments[column], widths[column], &contentOffset);
 				const std::size_t cellStart = line.size();
-				line += value;
+				appendPaddedCell(line, row.cells[column], table.alignments[column], widths[column], cellWidths[rowIndex * table.columns + column], &contentOffset);
 				if (rowIndex == result.targetRow && column == result.targetColumn)
 					result.targetColumnOffset = cellStart + contentOffset;
 			}
@@ -666,7 +735,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 				line += " |";
 		}
 
-		result.lines.push_back(line);
+		result.lines.push_back(std::move(line));
 	}
 
 	return result;
@@ -1005,9 +1074,9 @@ std::size_t sortRows(Table &table, std::size_t column, bool ascending, std::size
 	for (std::size_t i = firstDataRow; i < table.rows.size(); ++i)
 	{
 		SortEntry entry;
-		entry.row = table.rows[i];
-		entry.key = makeSortKey(entry.row.cells[column]);
-		entries.push_back(entry);
+		entry.key = makeSortKey(table.rows[i].cells[column]);
+		entry.row = std::move(table.rows[i]);
+		entries.push_back(std::move(entry));
 	}
 
 	std::stable_sort(entries.begin(), entries.end(),
@@ -1020,7 +1089,7 @@ std::size_t sortRows(Table &table, std::size_t column, bool ascending, std::size
 		});
 
 	for (std::size_t i = 0; i < entries.size(); ++i)
-		table.rows[firstDataRow + i] = entries[i].row;
+		table.rows[firstDataRow + i] = std::move(entries[i].row);
 
 	return rowById(table, currentRowId, fallbackRow);
 }
@@ -1032,7 +1101,7 @@ void insertEmptyRow(Table &table, std::size_t index)
 	row.cells.assign(table.columns, std::string());
 	if (index > table.rows.size())
 		index = table.rows.size();
-	table.rows.insert(table.rows.begin() + static_cast<std::ptrdiff_t>(index), row);
+	table.rows.insert(table.rows.begin() + static_cast<std::ptrdiff_t>(index), std::move(row));
 	if (table.separatorRow != static_cast<std::size_t>(-1) && index <= table.separatorRow)
 		++table.separatorRow;
 }
@@ -1066,9 +1135,9 @@ void moveColumn(Table &table, std::size_t from, std::size_t to)
 
 	for (std::size_t i = 0; i < table.rows.size(); ++i)
 	{
-		std::string value = table.rows[i].cells[from];
+		std::string value = std::move(table.rows[i].cells[from]);
 		table.rows[i].cells.erase(table.rows[i].cells.begin() + static_cast<std::ptrdiff_t>(from));
-		table.rows[i].cells.insert(table.rows[i].cells.begin() + static_cast<std::ptrdiff_t>(to), value);
+		table.rows[i].cells.insert(table.rows[i].cells.begin() + static_cast<std::ptrdiff_t>(to), std::move(value));
 	}
 
 	const Align align = table.alignments[from];
@@ -1409,12 +1478,9 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 		return result;
 	}
 
-	const std::vector<std::string> tableLines(
-		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.firstRow),
-		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.lastRow + 1));
 	std::size_t tableRow = sourceRow - tableRange.firstRow;
 
-	Table table = parseTable(tableLines);
+	Table table = parseTable(lines, tableRange.firstRow, tableRange.lastRow);
 	if (!isMarkdownTable(table))
 	{
 		result.message = "No Markdown table found";

@@ -32,6 +32,10 @@ jobs:
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
       run: msbuild Package.proj /m /t:Coverage /p:Configuration=Debug /p:Platform=x64
 
+    - name: Core performance benchmarks
+      if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
+      run: msbuild Package.proj /m /t:CorePerformance /p:Configuration=Release /p:Platform=x64
+
     - name: Upload coverage to Codecov
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
       uses: codecov/codecov-action@v7
