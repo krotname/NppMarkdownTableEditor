@@ -206,6 +206,15 @@ int runPluginShortcutTests()
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
+	MarkdownTablePluginTesting::setAutoWrapLongCellsEnabledForTests(false);
+	expectTrue(failures, "auto wrap starts disabled in test", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	toggleAutoWrapLongCells();
+	expectTrue(failures, "auto wrap toggles on", MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	toggleAutoWrapLongCells();
+	expectTrue(failures, "auto wrap toggles off", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
+	expectTrue(failures, "auto wrap toolbar icons are created", MarkdownTablePluginTesting::ensureAutoWrapToolbarIconsForTests());
+	MarkdownTablePluginTesting::destroyAutoWrapToolbarIconsForTests();
+
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");
 	expectString(failures, "plugin eol keeps cr source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r1,2", "\n"), "\r");
 	expectString(failures, "plugin eol keeps lf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\n1,2", "\r\n"), "\n");

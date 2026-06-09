@@ -113,6 +113,10 @@ ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &e
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
 void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
+bool autoWrapLongCellsEnabledForTests();
+void setAutoWrapLongCellsEnabledForTests(bool enabled);
+bool ensureAutoWrapToolbarIconsForTests();
+void destroyAutoWrapToolbarIconsForTests();
 }
 #endif
 

@@ -79,6 +79,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 
 		case NPPN_TBMODIFICATION:
 		case NPPN_TOOLBARICONSETCHANGED:
+		case NPPN_DARKMODECHANGED:
 		{
 			registerToolbarIcons();
 		}

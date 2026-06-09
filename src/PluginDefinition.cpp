@@ -1630,6 +1630,26 @@ const wchar_t *pluginMenuNameForTests()
 {
 	return uiText().pluginMenuName;
 }
+
+bool autoWrapLongCellsEnabledForTests()
+{
+	return g_autoWrapLongCells;
+}
+
+void setAutoWrapLongCellsEnabledForTests(bool enabled)
+{
+	g_autoWrapLongCells = enabled;
+}
+
+bool ensureAutoWrapToolbarIconsForTests()
+{
+	return ensureAutoWrapToolbarIconHandles();
+}
+
+void destroyAutoWrapToolbarIconsForTests()
+{
+	destroyAutoWrapToolbarIconHandles();
+}
 }
 #endif
 
