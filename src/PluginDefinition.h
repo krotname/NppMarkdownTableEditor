@@ -42,7 +42,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 16;
+const int nbFunc = 18;
 
 
 //
@@ -63,6 +63,8 @@ void pluginCleanUp();
 void commandMenuInit();
 
 void refreshUiLanguageFromNotepad();
+void registerToolbarIcons();
+void refreshAutoWrapLongCellsUi();
 
 //
 //Clean up your plugin commands allocation (if any)
@@ -94,6 +96,8 @@ void sortRowsDescending();
 void convertCsvTsvSelectionToTable();
 void insertTable();
 void tabOrIndent();
+void wrapLongCells();
+void toggleAutoWrapLongCells();
 
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting

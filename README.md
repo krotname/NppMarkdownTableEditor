@@ -39,6 +39,7 @@ GIF собран из реальных скриншотов Notepad++ под Win
 - Вставка, удаление и перемещение строк.
 - Вставка, удаление и перемещение колонок.
 - Сортировка строк по текущей колонке по возрастанию или убыванию.
+- Перенос длинных ячеек в строки-продолжения, чтобы широкие реестры было легче редактировать в plain text, с отдельным тумблером на панели для автоматического переноса после правок таблицы.
 - Конвертация выделенного CSV/TSV-текста или текущего CSV/TSV-блока в Markdown-таблицу.
 - Определение CSV/TSV-блока игнорирует запятые внутри кавычек и не захватывает соседний обычный текст.
 - Вставка новой таблицы с выбранным числом колонок и строк.
@@ -92,6 +93,8 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 | `Move row up` / `Move row down`                | Перемещает текущую строку                                                |
 | `Move column left` / `Move column right`       | Перемещает текущую колонку                                               |
 | `Sort rows ascending` / `Sort rows descending` | Сортирует строки по текущей колонке                                      |
+| `Wrap long cells`                              | Разбивает длинные ячейки на строки-продолжения                           |
+| `Auto wrap long cells`                         | Включает или выключает автоперенос длинных ячеек после команд таблицы     |
 | `Convert CSV/TSV to table`                     | Превращает выделенный CSV/TSV или текущий блок в Markdown-таблицу        |
 | `Insert table...`                              | Вставляет новую таблицу заданного размера                                |
 
@@ -119,6 +122,8 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 | `Move column right`          | `Ctrl+Alt+Shift+]` |
 | `Sort rows ascending`        | `Ctrl+Alt+Shift+=` |
 | `Sort rows descending`       | `Ctrl+Alt+Shift+-` |
+| `Wrap long cells`            | `Ctrl+Alt+Shift+W` |
+| `Auto wrap long cells`       | тумблер в меню/на панели |
 | `Convert CSV/TSV to table`   | `Ctrl+Alt+Shift+0` |
 | `Insert table...`            | `Ctrl+Alt+Shift+\` |
 

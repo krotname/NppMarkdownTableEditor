@@ -77,6 +77,13 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		}
 		break;
 
+		case NPPN_TBMODIFICATION:
+		case NPPN_TOOLBARICONSETCHANGED:
+		{
+			registerToolbarIcons();
+		}
+		break;
+
 		case NPPN_SHUTDOWN:
 		{
 			commandMenuCleanUp();

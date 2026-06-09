@@ -126,6 +126,8 @@ MarkdownTable::Action actionFromString(const std::string &value)
 		return MarkdownTable::Action::SortRowsAscending;
 	if (value == "SORT_DESCENDING")
 		return MarkdownTable::Action::SortRowsDescending;
+	if (value == "WRAP_LONG_CELLS")
+		return MarkdownTable::Action::WrapLongCells;
 	throw std::runtime_error("Unsupported action: " + value);
 }
 

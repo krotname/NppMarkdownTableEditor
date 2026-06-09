@@ -65,6 +65,10 @@ struct CodePointRange
 	unsigned int last;
 };
 
+const std::size_t hardWrapCellWidth = 32;
+
+std::size_t nextRowId(const Table &table);
+
 bool isSpace(unsigned char ch)
 {
 	return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
@@ -609,6 +613,239 @@ std::size_t displayWidth(const std::string &text)
 		width += joined && clusterWidth > 0 ? (std::max)(clusterWidth, static_cast<std::size_t>(2)) : clusterWidth;
 	}
 	return width;
+}
+
+std::size_t nextUtf8Offset(const std::string &text, std::size_t offset)
+{
+	readUtf8CodePoint(text, offset);
+	return offset;
+}
+
+bool startsMarkdownLinkAt(const std::string &text, std::size_t offset)
+{
+	if (offset >= text.size() || text[offset] != '[')
+		return false;
+
+	std::size_t closeBracket = offset + 1;
+	while (closeBracket < text.size())
+	{
+		if (text[closeBracket] == ']' && !isEscaped(text, closeBracket))
+			break;
+		closeBracket = nextUtf8Offset(text, closeBracket);
+	}
+	return closeBracket + 1 < text.size() && text[closeBracket + 1] == '(';
+}
+
+std::size_t markdownLinkEnd(const std::string &text, std::size_t offset)
+{
+	std::size_t closeBracket = offset + 1;
+	while (closeBracket < text.size())
+	{
+		if (text[closeBracket] == ']' && !isEscaped(text, closeBracket))
+			break;
+		closeBracket = nextUtf8Offset(text, closeBracket);
+	}
+	if (closeBracket + 1 >= text.size() || text[closeBracket + 1] != '(')
+		return offset + 1;
+
+	std::size_t pos = closeBracket + 2;
+	int depth = 1;
+	while (pos < text.size())
+	{
+		if (text[pos] == '(' && !isEscaped(text, pos))
+			++depth;
+		else if (text[pos] == ')' && !isEscaped(text, pos))
+		{
+			--depth;
+			if (depth == 0)
+				return pos + 1;
+		}
+		pos = nextUtf8Offset(text, pos);
+	}
+	return offset + 1;
+}
+
+std::size_t markdownCodeSpanEnd(const std::string &text, std::size_t offset)
+{
+	if (offset >= text.size() || text[offset] != '`')
+		return offset + 1;
+
+	std::size_t tickCount = 0;
+	while (offset + tickCount < text.size() && text[offset + tickCount] == '`')
+		++tickCount;
+
+	std::size_t pos = offset + tickCount;
+	while (pos < text.size())
+	{
+		if (text[pos] == '`')
+		{
+			std::size_t closingTicks = 0;
+			while (pos + closingTicks < text.size() && text[pos + closingTicks] == '`')
+				++closingTicks;
+			if (closingTicks == tickCount)
+				return pos + closingTicks;
+			pos += closingTicks;
+		}
+		else
+		{
+			pos = nextUtf8Offset(text, pos);
+		}
+	}
+	return offset + tickCount;
+}
+
+std::size_t longTokenChunkEnd(const std::string &token, std::size_t offset, std::size_t width)
+{
+	const std::size_t targetWidth = (std::max)(static_cast<std::size_t>(1), width);
+	std::size_t end = offset;
+	std::size_t chunkWidth = 0;
+	while (end < token.size())
+	{
+		const std::size_t before = end;
+		const std::size_t after = nextUtf8Offset(token, before);
+		const std::size_t codePointWidth = displayWidth(token.substr(before, after - before));
+		if (before > offset && chunkWidth + codePointWidth > targetWidth)
+			return before;
+		chunkWidth += codePointWidth;
+		end = after;
+		if (chunkWidth >= targetWidth)
+			return end;
+	}
+	return end > offset ? end : nextUtf8Offset(token, offset);
+}
+
+void appendWrappedToken(std::vector<std::string> &segments, std::string &current, const std::string &token, std::size_t width)
+{
+	const std::size_t tokenWidth = displayWidth(token);
+	const std::size_t currentWidth = displayWidth(current);
+	const std::size_t candidateWidth = current.empty() ? tokenWidth : currentWidth + 1 + tokenWidth;
+	if (tokenWidth <= width)
+	{
+		if (!current.empty() && candidateWidth > width)
+		{
+			segments.push_back(current);
+			current.clear();
+		}
+		if (!current.empty())
+			current.push_back(' ');
+		current += token;
+		return;
+	}
+
+	if (!current.empty())
+	{
+		segments.push_back(current);
+		current.clear();
+	}
+
+	std::size_t offset = 0;
+	while (offset < token.size())
+	{
+		const std::size_t end = longTokenChunkEnd(token, offset, width);
+		const std::string chunk = token.substr(offset, end - offset);
+		if (end < token.size())
+		{
+			segments.push_back(chunk);
+		}
+		else
+		{
+			current = chunk;
+		}
+		offset = end;
+	}
+}
+
+std::vector<std::string> wrapCellSegments(const std::string &cell, std::size_t width)
+{
+	const std::string value = trim(cell);
+	if (value.empty())
+		return { "" };
+
+	std::vector<std::string> segments;
+	std::string current;
+	std::size_t offset = 0;
+	while (offset < value.size())
+	{
+		while (offset < value.size() && isSpace(static_cast<unsigned char>(value[offset])))
+			++offset;
+		if (offset >= value.size())
+			break;
+
+		std::size_t end = offset;
+		if (value[offset] == '`')
+		{
+			end = markdownCodeSpanEnd(value, offset);
+		}
+		else if (startsMarkdownLinkAt(value, offset))
+		{
+			end = markdownLinkEnd(value, offset);
+		}
+		else
+		{
+			while (end < value.size() && !isSpace(static_cast<unsigned char>(value[end])))
+				end = nextUtf8Offset(value, end);
+		}
+
+		appendWrappedToken(segments, current, value.substr(offset, end - offset), width);
+		offset = end;
+	}
+
+	if (!current.empty())
+		segments.push_back(current);
+	if (segments.empty())
+		segments.push_back("");
+	return segments;
+}
+
+std::size_t wrapLongCells(Table &table, std::size_t originalTargetRow)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1))
+		return originalTargetRow;
+
+	std::vector<Row> wrappedRows;
+	wrappedRows.reserve(table.rows.size());
+	std::size_t wrappedTargetRow = originalTargetRow;
+	std::size_t nextId = nextRowId(table);
+
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex <= table.separatorRow)
+		{
+			if (rowIndex == originalTargetRow)
+				wrappedTargetRow = wrappedRows.size();
+			wrappedRows.push_back(row);
+			continue;
+		}
+
+		std::vector<std::vector<std::string>> cellSegments;
+		cellSegments.reserve(table.columns);
+		std::size_t segmentCount = 1;
+		for (std::size_t column = 0; column < table.columns; ++column)
+		{
+			cellSegments.push_back(wrapCellSegments(row.cells[column], hardWrapCellWidth));
+			segmentCount = (std::max)(segmentCount, cellSegments.back().size());
+		}
+
+		if (rowIndex == originalTargetRow)
+			wrappedTargetRow = wrappedRows.size();
+
+		for (std::size_t segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex)
+		{
+			Row wrapped;
+			wrapped.id = segmentIndex == 0 ? row.id : nextId++;
+			wrapped.cells.reserve(table.columns);
+			for (std::size_t column = 0; column < table.columns; ++column)
+			{
+				const std::vector<std::string> &segments = cellSegments[column];
+				wrapped.cells.push_back(segmentIndex < segments.size() ? segments[segmentIndex] : "");
+			}
+			wrappedRows.push_back(std::move(wrapped));
+		}
+	}
+
+	table.rows = std::move(wrappedRows);
+	return wrappedTargetRow;
 }
 
 void appendSeparatorCell(std::string &line, Align align, std::size_t width)
@@ -1588,6 +1825,10 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 
 		case Action::SortRowsDescending:
 			targetRow = sortRows(table, tableColumn, false, currentRowId, tableRow);
+			break;
+
+		case Action::WrapLongCells:
+			targetRow = wrapLongCells(table, tableRow);
 			break;
 
 		case Action::Align:

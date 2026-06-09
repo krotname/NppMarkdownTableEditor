@@ -18,8 +18,12 @@
 #include "PluginDefinition.h"
 #include "MarkdownTableCore.h"
 
+#include <commctrl.h>
+
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <cwchar>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -87,6 +91,15 @@ ShortcutKey g_sortRowsDescendingShortcut = { true, true, true, VK_OEM_MINUS };
 ShortcutKey g_convertCsvTsvShortcut = { true, true, true, '0' };
 ShortcutKey g_insertTableShortcut = { true, true, true, VK_OEM_5 };
 ShortcutKey g_tabShortcut = { false, false, false, VK_TAB };
+ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
+
+const std::size_t wrapLongCellsCommandIndex = 16;
+const std::size_t autoWrapLongCellsCommandIndex = 17;
+
+bool g_autoWrapLongCells = false;
+HBITMAP g_autoWrapToolbarBmp = NULL;
+HICON g_autoWrapToolbarIcon = NULL;
+HICON g_autoWrapToolbarIconDarkMode = NULL;
 
 enum class UiLanguage
 {
@@ -163,7 +176,9 @@ const UiText englishUiText =
 		L"Sort rows descending",
 		L"Convert CSV/TSV to table",
 		L"Insert table...",
-		L"Tab: align table or indent"
+		L"Tab: align table or indent",
+		L"Wrap long cells",
+		L"Auto wrap long cells"
 	},
 	L"Insert Markdown table",
 	L"Columns:",
@@ -396,7 +411,9 @@ const UiText russianUiText =
 		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E",
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
-		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F"
+		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F",
+		L"\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438 \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u044F\u0447\u0435\u0439\u043A\u0438",
+		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0434\u043B\u0438\u043D\u043D\u044B\u0445 \u044F\u0447\u0435\u0435\u043A"
 	},
 	L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 	L"\u0421\u0442\u043E\u043B\u0431\u0446\u044B:",
@@ -619,6 +636,14 @@ const UiText &uiText()
 	}
 }
 
+const wchar_t *commandText(std::size_t index)
+{
+	const UiText &localized = uiText();
+	if (index < static_cast<std::size_t>(nbFunc) && localized.commands[index])
+		return localized.commands[index];
+	return englishUiText.commands[index];
+}
+
 std::string toLowerAscii(std::string value)
 {
 	std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -693,9 +718,8 @@ UiLanguage languageFromNativeLangFileName(const std::string &nativeLangFileName)
 
 void applyCommandNames()
 {
-	const UiText &text = uiText();
 	for (int index = 0; index < nbFunc; ++index)
-		lstrcpyn(funcItem[index]._itemName, text.commands[index], menuItemSize);
+		lstrcpyn(funcItem[index]._itemName, commandText(static_cast<std::size_t>(index)), menuItemSize);
 }
 
 void setUiLanguage(UiLanguage language)
@@ -822,13 +846,178 @@ void updateNotepadPluginMenu()
 		return;
 
 	updatePluginSubmenuTitle(pluginsMenu);
-	const UiText &text = uiText();
 	for (int index = 0; index < nbFunc; ++index)
 	{
 		if (funcItem[index]._cmdID != 0)
-			updateCommandMenuItem(pluginsMenu, static_cast<UINT>(funcItem[index]._cmdID), text.commands[index]);
+			updateCommandMenuItem(pluginsMenu, static_cast<UINT>(funcItem[index]._cmdID), commandText(static_cast<std::size_t>(index)));
 	}
 	::DrawMenuBar(nppData._nppHandle);
+}
+
+std::uint32_t argb(unsigned char alpha, unsigned char red, unsigned char green, unsigned char blue)
+{
+	return (static_cast<std::uint32_t>(alpha) << 24) |
+		(static_cast<std::uint32_t>(red) << 16) |
+		(static_cast<std::uint32_t>(green) << 8) |
+		static_cast<std::uint32_t>(blue);
+}
+
+void setIconPixel(std::uint32_t *pixels, int x, int y, std::uint32_t color)
+{
+	if (!pixels || x < 0 || x >= 16 || y < 0 || y >= 16)
+		return;
+	pixels[y * 16 + x] = color;
+}
+
+void drawIconHorizontalLine(std::uint32_t *pixels, int x1, int x2, int y, std::uint32_t color)
+{
+	for (int x = x1; x <= x2; ++x)
+		setIconPixel(pixels, x, y, color);
+}
+
+void drawIconVerticalLine(std::uint32_t *pixels, int x, int y1, int y2, std::uint32_t color)
+{
+	for (int y = y1; y <= y2; ++y)
+		setIconPixel(pixels, x, y, color);
+}
+
+void drawAutoWrapIcon(std::uint32_t *pixels, bool darkMode)
+{
+	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
+	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
+	const std::uint32_t accent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
+
+	for (int y = 0; y < 16; ++y)
+		for (int x = 0; x < 16; ++x)
+			pixels[y * 16 + x] = argb(0, 0, 0, 0);
+
+	drawIconHorizontalLine(pixels, 2, 13, 2, grid);
+	drawIconHorizontalLine(pixels, 2, 13, 5, muted);
+	drawIconHorizontalLine(pixels, 2, 13, 8, muted);
+	drawIconHorizontalLine(pixels, 2, 13, 11, grid);
+	drawIconVerticalLine(pixels, 2, 2, 11, grid);
+	drawIconVerticalLine(pixels, 6, 2, 11, muted);
+	drawIconVerticalLine(pixels, 10, 2, 11, muted);
+	drawIconVerticalLine(pixels, 13, 2, 11, grid);
+
+	drawIconHorizontalLine(pixels, 9, 13, 13, accent);
+	drawIconVerticalLine(pixels, 13, 10, 13, accent);
+	drawIconHorizontalLine(pixels, 4, 13, 10, accent);
+	setIconPixel(pixels, 4, 10, accent);
+	setIconPixel(pixels, 5, 9, accent);
+	setIconPixel(pixels, 5, 11, accent);
+}
+
+HBITMAP createAutoWrapBitmap(bool darkMode)
+{
+	BITMAPINFO info;
+	ZeroMemory(&info, sizeof(info));
+	info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	info.bmiHeader.biWidth = 16;
+	info.bmiHeader.biHeight = -16;
+	info.bmiHeader.biPlanes = 1;
+	info.bmiHeader.biBitCount = 32;
+	info.bmiHeader.biCompression = BI_RGB;
+
+	void *bits = NULL;
+	HBITMAP bitmap = ::CreateDIBSection(NULL, &info, DIB_RGB_COLORS, &bits, NULL, 0);
+	if (!bitmap || !bits)
+		return bitmap;
+
+	drawAutoWrapIcon(reinterpret_cast<std::uint32_t *>(bits), darkMode);
+	return bitmap;
+}
+
+HICON createAutoWrapIcon(bool darkMode)
+{
+	HBITMAP color = createAutoWrapBitmap(darkMode);
+	if (!color)
+		return NULL;
+
+	const unsigned char maskBits[32] = { 0 };
+	HBITMAP mask = ::CreateBitmap(16, 16, 1, 1, maskBits);
+	if (!mask)
+	{
+		::DeleteObject(color);
+		return NULL;
+	}
+
+	ICONINFO iconInfo;
+	ZeroMemory(&iconInfo, sizeof(iconInfo));
+	iconInfo.fIcon = TRUE;
+	iconInfo.hbmColor = color;
+	iconInfo.hbmMask = mask;
+	HICON icon = ::CreateIconIndirect(&iconInfo);
+
+	::DeleteObject(color);
+	::DeleteObject(mask);
+	return icon;
+}
+
+bool ensureAutoWrapToolbarIconHandles()
+{
+	if (!g_autoWrapToolbarBmp)
+		g_autoWrapToolbarBmp = createAutoWrapBitmap(false);
+	if (!g_autoWrapToolbarIcon)
+		g_autoWrapToolbarIcon = createAutoWrapIcon(false);
+	if (!g_autoWrapToolbarIconDarkMode)
+		g_autoWrapToolbarIconDarkMode = createAutoWrapIcon(true);
+	return g_autoWrapToolbarBmp && g_autoWrapToolbarIcon && g_autoWrapToolbarIconDarkMode;
+}
+
+void destroyAutoWrapToolbarIconHandles()
+{
+	if (g_autoWrapToolbarBmp)
+	{
+		::DeleteObject(g_autoWrapToolbarBmp);
+		g_autoWrapToolbarBmp = NULL;
+	}
+	if (g_autoWrapToolbarIcon)
+	{
+		::DestroyIcon(g_autoWrapToolbarIcon);
+		g_autoWrapToolbarIcon = NULL;
+	}
+	if (g_autoWrapToolbarIconDarkMode)
+	{
+		::DestroyIcon(g_autoWrapToolbarIconDarkMode);
+		g_autoWrapToolbarIconDarkMode = NULL;
+	}
+}
+
+BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
+{
+	wchar_t className[64] = { 0 };
+	::GetClassName(hwnd, className, static_cast<int>(sizeof(className) / sizeof(className[0])));
+	if (std::wcscmp(className, L"ToolbarWindow32") == 0)
+	{
+		HWND *result = reinterpret_cast<HWND *>(lParam);
+		*result = hwnd;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+HWND findToolbarWindow(HWND parent)
+{
+	if (!parent)
+		return NULL;
+
+	HWND toolbar = NULL;
+	::EnumChildWindows(parent, findToolbarWindowCallback, reinterpret_cast<LPARAM>(&toolbar));
+	return toolbar;
+}
+
+void setAutoWrapToolbarCheckState()
+{
+	HWND toolbar = findToolbarWindow(nppData._nppHandle);
+	if (!toolbar || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0)
+		return;
+
+	::SendMessage(
+		toolbar,
+		TB_CHECKBUTTON,
+		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+		MAKELPARAM(g_autoWrapLongCells ? TRUE : FALSE, 0));
 }
 
 int coreIndex(std::size_t value)
@@ -1275,6 +1464,12 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
+	if (g_autoWrapLongCells && action != MarkdownTable::Action::WrapLongCells)
+	{
+		MarkdownTable::EditResult wrapped = MarkdownTable::apply(edit.lines, coreIndex(edit.targetRow), coreIndex(column), MarkdownTable::Action::WrapLongCells);
+		if (wrapped.ok)
+			edit = wrapped;
+	}
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
@@ -1451,6 +1646,7 @@ void pluginInit(HANDLE hModule)
 //
 void pluginCleanUp()
 {
+	destroyAutoWrapToolbarIconHandles();
 }
 
 //
@@ -1469,29 +1665,74 @@ void commandMenuInit()
     //            ShortcutKey *shortcut,          // optional. Define a shortcut to trigger this command
     //            bool check0nInit                // optional. Make this menu item be checked visually
     //            );
-	const UiText &text = uiText();
-	setCommand(0, text.commands[0], alignTable, &g_alignShortcut, false);
-	setCommand(1, text.commands[1], nextCell, &g_nextCellShortcut, false);
-	setCommand(2, text.commands[2], previousCell, &g_previousCellShortcut, false);
-	setCommand(3, text.commands[3], insertRowBelow, &g_insertRowShortcut, false);
-	setCommand(4, text.commands[4], deleteRow, &g_deleteRowShortcut, false);
-	setCommand(5, text.commands[5], insertColumnRight, &g_insertColumnShortcut, false);
-	setCommand(6, text.commands[6], deleteColumn, &g_deleteColumnShortcut, false);
-	setCommand(7, text.commands[7], moveRowUp, &g_moveRowUpShortcut, false);
-	setCommand(8, text.commands[8], moveRowDown, &g_moveRowDownShortcut, false);
-	setCommand(9, text.commands[9], moveColumnLeft, &g_moveColumnLeftShortcut, false);
-	setCommand(10, text.commands[10], moveColumnRight, &g_moveColumnRightShortcut, false);
-	setCommand(11, text.commands[11], sortRowsAscending, &g_sortRowsAscendingShortcut, false);
-	setCommand(12, text.commands[12], sortRowsDescending, &g_sortRowsDescendingShortcut, false);
-	setCommand(13, text.commands[13], convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
-	setCommand(14, text.commands[14], insertTable, &g_insertTableShortcut, false);
-	setCommand(15, text.commands[15], tabOrIndent, &g_tabShortcut, false);
+	setCommand(0, commandText(0), alignTable, &g_alignShortcut, false);
+	setCommand(1, commandText(1), nextCell, &g_nextCellShortcut, false);
+	setCommand(2, commandText(2), previousCell, &g_previousCellShortcut, false);
+	setCommand(3, commandText(3), insertRowBelow, &g_insertRowShortcut, false);
+	setCommand(4, commandText(4), deleteRow, &g_deleteRowShortcut, false);
+	setCommand(5, commandText(5), insertColumnRight, &g_insertColumnShortcut, false);
+	setCommand(6, commandText(6), deleteColumn, &g_deleteColumnShortcut, false);
+	setCommand(7, commandText(7), moveRowUp, &g_moveRowUpShortcut, false);
+	setCommand(8, commandText(8), moveRowDown, &g_moveRowDownShortcut, false);
+	setCommand(9, commandText(9), moveColumnLeft, &g_moveColumnLeftShortcut, false);
+	setCommand(10, commandText(10), moveColumnRight, &g_moveColumnRightShortcut, false);
+	setCommand(11, commandText(11), sortRowsAscending, &g_sortRowsAscendingShortcut, false);
+	setCommand(12, commandText(12), sortRowsDescending, &g_sortRowsDescendingShortcut, false);
+	setCommand(13, commandText(13), convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
+	setCommand(14, commandText(14), insertTable, &g_insertTableShortcut, false);
+	setCommand(15, commandText(15), tabOrIndent, &g_tabShortcut, false);
+	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
+	setCommand(autoWrapLongCellsCommandIndex, commandText(autoWrapLongCellsCommandIndex), toggleAutoWrapLongCells, NULL, false);
 }
 
 void refreshUiLanguageFromNotepad()
 {
 	setUiLanguage(languageFromNativeLangFileName(nativeLangFileName()));
 	updateNotepadPluginMenu();
+	refreshAutoWrapLongCellsUi();
+}
+
+void refreshAutoWrapLongCellsUi()
+{
+	if (!nppData._nppHandle || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0)
+		return;
+
+	::SendMessage(
+		nppData._nppHandle,
+		NPPM_SETMENUITEMCHECK,
+		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+		static_cast<LPARAM>(g_autoWrapLongCells ? TRUE : FALSE));
+	setAutoWrapToolbarCheckState();
+}
+
+void registerToolbarIcons()
+{
+	if (!nppData._nppHandle || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0 || !ensureAutoWrapToolbarIconHandles())
+		return;
+
+	toolbarIconsWithDarkMode icons;
+	ZeroMemory(&icons, sizeof(icons));
+	icons.hToolbarBmp = g_autoWrapToolbarBmp;
+	icons.hToolbarIcon = g_autoWrapToolbarIcon;
+	icons.hToolbarIconDarkMode = g_autoWrapToolbarIconDarkMode;
+	const LRESULT darkModeResult = ::SendMessage(
+		nppData._nppHandle,
+		NPPM_ADDTOOLBARICON_FORDARKMODE,
+		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+		reinterpret_cast<LPARAM>(&icons));
+	if (!darkModeResult)
+	{
+		toolbarIcons legacyIcons;
+		ZeroMemory(&legacyIcons, sizeof(legacyIcons));
+		legacyIcons.hToolbarBmp = g_autoWrapToolbarBmp;
+		legacyIcons.hToolbarIcon = g_autoWrapToolbarIcon;
+		::SendMessage(
+			nppData._nppHandle,
+			NPPM_ADDTOOLBARICON_DEPRECATED,
+			static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
+			reinterpret_cast<LPARAM>(&legacyIcons));
+	}
+	refreshAutoWrapLongCellsUi();
 }
 
 //
@@ -1608,4 +1849,17 @@ void tabOrIndent()
 	HWND scintilla = currentScintilla();
 	if (scintilla)
 		::SendMessage(scintilla, SCI_TAB, 0, 0);
+}
+
+void wrapLongCells()
+{
+	runTableAction(MarkdownTable::Action::WrapLongCells, false);
+}
+
+void toggleAutoWrapLongCells()
+{
+	g_autoWrapLongCells = !g_autoWrapLongCells;
+	refreshAutoWrapLongCellsUi();
+	if (g_autoWrapLongCells)
+		runTableAction(MarkdownTable::Action::WrapLongCells, true);
 }

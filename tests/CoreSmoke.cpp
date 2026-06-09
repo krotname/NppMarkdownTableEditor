@@ -188,6 +188,47 @@ int main()
 			"Anna |  20"
 		});
 
+	const MarkdownTable::EditResult wrappedLongCells = MarkdownTable::apply(
+		{
+			"| Key | Value |",
+			"| --- | --- |",
+			"| row | alpha beta gamma delta epsilon zeta eta theta |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::WrapLongCells);
+	expectTrue("wrap long cells ok", wrappedLongCells.ok);
+	expectSize("wrap long cells target row", wrappedLongCells.targetRow, 2);
+	expectSize("wrap long cells target column", wrappedLongCells.targetColumn, 1);
+	expectLines("wrap long cells", wrappedLongCells.lines,
+		{
+			"| Key | Value                          |",
+			"| --- | ------------------------------ |",
+			"| row | alpha beta gamma delta epsilon |",
+			"|     | zeta eta theta                 |"
+		});
+
+	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
+		{
+			"| Key | Value | Other |",
+			"| --- | --- | --- |",
+			"| protected | before [Codex Desktop registry](<C:/tmp/patch registry.md>) after ``code span with spaces`` alpha beta gamma delta epsilon zeta | empty |",
+			"| empty | | [broken bracket text keeps moving across words |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::WrapLongCells);
+	expectTrue("wrap protected tokens ok", wrappedProtectedTokens.ok);
+	expectTrue("wrap protected tokens expands rows", wrappedProtectedTokens.lines.size() > 5);
+	std::string wrappedProtectedText;
+	for (std::size_t i = 0; i < wrappedProtectedTokens.lines.size(); ++i)
+		wrappedProtectedText += wrappedProtectedTokens.lines[i] + "\n";
+	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp") != std::string::npos);
+	expectTrue("wrap keeps markdown link remainder", wrappedProtectedText.find("/patch registry.md>)") != std::string::npos);
+	expectTrue("wrap no longer keeps overwide markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp/patch registry.md>)") == std::string::npos);
+	expectTrue("wrap keeps code span token", wrappedProtectedText.find("``code span with spaces``") != std::string::npos);
+	expectTrue("wrap keeps malformed bracket token text", wrappedProtectedText.find("[broken") != std::string::npos);
+
 	const std::string escaped = "| a \\| b | c |";
 	expectTrue("escaped pipe potential", MarkdownTable::isPotentialTableLine(escaped));
 	expectTrue("only escaped pipe is not table", !MarkdownTable::isPotentialTableLine("a \\| b"));

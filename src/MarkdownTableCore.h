@@ -24,7 +24,8 @@ enum class Action
 	MoveColumnLeft,
 	MoveColumnRight,
 	SortRowsAscending,
-	SortRowsDescending
+	SortRowsDescending,
+	WrapLongCells
 };
 
 struct EditResult

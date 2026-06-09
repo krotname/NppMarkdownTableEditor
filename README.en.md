@@ -39,6 +39,7 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 - Insert, delete, and move rows.
 - Insert, delete, and move columns.
 - Sort rows by the current column in ascending or descending order.
+- Wrap long cells into continuation rows so wide registries are easier to edit in plain text, with an optional toolbar toggle for automatic wrapping after table edits.
 - Convert selected CSV/TSV text or the current CSV/TSV block into a Markdown table.
 - CSV/TSV block detection ignores commas inside quotes and does not capture adjacent plain text.
 - Insert a new table with a selected number of columns and rows.
@@ -92,6 +93,8 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | `Move row up` / `Move row down`                | Moves the current row                                                |
 | `Move column left` / `Move column right`       | Moves the current column                                             |
 | `Sort rows ascending` / `Sort rows descending` | Sorts rows by the current column                                     |
+| `Wrap long cells`                              | Splits long cells into continuation rows                             |
+| `Auto wrap long cells`                         | Toggles automatic long-cell wrapping after table edit commands        |
 | `Convert CSV/TSV to table`                     | Converts selected CSV/TSV or the current block to a Markdown table   |
 | `Insert table...`                              | Inserts a new table with the requested size                          |
 
@@ -119,6 +122,8 @@ Except for the contextual `Tab`, commands use `Ctrl+Alt+Shift` with the top numb
 | `Move column right`          | `Ctrl+Alt+Shift+]` |
 | `Sort rows ascending`        | `Ctrl+Alt+Shift+=` |
 | `Sort rows descending`       | `Ctrl+Alt+Shift+-` |
+| `Wrap long cells`            | `Ctrl+Alt+Shift+W` |
+| `Auto wrap long cells`       | toolbar/menu toggle |
 | `Convert CSV/TSV to table`   | `Ctrl+Alt+Shift+0` |
 | `Insert table...`            | `Ctrl+Alt+Shift+\` |
 

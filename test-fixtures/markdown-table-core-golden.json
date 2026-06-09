@@ -193,6 +193,105 @@
       "targetColumn": 1
     },
     {
+      "name": "wrap long cells creates continuation rows",
+      "action": "WRAP_LONG_CELLS",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "| Key | Value |",
+        "| --- | --- |",
+        "| row | alpha beta gamma delta epsilon zeta eta theta |"
+      ],
+      "lines": [
+        "| Key | Value                          |",
+        "| --- | ------------------------------ |",
+        "| row | alpha beta gamma delta epsilon |",
+        "|     | zeta eta theta                 |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 1
+    },
+    {
+      "name": "wrap long cells splits overwide markdown links and keeps code spans",
+      "action": "WRAP_LONG_CELLS",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "| Item | Text | Empty |",
+        "| --- | --- | --- |",
+        "| link | [release notes](https://example.com/path_(v1)) alpha beta gamma delta | |",
+        "| code | ``alpha beta`` gamma delta epsilon zeta eta theta | tail |"
+      ],
+      "lines": [
+        "| Item | Text                             | Empty |",
+        "| ---- | -------------------------------- | ----- |",
+        "| link | [release notes](https://example. |       |",
+        "|      | com/path_(v1)) alpha beta gamma  |       |",
+        "|      | delta                            |       |",
+        "| code | ``alpha beta`` gamma delta       | tail  |",
+        "|      | epsilon zeta eta theta           |       |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 1
+    },
+    {
+      "name": "wrap long cells keeps header target row",
+      "action": "WRAP_LONG_CELLS",
+      "row": 0,
+      "column": 0,
+      "input": [
+        "| H | V |",
+        "| --- | --- |",
+        "| alpha beta gamma delta epsilon zeta eta theta | tail |"
+      ],
+      "lines": [
+        "| H                              | V    |",
+        "| ------------------------------ | ---- |",
+        "| alpha beta gamma delta epsilon | tail |",
+        "| zeta eta theta                 |      |"
+      ],
+      "targetRow": 0,
+      "targetColumn": 0
+    },
+    {
+      "name": "wrap long cells trims padded rows",
+      "action": "WRAP_LONG_CELLS",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "  | H | V |  ",
+        "  | --- | --- |  ",
+        "  | a  |  b  |  "
+      ],
+      "lines": [
+        "| H   | V   |",
+        "| --- | --- |",
+        "| a   | b   |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
+      "name": "wrap long cells keeps combining marks narrow and cjk wide",
+      "action": "WRAP_LONG_CELLS",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| C | N |",
+        "| --- | --- |",
+        "| e\u0301 | 1 |",
+        "| 表 | 2 |"
+      ],
+      "lines": [
+        "| C   | N   |",
+        "| --- | --- |",
+        "| e\u0301   | 1   |",
+        "| 表  | 2   |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
       "name": "sort rows ascending decimal numbers",
       "action": "SORT_ASCENDING",
       "row": 2,
