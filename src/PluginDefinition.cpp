@@ -1156,55 +1156,6 @@ bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
 	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
 }
 
-int availableTextPixelWidth(HWND scintilla)
-{
-	if (!scintilla)
-		return 0;
-
-	RECT client;
-	if (!::GetClientRect(scintilla, &client))
-		return 0;
-
-	const int safeMargin = 6;
-	const int availableWidth = (client.right - client.left) - safeMargin;
-	return availableWidth > 0 ? availableWidth : 0;
-}
-
-bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
-{
-	const int availableWidth = availableTextPixelWidth(scintilla);
-	if (availableWidth <= 0)
-		return false;
-
-	for (const auto &line : lines)
-	{
-		const LRESULT width = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(line.c_str()));
-		if (width > availableWidth)
-			return false;
-	}
-	return true;
-}
-
-std::size_t availableDisplayColumns(HWND scintilla)
-{
-	const int availableWidth = availableTextPixelWidth(scintilla);
-	if (availableWidth <= 0)
-		return 80;
-
-	const std::string sample(80, '0');
-	const LRESULT sampleWidth = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(sample.c_str()));
-	if (sampleWidth <= 0)
-		return 80;
-
-	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
-	return (std::max)(columns, static_cast<std::size_t>(20));
-}
-
-bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action, HWND scintilla, const std::vector<std::string> &previewLines)
-{
-	return shouldApplyAutoWrapAfterAction(action) && !tableFitsAvailableWidth(scintilla, previewLines);
-}
-
 int coreIndex(std::size_t value)
 {
 	const std::size_t maxInt = static_cast<std::size_t>((std::numeric_limits<int>::max)());
@@ -1649,13 +1600,13 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
-	if (shouldApplyAutoWrapAfterAction(action, scintilla, edit.lines))
+	if (shouldApplyAutoWrapAfterAction(action))
 	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
+		MarkdownTable::EditResult wrapped = MarkdownTable::apply(
 			edit.lines,
 			coreIndex(edit.targetRow),
 			coreIndex(edit.targetColumn),
-			availableDisplayColumns(scintilla));
+			MarkdownTable::Action::WrapLongCells);
 		if (wrapped.ok)
 			edit = wrapped;
 	}

@@ -208,25 +208,6 @@ int main()
 			"|     | zeta eta theta                 |"
 		});
 
-	const MarkdownTable::EditResult widthWrapped = MarkdownTable::applyWrappedToWidth(
-		{
-			"| Summary | Type | Priority | Reason | Id |",
-			"| --- | --- | --- | --- | --- |",
-			"| alpha beta gamma delta epsilon zeta eta theta | Task | High | one two three four five six seven | `abcdef0123456789` |"
-		},
-		2,
-		0,
-		80);
-	expectTrue("wrap to table width ok", widthWrapped.ok);
-	expectLines("wrap to table width keeps narrow columns", widthWrapped.lines,
-		{
-			"| Summary          | Type | Priority | Reason        | Id                 |",
-			"| ---------------- | ---- | -------- | ------------- | ------------------ |",
-			"| alpha beta gamma | Task | High     | one two three | `abcdef0123456789` |",
-			"| delta epsilon    |      |          | four five six |                    |",
-			"| zeta eta theta   |      |          | seven         |                    |"
-		});
-
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{
 			"| Key | Value | Other |",
