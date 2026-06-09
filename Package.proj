@@ -346,6 +346,8 @@
     <PluginProject>$(ProjectRoot)vs.proj\MarkdownTableEditor.vcxproj</PluginProject>
     <TestProject>$(ProjectRoot)tests\CoreSmoke.vcxproj</TestProject>
     <TestExe>$(ProjectRoot)tests\CoreSmoke.exe</TestExe>
+    <PluginShortcutTestProject>$(ProjectRoot)tests\PluginShortcutSmoke.vcxproj</PluginShortcutTestProject>
+    <PluginShortcutTestExe>$(ProjectRoot)tests\PluginShortcutSmoke.exe</PluginShortcutTestExe>
     <BuildDir>$(ProjectRoot)build</BuildDir>
     <CoverageWorkDir>$(BuildDir)\coverage</CoverageWorkDir>
     <CoverageReportsDir>$(BuildDir)\reports\coverage</CoverageReportsDir>
@@ -450,6 +452,14 @@
     <Exec Command="&quot;$(TestExe)&quot;" />
   </Target>
 
+  <Target Name="BuildPluginShortcutSmokeTests">
+    <MSBuild Projects="$(PluginShortcutTestProject)" Targets="Rebuild" Properties="Configuration=Debug;Platform=x64" />
+  </Target>
+
+  <Target Name="RunPluginShortcutSmokeTests" DependsOnTargets="BuildPluginShortcutSmokeTests">
+    <Exec Command="&quot;$(PluginShortcutTestExe)&quot;" />
+  </Target>
+
   <Target Name="CleanCoverage">
     <RemoveDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" Condition="Exists('$(CoverageWorkDir)') Or Exists('$(CoverageReportsDir)')" />
     <MakeDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" />
@@ -510,5 +520,5 @@
     <Message Importance="high" Text="Built $(PluginAdminZipPath)" />
   </Target>
 
-  <Target Name="Package" DependsOnTargets="CleanPackage;BuildPlugin;Coverage;ValidateDllVersion;PreparePackage;CreateArchives;ValidateArchives" />
+  <Target Name="Package" DependsOnTargets="CleanPackage;BuildPlugin;RunPluginShortcutSmokeTests;Coverage;ValidateDllVersion;PreparePackage;CreateArchives;ValidateArchives" />
 </Project>

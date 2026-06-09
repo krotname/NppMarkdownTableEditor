@@ -97,16 +97,26 @@ You will get a Markdown table with `Name` and `Score` columns.
 
 Default keyboard shortcuts:
 
-| Command                      | Shortcut               |
-| ---------------------------- | ---------------------- |
-| `Tab: align table or indent` | `Tab`                  |
-| `Align table`                | `Ctrl+Alt+A`           |
-| `Next cell`                  | `Ctrl+Alt+Right`       |
-| `Previous cell`              | `Ctrl+Alt+Left`        |
-| `Insert row below`           | `Ctrl+Alt+Down`        |
-| `Delete row`                 | `Ctrl+Alt+Up`          |
-| `Insert column right`        | `Ctrl+Alt+Shift+Right` |
-| `Delete column`              | `Ctrl+Alt+Shift+Left`  |
+Except for the contextual `Tab`, commands use `Ctrl+Alt+Shift` with the top number row and adjacent keys to avoid standard JetBrains IDE and Notepad++ shortcuts.
+
+| Command                      | Shortcut           |
+| ---------------------------- | ------------------ |
+| `Tab: align table or indent` | `Tab`              |
+| `Align table`                | `Ctrl+Alt+Shift+1` |
+| `Next cell`                  | `Ctrl+Alt+Shift+2` |
+| `Previous cell`              | `Ctrl+Alt+Shift+3` |
+| `Insert row below`           | `Ctrl+Alt+Shift+4` |
+| `Delete row`                 | `Ctrl+Alt+Shift+5` |
+| `Insert column right`        | `Ctrl+Alt+Shift+6` |
+| `Delete column`              | `Ctrl+Alt+Shift+7` |
+| `Move row up`                | `Ctrl+Alt+Shift+8` |
+| `Move row down`              | `Ctrl+Alt+Shift+9` |
+| `Move column left`           | `Ctrl+Alt+Shift+[` |
+| `Move column right`          | `Ctrl+Alt+Shift+]` |
+| `Sort rows ascending`        | `Ctrl+Alt+Shift+=` |
+| `Sort rows descending`       | `Ctrl+Alt+Shift+-` |
+| `Convert CSV/TSV to table`   | `Ctrl+Alt+Shift+0` |
+| `Insert table...`            | `Ctrl+Alt+Shift+\` |
 
 ## Build and Tests
 

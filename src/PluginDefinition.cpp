@@ -69,13 +69,21 @@ struct LegacySciTextRange
 	char *lpstrText;
 };
 
-ShortcutKey g_alignShortcut = { true, true, false, 'A' };
-ShortcutKey g_nextCellShortcut = { true, true, false, VK_RIGHT };
-ShortcutKey g_previousCellShortcut = { true, true, false, VK_LEFT };
-ShortcutKey g_insertRowShortcut = { true, true, false, VK_DOWN };
-ShortcutKey g_deleteRowShortcut = { true, true, false, VK_UP };
-ShortcutKey g_insertColumnShortcut = { true, true, true, VK_RIGHT };
-ShortcutKey g_deleteColumnShortcut = { true, true, true, VK_LEFT };
+ShortcutKey g_alignShortcut = { true, true, true, '1' };
+ShortcutKey g_nextCellShortcut = { true, true, true, '2' };
+ShortcutKey g_previousCellShortcut = { true, true, true, '3' };
+ShortcutKey g_insertRowShortcut = { true, true, true, '4' };
+ShortcutKey g_deleteRowShortcut = { true, true, true, '5' };
+ShortcutKey g_insertColumnShortcut = { true, true, true, '6' };
+ShortcutKey g_deleteColumnShortcut = { true, true, true, '7' };
+ShortcutKey g_moveRowUpShortcut = { true, true, true, '8' };
+ShortcutKey g_moveRowDownShortcut = { true, true, true, '9' };
+ShortcutKey g_moveColumnLeftShortcut = { true, true, true, VK_OEM_4 };
+ShortcutKey g_moveColumnRightShortcut = { true, true, true, VK_OEM_6 };
+ShortcutKey g_sortRowsAscendingShortcut = { true, true, true, VK_OEM_PLUS };
+ShortcutKey g_sortRowsDescendingShortcut = { true, true, true, VK_OEM_MINUS };
+ShortcutKey g_convertCsvTsvShortcut = { true, true, true, '0' };
+ShortcutKey g_insertTableShortcut = { true, true, true, VK_OEM_5 };
 ShortcutKey g_tabShortcut = { false, false, false, VK_TAB };
 
 HWND currentScintilla()
@@ -697,14 +705,14 @@ void commandMenuInit()
 	setCommand(4, TEXT("Delete row"), deleteRow, &g_deleteRowShortcut, false);
 	setCommand(5, TEXT("Insert column right"), insertColumnRight, &g_insertColumnShortcut, false);
 	setCommand(6, TEXT("Delete column"), deleteColumn, &g_deleteColumnShortcut, false);
-	setCommand(7, TEXT("Move row up"), moveRowUp, NULL, false);
-	setCommand(8, TEXT("Move row down"), moveRowDown, NULL, false);
-	setCommand(9, TEXT("Move column left"), moveColumnLeft, NULL, false);
-	setCommand(10, TEXT("Move column right"), moveColumnRight, NULL, false);
-	setCommand(11, TEXT("Sort rows ascending"), sortRowsAscending, NULL, false);
-	setCommand(12, TEXT("Sort rows descending"), sortRowsDescending, NULL, false);
-	setCommand(13, TEXT("Convert CSV/TSV to table"), convertCsvTsvSelectionToTable, NULL, false);
-	setCommand(14, TEXT("Insert table..."), insertTable, NULL, false);
+	setCommand(7, TEXT("Move row up"), moveRowUp, &g_moveRowUpShortcut, false);
+	setCommand(8, TEXT("Move row down"), moveRowDown, &g_moveRowDownShortcut, false);
+	setCommand(9, TEXT("Move column left"), moveColumnLeft, &g_moveColumnLeftShortcut, false);
+	setCommand(10, TEXT("Move column right"), moveColumnRight, &g_moveColumnRightShortcut, false);
+	setCommand(11, TEXT("Sort rows ascending"), sortRowsAscending, &g_sortRowsAscendingShortcut, false);
+	setCommand(12, TEXT("Sort rows descending"), sortRowsDescending, &g_sortRowsDescendingShortcut, false);
+	setCommand(13, TEXT("Convert CSV/TSV to table"), convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
+	setCommand(14, TEXT("Insert table..."), insertTable, &g_insertTableShortcut, false);
 	setCommand(15, TEXT("Tab: align table or indent"), tabOrIndent, &g_tabShortcut, false);
 }
 

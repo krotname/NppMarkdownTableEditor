@@ -285,6 +285,8 @@
   <Target Name="RunCoreScenarioUnitTests" AfterTargets="Build" Condition="'$(Platform)'=='x64' and '$(SkipCoreScenarioTests)'!='true'">
     <MSBuild Projects="$(MSBuildThisFileDirectory)..\tests\CoreSmoke.vcxproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64" />
     <Exec Command="&quot;$(MSBuildThisFileDirectory)..\tests\CoreSmoke.exe&quot;" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\tests\PluginShortcutSmoke.vcxproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64" />
+    <Exec Command="&quot;$(MSBuildThisFileDirectory)..\tests\PluginShortcutSmoke.exe&quot;" />
   </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
