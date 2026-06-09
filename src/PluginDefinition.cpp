@@ -19,6 +19,7 @@
 #include "MarkdownTableCore.h"
 
 #include <algorithm>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -98,6 +99,12 @@ HWND currentScintilla()
 void showMessage(const wchar_t *message)
 {
 	::MessageBox(nppData._nppHandle, message, NPP_PLUGIN_NAME, MB_OK | MB_ICONINFORMATION);
+}
+
+int coreIndex(std::size_t value)
+{
+	const std::size_t maxInt = static_cast<std::size_t>((std::numeric_limits<int>::max)());
+	return value > maxInt ? (std::numeric_limits<int>::max)() : static_cast<int>(value);
 }
 
 std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
@@ -512,7 +519,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	for (std::size_t i = potentialFirstLine; i <= potentialLastLine; ++i)
 		candidateLines.push_back(getLineText(scintilla, i));
 
-	const MarkdownTable::TableRange tableRange = MarkdownTable::findTableRange(candidateLines, currentLine - potentialFirstLine);
+	const MarkdownTable::TableRange tableRange = MarkdownTable::findTableRange(candidateLines, coreIndex(currentLine - potentialFirstLine));
 	if (!tableRange.found)
 	{
 		if (!quiet)
@@ -530,7 +537,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
-	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, row, column, action);
+	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), action);
 	if (!edit.ok)
 	{
 		if (!quiet)
@@ -657,7 +664,7 @@ bool runInsertTable()
 	if (!promptTableSize(state))
 		return false;
 
-	MarkdownTable::EditResult edit = MarkdownTable::createTable(state.columns, state.dataRows);
+	MarkdownTable::EditResult edit = MarkdownTable::createTable(coreIndex(state.columns), coreIndex(state.dataRows));
 	if (!edit.ok)
 		return false;
 
@@ -666,6 +673,29 @@ bool runInsertTable()
 }
 
 }
+
+#ifdef MARKDOWN_TABLE_PLUGIN_TESTING
+namespace MarkdownTablePluginTesting
+{
+std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback)
+{
+	return chooseEol(text, fallback);
+}
+
+ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &edit, const std::string &eol)
+{
+	ReplacementPreview preview;
+	preview.text = joinLines(edit.lines, eol);
+	preview.caretOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+	return preview;
+}
+
+ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit)
+{
+	return replacementPreviewForTests(edit, chooseEol(source, fallback));
+}
+}
+#endif
 
 //
 // Initialize your plugin data here

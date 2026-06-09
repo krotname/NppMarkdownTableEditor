@@ -23,6 +23,12 @@
 //
 #include "PluginInterface.h"
 
+#ifdef MARKDOWN_TABLE_PLUGIN_TESTING
+#include "MarkdownTableCore.h"
+#include <cstddef>
+#include <string>
+#endif
+
 //-------------------------------------//
 //-- STEP 1. DEFINE YOUR PLUGIN NAME --//
 //-------------------------------------//
@@ -86,5 +92,20 @@ void sortRowsDescending();
 void convertCsvTsvSelectionToTable();
 void insertTable();
 void tabOrIndent();
+
+#ifdef MARKDOWN_TABLE_PLUGIN_TESTING
+namespace MarkdownTablePluginTesting
+{
+struct ReplacementPreview
+{
+	std::string text;
+	std::size_t caretOffset = 0;
+};
+
+std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback);
+ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &edit, const std::string &eol);
+ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
+}
+#endif
 
 #endif //PLUGINDEFINITION_H

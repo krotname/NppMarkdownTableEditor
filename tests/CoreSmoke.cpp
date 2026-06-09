@@ -88,6 +88,14 @@ int main()
 	const MarkdownTable::EditResult plainPipe = MarkdownTable::apply({ "Use A | B in text" }, 0, 0, MarkdownTable::Action::Align);
 	expectTrue("plain pipe is not table", !plainPipe.ok);
 	expectSize("plain pipe keeps empty result", plainPipe.lines.size(), 0);
+	expectTrue("negative row range is rejected", !MarkdownTable::findTableRange(input, -1).found);
+	expectLines("negative row and column clamp to first cell", MarkdownTable::apply(input, -1, -1, MarkdownTable::Action::Align).lines,
+		{
+			"| Name      | Age |",
+			"| --------- | --: |",
+			"| Anna      |  20 |",
+			"| Alexander |   7 |"
+		});
 	expectTrue("pipe-only separator is not table", !MarkdownTable::findTableRange({ "| A | B |", "|   |   |", "| 1 | 2 |" }, 2).found);
 	expectTrue("equals short separator is table", MarkdownTable::findTableRange({ "| A | B |", "| === | === |", "| 1 | 2 |" }, 2).found);
 
@@ -105,6 +113,7 @@ int main()
 	expectSize("adjacent pipe range end", adjacentTable.lastRow, 3);
 	expectTrue("adjacent pipe text before rejected", !MarkdownTable::findTableRange(adjacentPipeText, 0).found);
 	expectTrue("adjacent pipe text after rejected", !MarkdownTable::findTableRange(adjacentPipeText, 4).found);
+	expectTrue("empty eof line after table rejected", !MarkdownTable::findTableRange({ "| A |", "| --- |", "| 1 |", "" }, 3).found);
 	const MarkdownTable::EditResult adjacentApply = MarkdownTable::apply(adjacentPipeText, 3, 0, MarkdownTable::Action::Align);
 	expectTrue("adjacent pipe apply ok", adjacentApply.ok);
 	expectLines("adjacent pipe apply excludes text", adjacentApply.lines,
@@ -518,6 +527,12 @@ int main()
 			"| 1   | 2   |     |",
 			"| 3   | 4   | 5   |"
 		});
+	expectLines("csv trims surrounding blank lines", MarkdownTable::convertDelimitedToTable("  \r\nName,Role\r\nAnna,Engineer\r\n  ").lines,
+		{
+			"| Name | Role     |",
+			"| ---- | -------- |",
+			"| Anna | Engineer |"
+		});
 
 	const MarkdownTable::EditResult created = MarkdownTable::createTable(3, 2);
 	expectTrue("create table ok", created.ok);
@@ -540,6 +555,8 @@ int main()
 	const MarkdownTable::EditResult invalidTableSize = MarkdownTable::createTable(0, 0);
 	expectTrue("invalid table size is rejected", !invalidTableSize.ok);
 	expectString("invalid table size message", invalidTableSize.message, "Invalid table size");
+	expectTrue("negative column count is rejected", !MarkdownTable::createTable(-1, 2).ok);
+	expectTrue("negative table size is rejected", !MarkdownTable::createTable(2, -1).ok);
 
 	expectTrue("plain text is not csv", !MarkdownTable::convertDelimitedToTable("just a note").ok);
 	expectString("plain text csv message", MarkdownTable::convertDelimitedToTable("just a note").message, "No CSV or TSV data found");

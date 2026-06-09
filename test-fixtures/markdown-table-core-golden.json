@@ -52,6 +52,15 @@
         "| Thai     | ภาษาไทย  | thai       |",
         "| Greek    | ελληνικά | greek      |"
       ]
+    },
+    {
+      "name": "single row csv cjk emoji pipe contract",
+      "input": "Name,Wide,Emoji,Pipe\nАнна,表字,😮‍💨,a|b",
+      "lines": [
+        "| Name | Wide | Emoji | Pipe |",
+        "| ---- | ---- | ----- | ---- |",
+        "| Анна | 表字 | 😮‍💨    | a\\|b |"
+      ]
     }
   ],
   "edits": [
@@ -160,6 +169,28 @@
         "| Keycap | 1️⃣    | keycap    |",
         "| Flag   | 🇯🇵    | flag      |"
       ]
+    },
+    {
+      "name": "escaped pipe cjk emoji align contract",
+      "action": "ALIGN",
+      "row": 3,
+      "column": 1,
+      "input": [
+        "| Key | Value | Note |",
+        "| --- | :---: | ---: |",
+        "| escaped | a \\| b | 1 |",
+        "| wide | 表字 | 20 |",
+        "| emoji | 😮‍💨 | cluster |"
+      ],
+      "lines": [
+        "| Key     | Value  |    Note |",
+        "| ------- | :----: | ------: |",
+        "| escaped | a \\| b |       1 |",
+        "| wide    |  表字  |      20 |",
+        "| emoji   |   😮‍💨   | cluster |"
+      ],
+      "targetRow": 3,
+      "targetColumn": 1
     },
     {
       "name": "sort rows ascending decimal numbers",

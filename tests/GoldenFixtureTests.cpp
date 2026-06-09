@@ -181,8 +181,8 @@ void runEditScenarios(const JsonValue &scenarios)
 		const std::string name = asString(member(scenario, "name"));
 		const MarkdownTable::EditResult result = MarkdownTable::apply(
 			asStringVector(member(scenario, "input")),
-			asSize(member(scenario, "row")),
-			asSize(member(scenario, "column")),
+			static_cast<int>(asSize(member(scenario, "row"))),
+			static_cast<int>(asSize(member(scenario, "column"))),
 			actionFromString(asString(member(scenario, "action"))));
 		expectTrue(name, result.ok, std::string("should apply: ") + result.message);
 		expectLines(name, result.lines, asStringVector(member(scenario, "lines")));

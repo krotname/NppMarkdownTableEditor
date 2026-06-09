@@ -47,10 +47,10 @@ struct TableRange
 
 bool isPotentialTableLine(const std::string &line);
 std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn);
-TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row);
-EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::size_t column, Action action);
+TableRange findTableRange(const std::vector<std::string> &lines, int row);
+EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action);
 EditResult convertDelimitedToTable(const std::string &text);
-EditResult createTable(std::size_t columns, std::size_t dataRows);
+EditResult createTable(int columns, int dataRows);
 }
 
 #endif

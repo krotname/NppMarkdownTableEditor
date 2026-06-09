@@ -295,6 +295,129 @@ void runEditorCommandScenarios()
 		});
 }
 
+void runMalformedTableScenarios()
+{
+	expectLines("uneven malformed rows align", MarkdownTable::apply(
+		{
+			"| H | V | Tail |",
+			"| --- | --- | --- |",
+			"| |",
+			"| short |",
+			"| a | b | c | d |"
+		},
+		3,
+		0,
+		MarkdownTable::Action::Align).lines,
+		{
+			"| H     | V   | Tail |     |",
+			"| ----- | --- | ---- | --- |",
+			"|       |     |      |     |",
+			"| short |     |      |     |",
+			"| a     | b   | c    | d   |"
+		});
+
+	const std::vector<std::string> mixedPipeStyle =
+	{
+		"A | B",
+		"| --- | --- |",
+		"| 1 | 2 |",
+		"3 | 4"
+	};
+	const MarkdownTable::TableRange mixedPipeRange = MarkdownTable::findTableRange(mixedPipeStyle, 2);
+	expectTrue("mixed pipe style range found", mixedPipeRange.found);
+	expectSize("mixed pipe style range start", mixedPipeRange.firstRow, 0);
+	expectSize("mixed pipe style range end", mixedPipeRange.lastRow, 3);
+	expectLines("mixed pipe style normalizes majority wrapper", MarkdownTable::apply(mixedPipeStyle, 2, 0, MarkdownTable::Action::Align).lines,
+		{
+			"| A   | B   |",
+			"| --- | --- |",
+			"| 1   | 2   |",
+			"| 3   | 4   |"
+		});
+
+	const std::vector<std::string> invalidAlignment =
+	{
+		"| H | V |",
+		"| :---x | --- |",
+		"| a | b |"
+	};
+	expectTrue("invalid alignment row range rejected", !MarkdownTable::findTableRange(invalidAlignment, 2).found);
+	expectTrue("invalid alignment row apply rejected", !MarkdownTable::apply(invalidAlignment, 2, 0, MarkdownTable::Action::Align).ok);
+
+	const std::vector<std::string> blankBreaksTable =
+	{
+		"| H | V |",
+		"| --- | --- |",
+		"| a | b |",
+		"",
+		"| orphan | row |"
+	};
+	const MarkdownTable::TableRange beforeBlank = MarkdownTable::findTableRange(blankBreaksTable, 2);
+	expectTrue("blank line ends malformed table", beforeBlank.found);
+	expectSize("blank line range end", beforeBlank.lastRow, 2);
+	expectTrue("orphan row after blank rejected", !MarkdownTable::findTableRange(blankBreaksTable, 4).found);
+}
+
+void runShortColumnScenarios()
+{
+	const MarkdownTable::EditResult singleInsert = MarkdownTable::apply(
+		{
+			"| H |",
+			"| - |",
+			"| a |"
+		},
+		2,
+		0,
+		MarkdownTable::Action::InsertColumnRight);
+	expectTrue("single short column insert ok", singleInsert.ok);
+	expectSize("single short column insert target column", singleInsert.targetColumn, 1);
+	expectSize("single short column insert target offset", singleInsert.targetColumnOffset, 8);
+	expectLines("single short column insert", singleInsert.lines,
+		{
+			"| H   |     |",
+			"| --- | --- |",
+			"| a   |     |"
+		});
+
+	const MarkdownTable::EditResult twoColumnInsert = MarkdownTable::apply(
+		{
+			"| A | B |",
+			"| - | - |",
+			"| x | |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::InsertColumnRight);
+	expectTrue("two short columns insert ok", twoColumnInsert.ok);
+	expectSize("two short columns insert target column", twoColumnInsert.targetColumn, 2);
+	expectSize("two short columns insert target offset", twoColumnInsert.targetColumnOffset, 14);
+	expectLines("two short columns insert", twoColumnInsert.lines,
+		{
+			"| A   | B   |     |",
+			"| --- | --- | --- |",
+			"| x   |     |     |"
+		});
+
+	const MarkdownTable::EditResult twoColumnDelete = MarkdownTable::apply(
+		{
+			"| A | B |",
+			"| - | - |",
+			"| x | |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::DeleteColumn);
+	expectTrue("two short columns delete ok", twoColumnDelete.ok);
+	expectSize("two short columns delete target column", twoColumnDelete.targetColumn, 0);
+	expectSize("two short columns delete target offset", twoColumnDelete.targetColumnOffset, 2);
+	expectLines("two short columns delete", twoColumnDelete.lines,
+		{
+			"| A   |",
+			"| --- |",
+			"| x   |"
+		});
+}
+
 void runDelimitedScenarios()
 {
 	expectLines("convert csv selection", MarkdownTable::convertDelimitedToTable("Name,Role,Score\nAnna,Engineer,42\nDmitry,QA,7").lines,
@@ -392,6 +515,8 @@ int runScenarioUnitTests()
 	g_failures = 0;
 
 	runEditorCommandScenarios();
+	runMalformedTableScenarios();
+	runShortColumnScenarios();
 	runDelimitedScenarios();
 	runLargeDataScenarios();
 

@@ -1355,10 +1355,14 @@ std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn)
 	return column;
 }
 
-TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row)
+TableRange findTableRange(const std::vector<std::string> &lines, int row)
 {
 	TableRange result;
-	if (lines.empty() || row >= lines.size())
+	if (lines.empty() || row < 0)
+		return result;
+
+	const std::size_t targetRow = static_cast<std::size_t>(row);
+	if (targetRow >= lines.size())
 		return result;
 
 	for (std::size_t separatorRow = 1; separatorRow < lines.size(); ++separatorRow)
@@ -1373,7 +1377,7 @@ TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row
 			continue;
 
 		const std::size_t lastRow = tableRangeEnd(lines, firstRow, separatorRow);
-		if (row >= firstRow && row <= lastRow)
+		if (targetRow >= firstRow && targetRow <= lastRow)
 		{
 			result.found = true;
 			result.firstRow = firstRow;
@@ -1385,7 +1389,7 @@ TableRange findTableRange(const std::vector<std::string> &lines, std::size_t row
 	return result;
 }
 
-EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::size_t column, Action action)
+EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action)
 {
 	EditResult result;
 	if (lines.empty())
@@ -1394,10 +1398,11 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 		return result;
 	}
 
-	if (row >= lines.size())
-		row = lines.size() - 1;
+	std::size_t sourceRow = row < 0 ? 0 : static_cast<std::size_t>(row);
+	if (sourceRow >= lines.size())
+		sourceRow = lines.size() - 1;
 
-	const TableRange tableRange = findTableRange(lines, row);
+	const TableRange tableRange = findTableRange(lines, static_cast<int>(sourceRow));
 	if (!tableRange.found)
 	{
 		result.message = "No Markdown table found";
@@ -1407,7 +1412,7 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 	const std::vector<std::string> tableLines(
 		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.firstRow),
 		lines.begin() + static_cast<std::ptrdiff_t>(tableRange.lastRow + 1));
-	row -= tableRange.firstRow;
+	std::size_t tableRow = sourceRow - tableRange.firstRow;
 
 	Table table = parseTable(tableLines);
 	if (!isMarkdownTable(table))
@@ -1416,14 +1421,15 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 		return result;
 	}
 
-	if (row >= table.rows.size())
-		row = table.rows.size() - 1;
-	if (column >= table.columns)
-		column = table.columns - 1;
+	if (tableRow >= table.rows.size())
+		tableRow = table.rows.size() - 1;
+	std::size_t tableColumn = column < 0 ? 0 : static_cast<std::size_t>(column);
+	if (tableColumn >= table.columns)
+		tableColumn = table.columns - 1;
 
-	std::size_t targetRow = row;
-	std::size_t targetColumn = column;
-	const std::size_t currentRowId = table.rows[row].id;
+	std::size_t targetRow = tableRow;
+	std::size_t targetColumn = tableColumn;
+	const std::size_t currentRowId = table.rows[tableRow].id;
 
 	switch (action)
 	{
@@ -1454,68 +1460,68 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 			break;
 
 		case Action::InsertRowBelow:
-			targetRow = nextEditableRow(table, row);
+			targetRow = nextEditableRow(table, tableRow);
 			insertEmptyRow(table, targetRow);
 			break;
 
 		case Action::DeleteRow:
-			if (canDeleteRow(table, row))
+			if (canDeleteRow(table, tableRow))
 			{
-				table.rows.erase(table.rows.begin() + static_cast<std::ptrdiff_t>(row));
-				if (table.separatorRow != static_cast<std::size_t>(-1) && row < table.separatorRow)
+				table.rows.erase(table.rows.begin() + static_cast<std::ptrdiff_t>(tableRow));
+				if (table.separatorRow != static_cast<std::size_t>(-1) && tableRow < table.separatorRow)
 					--table.separatorRow;
-				targetRow = closestEditableRow(table, row);
+				targetRow = closestEditableRow(table, tableRow);
 			}
 			break;
 
 		case Action::InsertColumnRight:
-			insertColumn(table, column + 1);
-			targetColumn = column + 1;
+			insertColumn(table, tableColumn + 1);
+			targetColumn = tableColumn + 1;
 			break;
 
 		case Action::DeleteColumn:
-			removeColumn(table, column);
-			targetColumn = column >= table.columns ? table.columns - 1 : column;
+			removeColumn(table, tableColumn);
+			targetColumn = tableColumn >= table.columns ? table.columns - 1 : tableColumn;
 			break;
 
 		case Action::MoveRowUp:
-			if (row > 0 && !table.rows[row].separator && !table.rows[row - 1].separator)
+			if (tableRow > 0 && !table.rows[tableRow].separator && !table.rows[tableRow - 1].separator)
 			{
-				std::swap(table.rows[row], table.rows[row - 1]);
-				targetRow = row - 1;
+				std::swap(table.rows[tableRow], table.rows[tableRow - 1]);
+				targetRow = tableRow - 1;
 			}
 			break;
 
 		case Action::MoveRowDown:
-			if (row + 1 < table.rows.size() && !table.rows[row].separator && !table.rows[row + 1].separator)
+			if (tableRow + 1 < table.rows.size() && !table.rows[tableRow].separator && !table.rows[tableRow + 1].separator)
 			{
-				std::swap(table.rows[row], table.rows[row + 1]);
-				targetRow = row + 1;
+				std::swap(table.rows[tableRow], table.rows[tableRow + 1]);
+				targetRow = tableRow + 1;
 			}
 			break;
 
 		case Action::MoveColumnLeft:
-			if (column > 0)
+			if (tableColumn > 0)
 			{
-				moveColumn(table, column, column - 1);
-				targetColumn = column - 1;
+				moveColumn(table, tableColumn, tableColumn - 1);
+				targetColumn = tableColumn - 1;
 			}
 			break;
 
 		case Action::MoveColumnRight:
-			if (column + 1 < table.columns)
+			if (tableColumn + 1 < table.columns)
 			{
-				moveColumn(table, column, column + 1);
-				targetColumn = column + 1;
+				moveColumn(table, tableColumn, tableColumn + 1);
+				targetColumn = tableColumn + 1;
 			}
 			break;
 
 		case Action::SortRowsAscending:
-			targetRow = sortRows(table, column, true, currentRowId, row);
+			targetRow = sortRows(table, tableColumn, true, currentRowId, tableRow);
 			break;
 
 		case Action::SortRowsDescending:
-			targetRow = sortRows(table, column, false, currentRowId, row);
+			targetRow = sortRows(table, tableColumn, false, currentRowId, tableRow);
 			break;
 
 		case Action::Align:
@@ -1532,13 +1538,14 @@ EditResult apply(const std::vector<std::string> &lines, std::size_t row, std::si
 EditResult convertDelimitedToTable(const std::string &text)
 {
 	EditResult result;
-	if (!hasDelimitedStructure(text))
+	const std::string value = trim(text);
+	if (!hasDelimitedStructure(value))
 	{
 		result.message = "No CSV or TSV data found";
 		return result;
 	}
 
-	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(text, detectDelimiter(text));
+	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(value, detectDelimiter(value));
 	if (rows.empty())
 	{
 		result.message = "No CSV or TSV data found";
@@ -1553,16 +1560,16 @@ EditResult convertDelimitedToTable(const std::string &text)
 	return result;
 }
 
-EditResult createTable(std::size_t columns, std::size_t dataRows)
+EditResult createTable(int columns, int dataRows)
 {
 	EditResult result;
-	if (columns < 1)
+	if (columns < 1 || dataRows < 0)
 	{
 		result.message = "Invalid table size";
 		return result;
 	}
 
-	const Table table = emptyTable(columns, dataRows);
+	const Table table = emptyTable(static_cast<std::size_t>(columns), static_cast<std::size_t>(dataRows));
 	FormatResult formatted = formatTable(table, dataRows > 0 ? 2 : 0, 0);
 	setResultFromFormat(result, formatted);
 	result.ok = true;

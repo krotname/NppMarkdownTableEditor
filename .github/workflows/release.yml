@@ -123,6 +123,8 @@ jobs:
           cat > release-notes.md <<EOF
           ## What's Changed
 
+          - Supersedes 8.5.0 as the current stable release.
+          - Use one non-conflicting default shortcut scheme across JetBrains IDEs and Notepad++: Tab plus Ctrl+Alt+Shift command shortcuts.
           - Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.
           - Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.
           - Convert CSV/TSV directly from the current multi-line block when there is no selection.
