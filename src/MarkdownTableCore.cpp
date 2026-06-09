@@ -65,7 +65,7 @@ struct CodePointRange
 	unsigned int last;
 };
 
-const std::size_t hardWrapCellWidth = 26;
+const std::size_t hardWrapCellWidth = 32;
 
 std::size_t nextRowId(const Table &table);
 

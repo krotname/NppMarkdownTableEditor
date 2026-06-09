@@ -202,10 +202,10 @@ int main()
 	expectSize("wrap long cells target column", wrappedLongCells.targetColumn, 1);
 	expectLines("wrap long cells", wrappedLongCells.lines,
 		{
-			"| Key | Value                  |",
-			"| --- | ---------------------- |",
-			"| row | alpha beta gamma delta |",
-			"|     | epsilon zeta eta theta |"
+			"| Key | Value                          |",
+			"| --- | ------------------------------ |",
+			"| row | alpha beta gamma delta epsilon |",
+			"|     | zeta eta theta                 |"
 		});
 
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
@@ -223,7 +223,7 @@ int main()
 	std::string wrappedProtectedText;
 	for (std::size_t i = 0; i < wrappedProtectedTokens.lines.size(); ++i)
 		wrappedProtectedText += wrappedProtectedTokens.lines[i] + "\n";
-	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](") != std::string::npos);
+	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp") != std::string::npos);
 	expectTrue("wrap keeps markdown link remainder", wrappedProtectedText.find("/patch registry.md>)") != std::string::npos);
 	expectTrue("wrap no longer keeps overwide markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp/patch registry.md>)") == std::string::npos);
 	expectTrue("wrap keeps code span token", wrappedProtectedText.find("``code span with spaces``") != std::string::npos);
