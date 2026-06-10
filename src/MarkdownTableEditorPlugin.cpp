@@ -82,12 +82,14 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		{
 			refreshNotepadWordWrapUi();
 			refreshAutoFitTableUi();
+			refreshAutoAlignTableUi();
 		}
 		break;
 
 		case SCN_UPDATEUI:
 		{
 			refreshNotepadWordWrapUi();
+			handleScintillaUpdateUi(notifyCode);
 		}
 		break;
 

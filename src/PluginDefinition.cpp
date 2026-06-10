@@ -95,19 +95,26 @@ ShortcutKey g_insertTableShortcut = { true, true, true, VK_OEM_5 };
 ShortcutKey g_tabShortcut = { false, false, false, VK_TAB };
 ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
 
+const std::size_t alignCommandIndex = 0;
 const std::size_t tabCommandIndex = 15;
 const std::size_t wrapLongCellsCommandIndex = 16;
 const std::size_t notepadWordWrapCommandIndex = 17;
 const std::size_t autoFitTableCommandIndex = 18;
+const std::size_t autoAlignTableCommandIndex = 19;
 // Notepad++ IDM_VIEW_WRAP = IDM + 4000 + 22.
 const int notepadWordWrapCommandId = 44022;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
+const UINT_PTR autoAlignTableTimerId = 0x4D41;
+const UINT autoAlignTableDelayMs = 450;
 
 bool g_autoFitTable = false;
+bool g_autoAlignTable = false;
 bool g_fitToWindowInProgress = false;
+bool g_autoAlignInProgress = false;
 std::size_t g_lastFitToWindowColumns = 0;
 HWND g_pendingFitToWindowScintilla = NULL;
+HWND g_pendingAutoAlignScintilla = NULL;
 WNDPROC g_originalMainScintillaProc = NULL;
 WNDPROC g_originalSecondScintillaProc = NULL;
 HBITMAP g_tabToolbarBmp = NULL;
@@ -122,6 +129,9 @@ HICON g_notepadWordWrapToolbarIconDarkMode = NULL;
 HBITMAP g_autoFitTableToolbarBmp = NULL;
 HICON g_autoFitTableToolbarIcon = NULL;
 HICON g_autoFitTableToolbarIconDarkMode = NULL;
+HBITMAP g_autoAlignTableToolbarBmp = NULL;
+HICON g_autoAlignTableToolbarIcon = NULL;
+HICON g_autoAlignTableToolbarIconDarkMode = NULL;
 
 enum class UiLanguage
 {
@@ -166,7 +176,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Auto fit table (MD)" }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Auto fit table (MD)", L"Auto align table (MD)" }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -201,7 +211,8 @@ const UiText englishUiText =
 		L"Tab: align table or indent (MD)",
 		L"Fit table to window",
 		L"Notepad++ word wrap (MD)",
-		L"Auto fit table (MD)"
+		L"Auto fit table (MD)",
+		L"Auto align table (MD)"
 	},
 	L"Insert Markdown table",
 	L"Columns:",
@@ -437,7 +448,8 @@ const UiText russianUiText =
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
+		L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
 	},
 	L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 	L"\u0421\u0442\u043E\u043B\u0431\u0446\u044B:",
@@ -963,6 +975,7 @@ enum class ToolbarIconKind
 {
 	TabAction,
 	TableWrap,
+	TableAlign,
 	EditorWordWrap
 };
 
@@ -1026,12 +1039,20 @@ void drawAutoWrapArrow(std::uint32_t *pixels, std::uint32_t accent)
 	setIconPixel(pixels, 6, 13, accent);
 }
 
+void drawAlignRows(std::uint32_t *pixels, std::uint32_t accent)
+{
+	drawIconHorizontalLine(pixels, 3, 12, 9, accent);
+	drawIconHorizontalLine(pixels, 3, 12, 11, accent);
+	drawIconHorizontalLine(pixels, 3, 12, 13, accent);
+}
+
 void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
 {
 	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
 	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
 	const std::uint32_t tabAccent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
 	const std::uint32_t wrapAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
+	const std::uint32_t alignAccent = darkMode ? argb(255, 155, 213, 255) : argb(255, 46, 105, 180);
 	const std::uint32_t editorAccent = darkMode ? argb(255, 255, 191, 105) : argb(255, 196, 112, 0);
 
 	clearIcon(pixels);
@@ -1045,6 +1066,12 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 		drawMdBadge(pixels, grid);
 		drawMiniTable(pixels, grid, muted);
 		drawAutoWrapArrow(pixels, wrapAccent);
+	}
+	else if (kind == ToolbarIconKind::TableAlign)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawAlignRows(pixels, alignAccent);
 	}
 	else
 	{
@@ -1153,6 +1180,15 @@ bool ensureAutoFitTableToolbarIconHandles()
 		ToolbarIconKind::TableWrap);
 }
 
+bool ensureAutoAlignTableToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(
+		g_autoAlignTableToolbarBmp,
+		g_autoAlignTableToolbarIcon,
+		g_autoAlignTableToolbarIconDarkMode,
+		ToolbarIconKind::TableAlign);
+}
+
 void destroyTabToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
@@ -1174,6 +1210,14 @@ void destroyAutoFitTableToolbarIconHandles()
 		g_autoFitTableToolbarBmp,
 		g_autoFitTableToolbarIcon,
 		g_autoFitTableToolbarIconDarkMode);
+}
+
+void destroyAutoAlignTableToolbarIconHandles()
+{
+	destroyToolbarIconHandles(
+		g_autoAlignTableToolbarBmp,
+		g_autoAlignTableToolbarIcon,
+		g_autoAlignTableToolbarIconDarkMode);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -1247,6 +1291,11 @@ void setAutoFitTableToolbarCheckState()
 	setToolbarCheckState(autoFitTableCommandIndex, g_autoFitTable);
 }
 
+void setAutoAlignTableToolbarCheckState()
+{
+	setToolbarCheckState(autoAlignTableCommandIndex, g_autoAlignTable);
+}
+
 bool notepadWordWrapEnabled()
 {
 	HWND scintilla = currentScintilla();
@@ -1283,12 +1332,27 @@ bool fitTableToWindowCommandEnabled()
 	return !g_autoFitTable;
 }
 
+bool alignTableCommandEnabled()
+{
+	return !g_autoAlignTable;
+}
+
 bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
 {
 	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
 }
 
 bool shouldRunInitialFitWhenTogglingAutoFitTable(bool currentlyEnabled)
+{
+	return !currentlyEnabled;
+}
+
+bool shouldScheduleAutoAlignAfterUpdate(bool enabled, bool inProgress, bool activeEditor, bool contentUpdated)
+{
+	return enabled && !inProgress && activeEditor && contentUpdated;
+}
+
+bool shouldRunInitialAlignWhenTogglingAutoAlignTable(bool currentlyEnabled)
 {
 	return !currentlyEnabled;
 }
@@ -1398,6 +1462,17 @@ bool fitCurrentTableToWindow(bool quiet)
 	return changed;
 }
 
+bool autoAlignCurrentTable(bool quiet)
+{
+	if (g_autoAlignInProgress || g_fitToWindowInProgress)
+		return false;
+
+	g_autoAlignInProgress = true;
+	const bool changed = runTableAction(MarkdownTable::Action::Align, quiet);
+	g_autoAlignInProgress = false;
+	return changed;
+}
+
 void fitToWindowAfterResize(HWND resizedScintilla)
 {
 	if (!g_autoFitTable || g_fitToWindowInProgress)
@@ -1420,6 +1495,28 @@ void fitToWindowAfterResize(HWND resizedScintilla)
 	fitCurrentTableToWindow(true);
 }
 
+bool selectionEmpty(HWND scintilla)
+{
+	if (!scintilla)
+		return false;
+
+	const LRESULT start = ::SendMessage(scintilla, SCI_GETSELECTIONSTART, 0, 0);
+	const LRESULT end = ::SendMessage(scintilla, SCI_GETSELECTIONEND, 0, 0);
+	return start == end;
+}
+
+void autoAlignTableAfterUpdate(HWND updatedScintilla)
+{
+	if (!g_autoAlignTable || g_autoAlignInProgress)
+		return;
+
+	HWND scintilla = currentScintilla();
+	if (!scintilla || scintilla != updatedScintilla || !selectionEmpty(scintilla))
+		return;
+
+	autoAlignCurrentTable(true);
+}
+
 void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 {
 	if (!g_autoFitTable || !resizedScintilla)
@@ -1427,6 +1524,26 @@ void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 
 	g_pendingFitToWindowScintilla = resizedScintilla;
 	::SetTimer(resizedScintilla, fitToWindowResizeTimerId, fitToWindowResizeDelayMs, NULL);
+}
+
+void scheduleAutoAlignAfterUpdate(HWND updatedScintilla, bool contentUpdated)
+{
+	HWND scintilla = currentScintilla();
+	const bool activeEditor = scintilla && scintilla == updatedScintilla;
+	if (!shouldScheduleAutoAlignAfterUpdate(g_autoAlignTable, g_autoAlignInProgress, activeEditor, contentUpdated))
+		return;
+
+	g_pendingAutoAlignScintilla = updatedScintilla;
+	::SetTimer(updatedScintilla, autoAlignTableTimerId, autoAlignTableDelayMs, NULL);
+}
+
+void handleScintillaUpdateUiInternal(const SCNotification *notification)
+{
+	if (!notification)
+		return;
+
+	const bool contentUpdated = (notification->updated & SC_UPDATE_CONTENT) != 0;
+	scheduleAutoAlignAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
 }
 
 void cancelFitToWindowResizeTimer(HWND scintilla)
@@ -1437,10 +1554,24 @@ void cancelFitToWindowResizeTimer(HWND scintilla)
 		g_pendingFitToWindowScintilla = NULL;
 }
 
+void cancelAutoAlignTableTimer(HWND scintilla)
+{
+	if (scintilla)
+		::KillTimer(scintilla, autoAlignTableTimerId);
+	if (g_pendingAutoAlignScintilla == scintilla)
+		g_pendingAutoAlignScintilla = NULL;
+}
+
 void cancelFitToWindowResizeTimers()
 {
 	cancelFitToWindowResizeTimer(nppData._scintillaMainHandle);
 	cancelFitToWindowResizeTimer(nppData._scintillaSecondHandle);
+}
+
+void cancelAutoAlignTableTimers()
+{
+	cancelAutoAlignTableTimer(nppData._scintillaMainHandle);
+	cancelAutoAlignTableTimer(nppData._scintillaSecondHandle);
 }
 
 WNDPROC originalScintillaProc(HWND hwnd)
@@ -1462,6 +1593,12 @@ LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam
 	{
 		cancelFitToWindowResizeTimer(hwnd);
 		fitToWindowAfterResize(hwnd);
+		return 0;
+	}
+	if (message == WM_TIMER && wParam == autoAlignTableTimerId)
+	{
+		cancelAutoAlignTableTimer(hwnd);
+		autoAlignTableAfterUpdate(hwnd);
 		return 0;
 	}
 
@@ -1944,9 +2081,18 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
 	const std::size_t targetPosition = positionForLineColumn(scintilla, firstLine, edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+	const Sci_Position replaceStart = lineStartPosition(scintilla, firstLine);
+	const Sci_Position replaceEnd = lineEndPosition(scintilla, lastLine);
+	const std::string source = getRangeText(scintilla, replaceStart, replaceEnd);
+	if (source == replacement)
+	{
+		if (static_cast<Sci_Position>(targetPosition) != currentPosResult)
+			::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
+		return true;
+	}
 
 	ScintillaUndoAction undo(scintilla);
-	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(lineStartPosition(scintilla, firstLine)), static_cast<LPARAM>(lineEndPosition(scintilla, lastLine)));
+	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(replaceStart), static_cast<LPARAM>(replaceEnd));
 	::SendMessage(scintilla, SCI_REPLACETARGET, static_cast<WPARAM>(replacement.size()), reinterpret_cast<LPARAM>(replacement.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
 	return true;
@@ -2070,6 +2216,11 @@ bool runInsertTable()
 
 }
 
+void handleScintillaUpdateUi(const SCNotification *notification)
+{
+	handleScintillaUpdateUiInternal(notification);
+}
+
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
 {
@@ -2113,6 +2264,18 @@ void setAutoFitTableEnabledForTests(bool enabled)
 		g_lastFitToWindowColumns = 0;
 }
 
+bool autoAlignTableEnabledForTests()
+{
+	return g_autoAlignTable;
+}
+
+void setAutoAlignTableEnabledForTests(bool enabled)
+{
+	g_autoAlignTable = enabled;
+	if (!enabled)
+		cancelAutoAlignTableTimers();
+}
+
 MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action)
 {
 	return coreActionForPluginAction(action);
@@ -2126,6 +2289,11 @@ bool shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action action)
 bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action)
 {
 	return shouldFitToWindowAfterAction(action);
+}
+
+bool alignTableCommandEnabledForTests()
+{
+	return alignTableCommandEnabled();
 }
 
 bool fitTableToWindowCommandEnabledForTests()
@@ -2143,9 +2311,24 @@ bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled)
 	return shouldRunInitialFitWhenTogglingAutoFitTable(currentlyEnabled);
 }
 
+bool shouldScheduleAutoAlignAfterUpdateForTests(bool enabled, bool inProgress, bool activeEditor, bool contentUpdated)
+{
+	return shouldScheduleAutoAlignAfterUpdate(enabled, inProgress, activeEditor, contentUpdated);
+}
+
+bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled)
+{
+	return shouldRunInitialAlignWhenTogglingAutoAlignTable(currentlyEnabled);
+}
+
 UINT fitToWindowResizeDelayMsForTests()
 {
 	return fitToWindowResizeDelayMs;
+}
+
+UINT autoAlignTableDelayMsForTests()
+{
+	return autoAlignTableDelayMs;
 }
 
 bool ensureTabToolbarIconsForTests()
@@ -2187,6 +2370,16 @@ void destroyAutoFitTableToolbarIconsForTests()
 {
 	destroyAutoFitTableToolbarIconHandles();
 }
+
+bool ensureAutoAlignTableToolbarIconsForTests()
+{
+	return ensureAutoAlignTableToolbarIconHandles();
+}
+
+void destroyAutoAlignTableToolbarIconsForTests()
+{
+	destroyAutoAlignTableToolbarIconHandles();
+}
 }
 #endif
 
@@ -2208,6 +2401,7 @@ void pluginCleanUp()
 	destroyWrapLongCellsToolbarIconHandles();
 	destroyNotepadWordWrapToolbarIconHandles();
 	destroyAutoFitTableToolbarIconHandles();
+	destroyAutoAlignTableToolbarIconHandles();
 }
 
 //
@@ -2246,6 +2440,7 @@ void commandMenuInit()
 	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
 	setCommand(notepadWordWrapCommandIndex, commandText(notepadWordWrapCommandIndex), toggleNotepadWordWrap, NULL, notepadWordWrapEnabled());
 	setCommand(autoFitTableCommandIndex, commandText(autoFitTableCommandIndex), toggleAutoFitTable, NULL, g_autoFitTable);
+	setCommand(autoAlignTableCommandIndex, commandText(autoAlignTableCommandIndex), toggleAutoAlignTable, NULL, g_autoAlignTable);
 }
 
 void refreshUiLanguageFromNotepad()
@@ -2254,6 +2449,7 @@ void refreshUiLanguageFromNotepad()
 	updateNotepadPluginMenu();
 	refreshNotepadWordWrapUi();
 	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
 }
 
 void refreshNotepadWordWrapUi()
@@ -2282,6 +2478,20 @@ void refreshAutoFitTableUi()
 		static_cast<LPARAM>(g_autoFitTable ? TRUE : FALSE));
 	setAutoFitTableToolbarCheckState();
 	setCommandEnabledState(wrapLongCellsCommandIndex, fitTableToWindowCommandEnabled());
+}
+
+void refreshAutoAlignTableUi()
+{
+	if (!nppData._nppHandle || funcItem[autoAlignTableCommandIndex]._cmdID == 0)
+		return;
+
+	::SendMessage(
+		nppData._nppHandle,
+		NPPM_SETMENUITEMCHECK,
+		static_cast<WPARAM>(funcItem[autoAlignTableCommandIndex]._cmdID),
+		static_cast<LPARAM>(g_autoAlignTable ? TRUE : FALSE));
+	setAutoAlignTableToolbarCheckState();
+	setCommandEnabledState(alignCommandIndex, alignTableCommandEnabled());
 }
 
 void registerToolbarIcon(std::size_t commandIndex, HBITMAP bitmap, HICON icon, HICON darkModeIcon)
@@ -2335,8 +2545,16 @@ void registerToolbarIcons()
 			g_autoFitTableToolbarIcon,
 			g_autoFitTableToolbarIconDarkMode);
 
+	if (funcItem[autoAlignTableCommandIndex]._cmdID != 0 && ensureAutoAlignTableToolbarIconHandles())
+		registerToolbarIcon(
+			autoAlignTableCommandIndex,
+			g_autoAlignTableToolbarBmp,
+			g_autoAlignTableToolbarIcon,
+			g_autoAlignTableToolbarIconDarkMode);
+
 	refreshNotepadWordWrapUi();
 	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
 }
 
 //
@@ -2372,6 +2590,8 @@ bool setCommand(size_t index, const TCHAR *cmdName, PFUNCPLUGINCMD pFunc, Shortc
 //----------------------------------------------//
 void alignTable()
 {
+	if (!alignTableCommandEnabled())
+		return;
 	runTableAction(MarkdownTable::Action::Align, false);
 }
 
@@ -2486,6 +2706,18 @@ void toggleAutoFitTable()
 		g_lastFitToWindowColumns = 0;
 	}
 	refreshAutoFitTableUi();
+}
+
+void toggleAutoAlignTable()
+{
+	const bool runInitialAlign = shouldRunInitialAlignWhenTogglingAutoAlignTable(g_autoAlignTable);
+	if (runInitialAlign)
+		autoAlignCurrentTable(true);
+
+	g_autoAlignTable = !g_autoAlignTable;
+	if (!g_autoAlignTable)
+		cancelAutoAlignTableTimers();
+	refreshAutoAlignTableUi();
 }
 
 void installFitToWindowResizeHooks()

@@ -120,7 +120,8 @@ int runPluginShortcutTests()
 		{ 15, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
 		{ 16, "fit table to window", L"Fit table to window", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
 		{ 17, "notepad word wrap", L"Notepad++ word wrap (MD)", toggleNotepadWordWrap, false, false, false, false, false, 0 },
-		{ 18, "auto fit table", L"Auto fit table (MD)", toggleAutoFitTable, false, false, false, false, false, 0 }
+		{ 18, "auto fit table", L"Auto fit table (MD)", toggleAutoFitTable, false, false, false, false, false, 0 },
+		{ 19, "auto align table", L"Auto align table (MD)", toggleAutoAlignTable, false, false, false, false, false, 0 }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -163,7 +164,8 @@ int runPluginShortcutTests()
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
+		L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
 	};
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
 	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
@@ -244,14 +246,33 @@ int runPluginShortcutTests()
 	toggleAutoFitTable();
 	expectTrue(failures, "auto fit table toggles off after resize mode", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "fit table command re-enabled after auto fit is off", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
+	expectTrue(failures, "auto align table starts disabled", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "align table command starts enabled", MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
+	expectTrue(failures, "auto align uses delayed debounce", MarkdownTablePluginTesting::autoAlignTableDelayMsForTests() > 0);
+	expectTrue(failures, "auto align update ignores disabled mode", !MarkdownTablePluginTesting::shouldScheduleAutoAlignAfterUpdateForTests(false, false, true, true));
+	expectTrue(failures, "auto align update ignores reentrant align", !MarkdownTablePluginTesting::shouldScheduleAutoAlignAfterUpdateForTests(true, true, true, true));
+	expectTrue(failures, "auto align update ignores inactive editor", !MarkdownTablePluginTesting::shouldScheduleAutoAlignAfterUpdateForTests(true, false, false, true));
+	expectTrue(failures, "auto align update ignores selection-only update", !MarkdownTablePluginTesting::shouldScheduleAutoAlignAfterUpdateForTests(true, false, true, false));
+	expectTrue(failures, "auto align update schedules active content update", MarkdownTablePluginTesting::shouldScheduleAutoAlignAfterUpdateForTests(true, false, true, true));
+	expectTrue(failures, "auto align toggle runs initial align before enabling", MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(false));
+	expectTrue(failures, "auto align toggle does not run initial align when disabling", !MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(true));
+	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);
+	toggleAutoAlignTable();
+	expectTrue(failures, "auto align table toggles on", MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "align table command disabled while auto align is on", !MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
+	toggleAutoAlignTable();
+	expectTrue(failures, "auto align table toggles off", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "align table command re-enabled after auto align is off", MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
 	expectTrue(failures, "tab toolbar icons are created", MarkdownTablePluginTesting::ensureTabToolbarIconsForTests());
 	expectTrue(failures, "wrap long cells toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
 	expectTrue(failures, "notepad word wrap toolbar icons are created", MarkdownTablePluginTesting::ensureNotepadWordWrapToolbarIconsForTests());
 	expectTrue(failures, "auto fit table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoFitTableToolbarIconsForTests());
+	expectTrue(failures, "auto align table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoAlignTableToolbarIconsForTests());
 	MarkdownTablePluginTesting::destroyTabToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyNotepadWordWrapToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoFitTableToolbarIconsForTests();
+	MarkdownTablePluginTesting::destroyAutoAlignTableToolbarIconsForTests();
 
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");
 	expectString(failures, "plugin eol keeps cr source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r1,2", "\n"), "\r");

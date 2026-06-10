@@ -42,7 +42,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 19;
+const int nbFunc = 20;
 
 
 //
@@ -66,6 +66,8 @@ void refreshUiLanguageFromNotepad();
 void registerToolbarIcons();
 void refreshNotepadWordWrapUi();
 void refreshAutoFitTableUi();
+void refreshAutoAlignTableUi();
+void handleScintillaUpdateUi(const SCNotification *notification);
 void installFitToWindowResizeHooks();
 void removeFitToWindowResizeHooks();
 
@@ -102,6 +104,7 @@ void tabOrIndent();
 void wrapLongCells();
 void toggleNotepadWordWrap();
 void toggleAutoFitTable();
+void toggleAutoAlignTable();
 
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
@@ -119,13 +122,19 @@ void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
 bool autoFitTableEnabledForTests();
 void setAutoFitTableEnabledForTests(bool enabled);
+bool autoAlignTableEnabledForTests();
+void setAutoAlignTableEnabledForTests(bool enabled);
 MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action);
 bool shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action action);
 bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action);
+bool alignTableCommandEnabledForTests();
 bool fitTableToWindowCommandEnabledForTests();
 bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns);
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
+bool shouldScheduleAutoAlignAfterUpdateForTests(bool enabled, bool inProgress, bool activeEditor, bool contentUpdated);
+bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
 UINT fitToWindowResizeDelayMsForTests();
+UINT autoAlignTableDelayMsForTests();
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();
@@ -134,6 +143,8 @@ bool ensureNotepadWordWrapToolbarIconsForTests();
 void destroyNotepadWordWrapToolbarIconsForTests();
 bool ensureAutoFitTableToolbarIconsForTests();
 void destroyAutoFitTableToolbarIconsForTests();
+bool ensureAutoAlignTableToolbarIconsForTests();
+void destroyAutoAlignTableToolbarIconsForTests();
 }
 #endif
 
