@@ -73,6 +73,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		case NPPN_READY:
 		case NPPN_NATIVELANGCHANGED:
 		{
+			installFitToWindowResizeHooks();
 			refreshUiLanguageFromNotepad();
 		}
 		break;
@@ -87,7 +88,6 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		case SCN_UPDATEUI:
 		{
 			refreshNotepadWordWrapUi();
-			maybeFitToWindowAfterUiUpdate();
 		}
 		break;
 
@@ -101,6 +101,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 
 		case NPPN_SHUTDOWN:
 		{
+			removeFitToWindowResizeHooks();
 			commandMenuCleanUp();
 		}
 		break;

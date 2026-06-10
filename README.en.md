@@ -99,7 +99,7 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | `Fit table to window`                          | Fits the current table to the visible width: it narrows long cells or rejoins continuation rows when the window is wider |
 | `Notepad++ word wrap (MD)`                     | Toggles Notepad++ visual word wrap next to the table-wrap button      |
 | `Table wrap (MD)`                              | Toggles table wrapping: when enabled, it fits the current table and then keeps wrapping after `Tab`/`Align table` |
-| `Auto fit on resize (MD)`                      | Toggles automatic fitting of the current table when the editor width changes |
+| `Auto fit on resize (MD)`                      | Toggles automatic fitting of the current table when the editor width changes; while enabled, manual `Fit table to window` is unavailable |
 | `Convert CSV/TSV to table`                     | Converts selected CSV/TSV or the current block to a Markdown table   |
 | `Insert table...`                              | Inserts a new table with the requested size                          |
 

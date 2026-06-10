@@ -67,7 +67,8 @@ void registerToolbarIcons();
 void refreshNotepadWordWrapUi();
 void refreshAutoWrapLongCellsUi();
 void refreshFitToWindowOnResizeUi();
-void maybeFitToWindowAfterUiUpdate();
+void installFitToWindowResizeHooks();
+void removeFitToWindowResizeHooks();
 
 //
 //Clean up your plugin commands allocation (if any)
@@ -125,6 +126,9 @@ bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action);
 bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action);
 bool fitToWindowOnResizeEnabledForTests();
 void setFitToWindowOnResizeEnabledForTests(bool enabled);
+bool fitTableToWindowCommandEnabledForTests();
+bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns);
+UINT fitToWindowResizeDelayMsForTests();
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();

@@ -102,11 +102,16 @@ const std::size_t autoWrapLongCellsCommandIndex = 18;
 const std::size_t fitToWindowOnResizeCommandIndex = 19;
 // Notepad++ IDM_VIEW_WRAP = IDM + 4000 + 22.
 const int notepadWordWrapCommandId = 44022;
+const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
+const UINT fitToWindowResizeDelayMs = 160;
 
 bool g_autoWrapLongCells = false;
 bool g_fitToWindowOnResize = false;
 bool g_fitToWindowInProgress = false;
 std::size_t g_lastFitToWindowColumns = 0;
+HWND g_pendingFitToWindowScintilla = NULL;
+WNDPROC g_originalMainScintillaProc = NULL;
+WNDPROC g_originalSecondScintillaProc = NULL;
 HBITMAP g_tabToolbarBmp = NULL;
 HICON g_tabToolbarIcon = NULL;
 HICON g_tabToolbarIconDarkMode = NULL;
@@ -1225,6 +1230,36 @@ void setToolbarCheckState(std::size_t commandIndex, bool checked)
 		MAKELPARAM(checked ? TRUE : FALSE, 0));
 }
 
+void setToolbarEnabledState(std::size_t commandIndex, bool enabled)
+{
+	HWND toolbar = findToolbarWindow(nppData._nppHandle);
+	if (!toolbar || commandIndex >= static_cast<std::size_t>(nbFunc) || funcItem[commandIndex]._cmdID == 0)
+		return;
+
+	::SendMessage(
+		toolbar,
+		TB_ENABLEBUTTON,
+		static_cast<WPARAM>(funcItem[commandIndex]._cmdID),
+		MAKELPARAM(enabled ? TRUE : FALSE, 0));
+}
+
+void setCommandEnabledState(std::size_t commandIndex, bool enabled)
+{
+	if (!nppData._nppHandle || commandIndex >= static_cast<std::size_t>(nbFunc) || funcItem[commandIndex]._cmdID == 0)
+		return;
+
+	HMENU pluginsMenu = reinterpret_cast<HMENU>(::SendMessage(nppData._nppHandle, NPPM_GETMENUHANDLE, NPPPLUGINMENU, 0));
+	if (pluginsMenu)
+	{
+		::EnableMenuItem(
+			pluginsMenu,
+			static_cast<UINT>(funcItem[commandIndex]._cmdID),
+			MF_BYCOMMAND | (enabled ? MF_ENABLED : MF_GRAYED));
+		::DrawMenuBar(nppData._nppHandle);
+	}
+	setToolbarEnabledState(commandIndex, enabled);
+}
+
 void setAutoWrapToolbarCheckState()
 {
 	setToolbarCheckState(autoWrapLongCellsCommandIndex, g_autoWrapLongCells);
@@ -1264,6 +1299,16 @@ MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
 bool shouldFitToWindowAfterAction(MarkdownTable::Action action)
 {
 	return action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoWrapAfterAction(action);
+}
+
+bool fitTableToWindowCommandEnabled()
+{
+	return !g_fitToWindowOnResize;
+}
+
+bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
+{
+	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
 }
 
 int availableTextPixelWidth(HWND scintilla)
@@ -1360,13 +1405,24 @@ void rememberCurrentFitToWindowWidth()
 	g_lastFitToWindowColumns = scintilla ? availableDisplayColumns(scintilla) : 0;
 }
 
-void maybeFitToWindowAfterUiUpdateImpl()
+bool fitCurrentTableToWindow(bool quiet)
+{
+	if (g_fitToWindowInProgress)
+		return false;
+
+	g_fitToWindowInProgress = true;
+	const bool changed = runTableAction(MarkdownTable::Action::WrapLongCells, quiet);
+	g_fitToWindowInProgress = false;
+	return changed;
+}
+
+void fitToWindowAfterResize(HWND resizedScintilla)
 {
 	if (!g_fitToWindowOnResize || g_fitToWindowInProgress)
 		return;
 
 	HWND scintilla = currentScintilla();
-	if (!scintilla)
+	if (!scintilla || scintilla != resizedScintilla)
 		return;
 
 	const std::size_t columns = availableDisplayColumns(scintilla);
@@ -1375,13 +1431,88 @@ void maybeFitToWindowAfterUiUpdateImpl()
 		g_lastFitToWindowColumns = columns;
 		return;
 	}
-	if (columns == g_lastFitToWindowColumns)
+	if (!shouldRunFitToWindowAfterResize(g_fitToWindowOnResize, g_fitToWindowInProgress, true, g_lastFitToWindowColumns, columns))
 		return;
 
 	g_lastFitToWindowColumns = columns;
-	g_fitToWindowInProgress = true;
-	runTableAction(MarkdownTable::Action::WrapLongCells, true);
-	g_fitToWindowInProgress = false;
+	fitCurrentTableToWindow(true);
+}
+
+void scheduleFitToWindowAfterResize(HWND resizedScintilla)
+{
+	if (!g_fitToWindowOnResize || !resizedScintilla)
+		return;
+
+	g_pendingFitToWindowScintilla = resizedScintilla;
+	::SetTimer(resizedScintilla, fitToWindowResizeTimerId, fitToWindowResizeDelayMs, NULL);
+}
+
+void cancelFitToWindowResizeTimer(HWND scintilla)
+{
+	if (scintilla)
+		::KillTimer(scintilla, fitToWindowResizeTimerId);
+	if (g_pendingFitToWindowScintilla == scintilla)
+		g_pendingFitToWindowScintilla = NULL;
+}
+
+void cancelFitToWindowResizeTimers()
+{
+	cancelFitToWindowResizeTimer(nppData._scintillaMainHandle);
+	cancelFitToWindowResizeTimer(nppData._scintillaSecondHandle);
+}
+
+WNDPROC originalScintillaProc(HWND hwnd)
+{
+	if (hwnd == nppData._scintillaMainHandle)
+		return g_originalMainScintillaProc;
+	if (hwnd == nppData._scintillaSecondHandle)
+		return g_originalSecondScintillaProc;
+	return NULL;
+}
+
+LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	WNDPROC original = originalScintillaProc(hwnd);
+	if (!original)
+		return ::DefWindowProc(hwnd, message, wParam, lParam);
+
+	if (message == WM_TIMER && wParam == fitToWindowResizeTimerId)
+	{
+		cancelFitToWindowResizeTimer(hwnd);
+		fitToWindowAfterResize(hwnd);
+		return 0;
+	}
+
+	const LRESULT result = ::CallWindowProc(original, hwnd, message, wParam, lParam);
+	if (message == WM_SIZE)
+		scheduleFitToWindowAfterResize(hwnd);
+	return result;
+}
+
+void subclassScintillaWindow(HWND hwnd, WNDPROC &original)
+{
+	if (!hwnd || original)
+		return;
+
+	original = reinterpret_cast<WNDPROC>(::SetWindowLongPtr(
+		hwnd,
+		GWLP_WNDPROC,
+		reinterpret_cast<LONG_PTR>(fitToWindowScintillaProc)));
+}
+
+void removeScintillaSubclass(HWND hwnd, WNDPROC &original)
+{
+	if (!hwnd || !original)
+	{
+		original = NULL;
+		return;
+	}
+
+	if (reinterpret_cast<WNDPROC>(::GetWindowLongPtr(hwnd, GWLP_WNDPROC)) == fitToWindowScintillaProc)
+	{
+		::SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(original));
+	}
+	original = NULL;
 }
 
 std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
@@ -2025,6 +2156,21 @@ void setFitToWindowOnResizeEnabledForTests(bool enabled)
 		g_lastFitToWindowColumns = 0;
 }
 
+bool fitTableToWindowCommandEnabledForTests()
+{
+	return fitTableToWindowCommandEnabled();
+}
+
+bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
+{
+	return shouldRunFitToWindowAfterResize(enabled, inProgress, activeEditor, previousColumns, currentColumns);
+}
+
+UINT fitToWindowResizeDelayMsForTests()
+{
+	return fitToWindowResizeDelayMs;
+}
+
 bool ensureTabToolbarIconsForTests()
 {
 	return ensureTabToolbarIconHandles();
@@ -2090,6 +2236,7 @@ void pluginInit(HANDLE hModule)
 //
 void pluginCleanUp()
 {
+	removeFitToWindowResizeHooks();
 	destroyTabToolbarIconHandles();
 	destroyWrapLongCellsToolbarIconHandles();
 	destroyNotepadWordWrapToolbarIconHandles();
@@ -2183,6 +2330,7 @@ void refreshFitToWindowOnResizeUi()
 		static_cast<WPARAM>(funcItem[fitToWindowOnResizeCommandIndex]._cmdID),
 		static_cast<LPARAM>(g_fitToWindowOnResize ? TRUE : FALSE));
 	setFitToWindowOnResizeToolbarCheckState();
+	setCommandEnabledState(wrapLongCellsCommandIndex, fitTableToWindowCommandEnabled());
 }
 
 void registerToolbarIcon(std::size_t commandIndex, HBITMAP bitmap, HICON icon, HICON darkModeIcon)
@@ -2362,7 +2510,9 @@ void tabOrIndent()
 
 void wrapLongCells()
 {
-	runTableAction(MarkdownTable::Action::WrapLongCells, false);
+	if (!fitTableToWindowCommandEnabled())
+		return;
+	fitCurrentTableToWindow(false);
 }
 
 void toggleNotepadWordWrap()
@@ -2379,7 +2529,7 @@ void toggleAutoWrapLongCells()
 	g_autoWrapLongCells = !g_autoWrapLongCells;
 	refreshAutoWrapLongCellsUi();
 	if (g_autoWrapLongCells)
-		runTableAction(MarkdownTable::Action::WrapLongCells, true);
+		fitCurrentTableToWindow(true);
 }
 
 void toggleFitToWindowOnResize()
@@ -2388,11 +2538,23 @@ void toggleFitToWindowOnResize()
 	if (g_fitToWindowOnResize)
 		rememberCurrentFitToWindowWidth();
 	else
+	{
+		cancelFitToWindowResizeTimers();
 		g_lastFitToWindowColumns = 0;
+	}
 	refreshFitToWindowOnResizeUi();
 }
 
-void maybeFitToWindowAfterUiUpdate()
+void installFitToWindowResizeHooks()
 {
-	maybeFitToWindowAfterUiUpdateImpl();
+	subclassScintillaWindow(nppData._scintillaMainHandle, g_originalMainScintillaProc);
+	subclassScintillaWindow(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
+	rememberCurrentFitToWindowWidth();
+}
+
+void removeFitToWindowResizeHooks()
+{
+	cancelFitToWindowResizeTimers();
+	removeScintillaSubclass(nppData._scintillaMainHandle, g_originalMainScintillaProc);
+	removeScintillaSubclass(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
 }
