@@ -259,14 +259,19 @@ int runPluginShortcutTests()
 	const std::string privet = "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
 	const std::string pri = "\xD0\xBF\xD1\x80\xD0\xB8";
 	const std::string sourcePrivetLine = "| " + privet + " |";
+	const std::string sourcePrivetSpaceLine = "| " + privet + "  |";
 	const std::string paddedPrivetLine = "| " + privet + "     |";
 	const std::size_t caretAfterPri = sourcePrivetLine.find(privet) + pri.size();
+	const std::size_t caretAfterPrivetSpace = sourcePrivetSpaceLine.find(privet) + privet.size() + 1;
 	expectSize(failures, "auto input preserves utf8 cell caret after same formatting",
 		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetLine, 0, caretAfterPri, sourcePrivetLine),
 		caretAfterPri);
 	expectSize(failures, "auto input preserves utf8 cell caret after padding changes",
 		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetLine, 0, caretAfterPri, paddedPrivetLine),
 		paddedPrivetLine.find(privet) + pri.size());
+	expectSize(failures, "auto input preserves utf8 trailing space between words",
+		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetSpaceLine, 0, caretAfterPrivetSpace, sourcePrivetLine),
+		sourcePrivetLine.find(privet) + privet.size() + 1);
 	expectTrue(failures, "auto align toggle runs initial align before enabling", MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(false));
 	expectTrue(failures, "auto align toggle does not run initial align when disabling", !MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(true));
 	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);

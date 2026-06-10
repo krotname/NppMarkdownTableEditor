@@ -65,6 +65,8 @@ struct InsertText
 struct CellBounds
 {
 	bool found = false;
+	std::size_t cellStart = 0;
+	std::size_t cellEnd = 0;
 	std::size_t contentStart = 0;
 	std::size_t contentEnd = 0;
 };
@@ -1813,6 +1815,8 @@ CellBounds cellBoundsForColumn(const std::string &line, std::size_t column)
 				--contentEnd;
 
 			bounds.found = true;
+			bounds.cellStart = cellStart;
+			bounds.cellEnd = i;
 			bounds.contentStart = contentStart;
 			bounds.contentEnd = contentEnd;
 			return bounds;
@@ -1833,16 +1837,29 @@ CellCaretSnapshot captureCellCaret(const std::string &line, std::size_t row, std
 		return snapshot;
 
 	const std::size_t clampedColumn = (std::min)(byteColumn, line.size());
-	const std::size_t cellLength = bounds.contentEnd > bounds.contentStart ? bounds.contentEnd - bounds.contentStart : 0;
 	std::size_t offset = 0;
 	if (clampedColumn > bounds.contentStart)
-		offset = (std::min)(clampedColumn, bounds.contentEnd) - bounds.contentStart;
+		offset = (std::min)(clampedColumn, bounds.cellEnd) - bounds.contentStart;
 
 	snapshot.valid = true;
 	snapshot.row = row;
 	snapshot.column = column;
-	snapshot.offset = (std::min)(offset, cellLength);
+	snapshot.offset = offset;
 	return snapshot;
+}
+
+void ensureCellCaretOffsetAvailable(std::vector<std::string> &lines, const CellCaretSnapshot &snapshot)
+{
+	if (!snapshot.valid || snapshot.row >= lines.size())
+		return;
+
+	const CellBounds bounds = cellBoundsForColumn(lines[snapshot.row], snapshot.column);
+	if (!bounds.found)
+		return;
+
+	const std::size_t targetOffset = bounds.contentStart + snapshot.offset;
+	if (targetOffset > bounds.cellEnd)
+		lines[snapshot.row].insert(bounds.cellEnd, targetOffset - bounds.cellEnd, ' ');
 }
 
 std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, const CellCaretSnapshot &snapshot, std::size_t fallback)
@@ -1854,8 +1871,7 @@ std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, cons
 	if (!bounds.found)
 		return fallback;
 
-	const std::size_t cellLength = bounds.contentEnd > bounds.contentStart ? bounds.contentEnd - bounds.contentStart : 0;
-	return bounds.contentStart + (std::min)(snapshot.offset, cellLength);
+	return (std::min)(bounds.contentStart + snapshot.offset, bounds.cellEnd);
 }
 
 std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
@@ -2166,6 +2182,8 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	{
 		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
+	if (caretPlacement == CaretPlacement::PreserveCellOffset && preservedCaret.valid)
+		ensureCellCaretOffsetAvailable(edit.lines, preservedCaret);
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
@@ -2425,7 +2443,9 @@ UINT fitToWindowResizeDelayMsForTests()
 std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine)
 {
 	const CellCaretSnapshot snapshot = captureCellCaret(sourceLine, 0, column, byteColumn);
-	return columnOffsetForCellCaret(std::vector<std::string>(1, replacementLine), snapshot, static_cast<std::size_t>(-1));
+	std::vector<std::string> lines(1, replacementLine);
+	ensureCellCaretOffsetAvailable(lines, snapshot);
+	return columnOffsetForCellCaret(lines, snapshot, static_cast<std::size_t>(-1));
 }
 
 bool ensureTabToolbarIconsForTests()
