@@ -1,11 +1,14 @@
 # Markdown Table Editor for Notepad++
 
 [![CI](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/CI_build.yml/badge.svg)](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/CI_build.yml)
-[![codecov](https://codecov.io/gh/krotname/NppMarkdownTableEditor/branch/master/graph/badge.svg)](https://codecov.io/gh/krotname/NppMarkdownTableEditor)
+[![CodeQL](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/codeql.yml?query=branch%3Amaster)
+[![Coverage](https://codecov.io/gh/krotname/NppMarkdownTableEditor/branch/master/graph/badge.svg)](https://codecov.io/gh/krotname/NppMarkdownTableEditor)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/krotname/NppMarkdownTableEditor/badge)](https://securityscorecards.dev/viewer/?uri=github.com/krotname/NppMarkdownTableEditor)
 [![Release](https://img.shields.io/github/v/release/krotname/NppMarkdownTableEditor?label=release)](https://github.com/krotname/NppMarkdownTableEditor/releases/latest)
+[![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
+[![C++](https://img.shields.io/badge/C%2B%2B-14-00599C)](https://isocpp.org/)
 [![Plugin List PR](https://img.shields.io/badge/Plugin%20List-PR%20%231115-f97316)](https://github.com/notepad-plus-plus/nppPluginList/pull/1115)
 [![Website](https://img.shields.io/badge/website-markdowntableeditor.krot.name-0f766e)](https://markdowntableeditor.krot.name/)
-[![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
 
 Markdown Table Editor turns Notepad++ into a convenient Markdown table editor.
 Paste a messy table from someone else or from an AI tool, press `Tab`, and the plugin aligns the columns, preserves Markdown formatting,
