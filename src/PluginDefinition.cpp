@@ -97,15 +97,31 @@ ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
 
 const std::size_t tabCommandIndex = 15;
 const std::size_t wrapLongCellsCommandIndex = 16;
-const std::size_t autoWrapLongCellsCommandIndex = 17;
+const std::size_t notepadWordWrapCommandIndex = 17;
+const std::size_t autoWrapLongCellsCommandIndex = 18;
+const std::size_t fitToWindowOnResizeCommandIndex = 19;
+// Notepad++ IDM_VIEW_WRAP = IDM + 4000 + 22.
+const int notepadWordWrapCommandId = 44022;
 
-bool g_autoWrapLongCells = true;
+bool g_autoWrapLongCells = false;
+bool g_fitToWindowOnResize = false;
+bool g_fitToWindowInProgress = false;
+std::size_t g_lastFitToWindowColumns = 0;
 HBITMAP g_tabToolbarBmp = NULL;
 HICON g_tabToolbarIcon = NULL;
 HICON g_tabToolbarIconDarkMode = NULL;
+HBITMAP g_wrapLongCellsToolbarBmp = NULL;
+HICON g_wrapLongCellsToolbarIcon = NULL;
+HICON g_wrapLongCellsToolbarIconDarkMode = NULL;
+HBITMAP g_notepadWordWrapToolbarBmp = NULL;
+HICON g_notepadWordWrapToolbarIcon = NULL;
+HICON g_notepadWordWrapToolbarIconDarkMode = NULL;
 HBITMAP g_autoWrapToolbarBmp = NULL;
 HICON g_autoWrapToolbarIcon = NULL;
 HICON g_autoWrapToolbarIconDarkMode = NULL;
+HBITMAP g_fitToWindowOnResizeToolbarBmp = NULL;
+HICON g_fitToWindowOnResizeToolbarIcon = NULL;
+HICON g_fitToWindowOnResizeToolbarIconDarkMode = NULL;
 
 enum class UiLanguage
 {
@@ -150,7 +166,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, L"Auto wrap on Tab (MD)" }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Table wrap (MD)", L"Auto fit on resize (MD)" }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -183,8 +199,10 @@ const UiText englishUiText =
 		L"Convert CSV/TSV to table",
 		L"Insert table...",
 		L"Tab: align table or indent (MD)",
-		L"Wrap long cells",
-		L"Auto wrap on Tab (MD)"
+		L"Fit table to window",
+		L"Notepad++ word wrap (MD)",
+		L"Table wrap (MD)",
+		L"Auto fit on resize (MD)"
 	},
 	L"Insert Markdown table",
 	L"Columns:",
@@ -418,8 +436,10 @@ const UiText russianUiText =
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
-		L"\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438 \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u044F\u0447\u0435\u0439\u043A\u0438",
-		L"\u0410\u0432\u0442\u043E\u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u043F\u0440\u0438 Tab (MD)"
+		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
+		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
+		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0432\u043D\u0443\u0442\u0440\u0438 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u043F\u0440\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0438 \u043E\u043A\u043D\u0430 (MD)"
 	},
 	L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 	L"\u0421\u0442\u043E\u043B\u0431\u0446\u044B:",
@@ -944,6 +964,8 @@ void drawIconVerticalLine(std::uint32_t *pixels, int x, int y1, int y2, std::uin
 enum class ToolbarIconKind
 {
 	TabAction,
+	TableWrap,
+	EditorWordWrap,
 	AutoWrap
 };
 
@@ -978,6 +1000,14 @@ void drawMiniTable(std::uint32_t *pixels, std::uint32_t grid, std::uint32_t mute
 	drawIconVerticalLine(pixels, 14, 8, 14, grid);
 }
 
+void drawEditorLines(std::uint32_t *pixels, std::uint32_t color, std::uint32_t muted)
+{
+	drawIconHorizontalLine(pixels, 2, 13, 3, color);
+	drawIconHorizontalLine(pixels, 2, 13, 6, muted);
+	drawIconHorizontalLine(pixels, 2, 9, 9, color);
+	drawIconHorizontalLine(pixels, 2, 13, 13, muted);
+}
+
 void drawTabActionArrow(std::uint32_t *pixels, std::uint32_t accent)
 {
 	drawIconHorizontalLine(pixels, 1, 5, 8, accent);
@@ -1005,17 +1035,24 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
 	const std::uint32_t tabAccent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
 	const std::uint32_t wrapAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
+	const std::uint32_t editorAccent = darkMode ? argb(255, 255, 191, 105) : argb(255, 196, 112, 0);
 
 	clearIcon(pixels);
-	drawMdBadge(pixels, grid);
 	if (kind == ToolbarIconKind::TabAction)
 	{
+		drawMdBadge(pixels, grid);
 		drawTabActionArrow(pixels, tabAccent);
+	}
+	else if (kind == ToolbarIconKind::TableWrap || kind == ToolbarIconKind::AutoWrap)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawAutoWrapArrow(pixels, wrapAccent);
 	}
 	else
 	{
-		drawMiniTable(pixels, grid, muted);
-		drawAutoWrapArrow(pixels, wrapAccent);
+		drawEditorLines(pixels, grid, muted);
+		drawAutoWrapArrow(pixels, editorAccent);
 	}
 }
 
@@ -1100,9 +1137,28 @@ bool ensureTabToolbarIconHandles()
 	return ensureToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode, ToolbarIconKind::TabAction);
 }
 
+bool ensureWrapLongCellsToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode, ToolbarIconKind::TableWrap);
+}
+
+bool ensureNotepadWordWrapToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode, ToolbarIconKind::EditorWordWrap);
+}
+
 bool ensureAutoWrapToolbarIconHandles()
 {
 	return ensureToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode, ToolbarIconKind::AutoWrap);
+}
+
+bool ensureFitToWindowOnResizeToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(
+		g_fitToWindowOnResizeToolbarBmp,
+		g_fitToWindowOnResizeToolbarIcon,
+		g_fitToWindowOnResizeToolbarIconDarkMode,
+		ToolbarIconKind::TableWrap);
 }
 
 void destroyTabToolbarIconHandles()
@@ -1113,6 +1169,24 @@ void destroyTabToolbarIconHandles()
 void destroyAutoWrapToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
+}
+
+void destroyWrapLongCellsToolbarIconHandles()
+{
+	destroyToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode);
+}
+
+void destroyNotepadWordWrapToolbarIconHandles()
+{
+	destroyToolbarIconHandles(g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode);
+}
+
+void destroyFitToWindowOnResizeToolbarIconHandles()
+{
+	destroyToolbarIconHandles(
+		g_fitToWindowOnResizeToolbarBmp,
+		g_fitToWindowOnResizeToolbarIcon,
+		g_fitToWindowOnResizeToolbarIconDarkMode);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -1138,17 +1212,41 @@ HWND findToolbarWindow(HWND parent)
 	return toolbar;
 }
 
-void setAutoWrapToolbarCheckState()
+void setToolbarCheckState(std::size_t commandIndex, bool checked)
 {
 	HWND toolbar = findToolbarWindow(nppData._nppHandle);
-	if (!toolbar || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0)
+	if (!toolbar || commandIndex >= static_cast<std::size_t>(nbFunc) || funcItem[commandIndex]._cmdID == 0)
 		return;
 
 	::SendMessage(
 		toolbar,
 		TB_CHECKBUTTON,
-		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
-		MAKELPARAM(g_autoWrapLongCells ? TRUE : FALSE, 0));
+		static_cast<WPARAM>(funcItem[commandIndex]._cmdID),
+		MAKELPARAM(checked ? TRUE : FALSE, 0));
+}
+
+void setAutoWrapToolbarCheckState()
+{
+	setToolbarCheckState(autoWrapLongCellsCommandIndex, g_autoWrapLongCells);
+}
+
+void setFitToWindowOnResizeToolbarCheckState()
+{
+	setToolbarCheckState(fitToWindowOnResizeCommandIndex, g_fitToWindowOnResize);
+}
+
+bool notepadWordWrapEnabled()
+{
+	HWND scintilla = currentScintilla();
+	if (!scintilla)
+		return false;
+
+	return ::SendMessage(scintilla, SCI_GETWRAPMODE, 0, 0) != SC_WRAP_NONE;
+}
+
+void setNotepadWordWrapToolbarCheckState()
+{
+	setToolbarCheckState(notepadWordWrapCommandIndex, notepadWordWrapEnabled());
 }
 
 bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
@@ -1165,8 +1263,19 @@ int availableTextPixelWidth(HWND scintilla)
 	if (!::GetClientRect(scintilla, &client))
 		return 0;
 
-	const int safeMargin = 6;
-	const int availableWidth = (client.right - client.left) - safeMargin;
+	int textLeft = 0;
+	const LRESULT currentPos = ::SendMessage(scintilla, SCI_GETCURRENTPOS, 0, 0);
+	const LRESULT currentLine = ::SendMessage(scintilla, SCI_LINEFROMPOSITION, static_cast<WPARAM>(currentPos), 0);
+	if (currentLine >= 0)
+	{
+		const LRESULT lineStart = ::SendMessage(scintilla, SCI_POSITIONFROMLINE, static_cast<WPARAM>(currentLine), 0);
+		const LRESULT lineStartX = ::SendMessage(scintilla, SCI_POINTXFROMPOSITION, 0, static_cast<LPARAM>(lineStart));
+		if (lineStartX > 0 && lineStartX < (client.right - client.left))
+			textLeft = static_cast<int>(lineStartX);
+	}
+
+	const int safeMargin = 10;
+	const int availableWidth = (client.right - client.left) - textLeft - safeMargin;
 	return availableWidth > 0 ? availableWidth : 0;
 }
 
@@ -1201,6 +1310,7 @@ bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lin
 }
 
 int coreIndex(std::size_t value);
+bool runTableAction(MarkdownTable::Action action, bool quiet);
 
 MarkdownTable::EditResult applyWrappedToVisibleWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
 {
@@ -1230,6 +1340,36 @@ int coreIndex(std::size_t value)
 {
 	const std::size_t maxInt = static_cast<std::size_t>((std::numeric_limits<int>::max)());
 	return value > maxInt ? (std::numeric_limits<int>::max)() : static_cast<int>(value);
+}
+
+void rememberCurrentFitToWindowWidth()
+{
+	HWND scintilla = currentScintilla();
+	g_lastFitToWindowColumns = scintilla ? availableDisplayColumns(scintilla) : 0;
+}
+
+void maybeFitToWindowAfterUiUpdateImpl()
+{
+	if (!g_fitToWindowOnResize || g_fitToWindowInProgress)
+		return;
+
+	HWND scintilla = currentScintilla();
+	if (!scintilla)
+		return;
+
+	const std::size_t columns = availableDisplayColumns(scintilla);
+	if (g_lastFitToWindowColumns == 0)
+	{
+		g_lastFitToWindowColumns = columns;
+		return;
+	}
+	if (columns == g_lastFitToWindowColumns)
+		return;
+
+	g_lastFitToWindowColumns = columns;
+	g_fitToWindowInProgress = true;
+	runTableAction(MarkdownTable::Action::WrapLongCells, true);
+	g_fitToWindowInProgress = false;
 }
 
 std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
@@ -1663,14 +1803,17 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
-	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), action);
+	const MarkdownTable::Action coreAction = action == MarkdownTable::Action::WrapLongCells
+		? MarkdownTable::Action::Align
+		: action;
+	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), coreAction);
 	if (!edit.ok)
 	{
 		if (!quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
-	if (shouldApplyAutoWrapAfterAction(action))
+	if (action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoWrapAfterAction(action))
 	{
 		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
@@ -1850,6 +1993,18 @@ bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action)
 	return shouldApplyAutoWrapAfterAction(action);
 }
 
+bool fitToWindowOnResizeEnabledForTests()
+{
+	return g_fitToWindowOnResize;
+}
+
+void setFitToWindowOnResizeEnabledForTests(bool enabled)
+{
+	g_fitToWindowOnResize = enabled;
+	if (!enabled)
+		g_lastFitToWindowColumns = 0;
+}
+
 bool ensureTabToolbarIconsForTests()
 {
 	return ensureTabToolbarIconHandles();
@@ -1860,6 +2015,26 @@ void destroyTabToolbarIconsForTests()
 	destroyTabToolbarIconHandles();
 }
 
+bool ensureWrapLongCellsToolbarIconsForTests()
+{
+	return ensureWrapLongCellsToolbarIconHandles();
+}
+
+void destroyWrapLongCellsToolbarIconsForTests()
+{
+	destroyWrapLongCellsToolbarIconHandles();
+}
+
+bool ensureNotepadWordWrapToolbarIconsForTests()
+{
+	return ensureNotepadWordWrapToolbarIconHandles();
+}
+
+void destroyNotepadWordWrapToolbarIconsForTests()
+{
+	destroyNotepadWordWrapToolbarIconHandles();
+}
+
 bool ensureAutoWrapToolbarIconsForTests()
 {
 	return ensureAutoWrapToolbarIconHandles();
@@ -1868,6 +2043,16 @@ bool ensureAutoWrapToolbarIconsForTests()
 void destroyAutoWrapToolbarIconsForTests()
 {
 	destroyAutoWrapToolbarIconHandles();
+}
+
+bool ensureFitToWindowOnResizeToolbarIconsForTests()
+{
+	return ensureFitToWindowOnResizeToolbarIconHandles();
+}
+
+void destroyFitToWindowOnResizeToolbarIconsForTests()
+{
+	destroyFitToWindowOnResizeToolbarIconHandles();
 }
 }
 #endif
@@ -1886,7 +2071,10 @@ void pluginInit(HANDLE hModule)
 void pluginCleanUp()
 {
 	destroyTabToolbarIconHandles();
+	destroyWrapLongCellsToolbarIconHandles();
+	destroyNotepadWordWrapToolbarIconHandles();
 	destroyAutoWrapToolbarIconHandles();
+	destroyFitToWindowOnResizeToolbarIconHandles();
 }
 
 //
@@ -1923,14 +2111,32 @@ void commandMenuInit()
 	setCommand(14, commandText(14), insertTable, &g_insertTableShortcut, false);
 	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
 	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
+	setCommand(notepadWordWrapCommandIndex, commandText(notepadWordWrapCommandIndex), toggleNotepadWordWrap, NULL, notepadWordWrapEnabled());
 	setCommand(autoWrapLongCellsCommandIndex, commandText(autoWrapLongCellsCommandIndex), toggleAutoWrapLongCells, NULL, g_autoWrapLongCells);
+	setCommand(fitToWindowOnResizeCommandIndex, commandText(fitToWindowOnResizeCommandIndex), toggleFitToWindowOnResize, NULL, g_fitToWindowOnResize);
 }
 
 void refreshUiLanguageFromNotepad()
 {
 	refreshUiLanguageState();
 	updateNotepadPluginMenu();
+	refreshNotepadWordWrapUi();
 	refreshAutoWrapLongCellsUi();
+	refreshFitToWindowOnResizeUi();
+}
+
+void refreshNotepadWordWrapUi()
+{
+	if (!nppData._nppHandle || funcItem[notepadWordWrapCommandIndex]._cmdID == 0)
+		return;
+
+	const bool enabled = notepadWordWrapEnabled();
+	::SendMessage(
+		nppData._nppHandle,
+		NPPM_SETMENUITEMCHECK,
+		static_cast<WPARAM>(funcItem[notepadWordWrapCommandIndex]._cmdID),
+		static_cast<LPARAM>(enabled ? TRUE : FALSE));
+	setNotepadWordWrapToolbarCheckState();
 }
 
 void refreshAutoWrapLongCellsUi()
@@ -1944,6 +2150,19 @@ void refreshAutoWrapLongCellsUi()
 		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
 		static_cast<LPARAM>(g_autoWrapLongCells ? TRUE : FALSE));
 	setAutoWrapToolbarCheckState();
+}
+
+void refreshFitToWindowOnResizeUi()
+{
+	if (!nppData._nppHandle || funcItem[fitToWindowOnResizeCommandIndex]._cmdID == 0)
+		return;
+
+	::SendMessage(
+		nppData._nppHandle,
+		NPPM_SETMENUITEMCHECK,
+		static_cast<WPARAM>(funcItem[fitToWindowOnResizeCommandIndex]._cmdID),
+		static_cast<LPARAM>(g_fitToWindowOnResize ? TRUE : FALSE));
+	setFitToWindowOnResizeToolbarCheckState();
 }
 
 void registerToolbarIcon(std::size_t commandIndex, HBITMAP bitmap, HICON icon, HICON darkModeIcon)
@@ -1984,10 +2203,25 @@ void registerToolbarIcons()
 	if (funcItem[tabCommandIndex]._cmdID != 0 && ensureTabToolbarIconHandles())
 		registerToolbarIcon(tabCommandIndex, g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
 
+	if (funcItem[wrapLongCellsCommandIndex]._cmdID != 0 && ensureWrapLongCellsToolbarIconHandles())
+		registerToolbarIcon(wrapLongCellsCommandIndex, g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode);
+
+	if (funcItem[notepadWordWrapCommandIndex]._cmdID != 0 && ensureNotepadWordWrapToolbarIconHandles())
+		registerToolbarIcon(notepadWordWrapCommandIndex, g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode);
+
 	if (funcItem[autoWrapLongCellsCommandIndex]._cmdID != 0 && ensureAutoWrapToolbarIconHandles())
 		registerToolbarIcon(autoWrapLongCellsCommandIndex, g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
 
+	if (funcItem[fitToWindowOnResizeCommandIndex]._cmdID != 0 && ensureFitToWindowOnResizeToolbarIconHandles())
+		registerToolbarIcon(
+			fitToWindowOnResizeCommandIndex,
+			g_fitToWindowOnResizeToolbarBmp,
+			g_fitToWindowOnResizeToolbarIcon,
+			g_fitToWindowOnResizeToolbarIconDarkMode);
+
+	refreshNotepadWordWrapUi();
 	refreshAutoWrapLongCellsUi();
+	refreshFitToWindowOnResizeUi();
 }
 
 //
@@ -2111,8 +2345,34 @@ void wrapLongCells()
 	runTableAction(MarkdownTable::Action::WrapLongCells, false);
 }
 
+void toggleNotepadWordWrap()
+{
+	if (!nppData._nppHandle)
+		return;
+
+	::SendMessage(nppData._nppHandle, NPPM_MENUCOMMAND, 0, static_cast<LPARAM>(notepadWordWrapCommandId));
+	refreshNotepadWordWrapUi();
+}
+
 void toggleAutoWrapLongCells()
 {
 	g_autoWrapLongCells = !g_autoWrapLongCells;
 	refreshAutoWrapLongCellsUi();
+	if (g_autoWrapLongCells)
+		runTableAction(MarkdownTable::Action::WrapLongCells, true);
+}
+
+void toggleFitToWindowOnResize()
+{
+	g_fitToWindowOnResize = !g_fitToWindowOnResize;
+	if (g_fitToWindowOnResize)
+		rememberCurrentFitToWindowWidth();
+	else
+		g_lastFitToWindowColumns = 0;
+	refreshFitToWindowOnResizeUi();
+}
+
+void maybeFitToWindowAfterUiUpdate()
+{
+	maybeFitToWindowAfterUiUpdateImpl();
 }

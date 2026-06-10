@@ -65,7 +65,7 @@ struct CodePointRange
 	unsigned int last;
 };
 
-const std::size_t hardWrapCellWidth = 32;
+const std::size_t hardWrapCellWidth = 26;
 const std::size_t minimumAutoWrapCellWidth = 1;
 
 std::size_t nextRowId(const Table &table);
@@ -1087,6 +1087,88 @@ std::size_t wrapCellsToColumnWidths(Table &table, std::size_t originalTargetRow,
 
 	table.rows = std::move(wrappedRows);
 	return wrappedTargetRow;
+}
+
+bool cellHasText(const std::string &cell)
+{
+	return !trim(cell).empty();
+}
+
+std::size_t nonEmptyCellCount(const Row &row)
+{
+	std::size_t count = 0;
+	for (std::size_t column = 0; column < row.cells.size(); ++column)
+	{
+		if (cellHasText(row.cells[column]))
+			++count;
+	}
+	return count;
+}
+
+bool isLikelyContinuationRow(const Row &row, const Row &baseRow, std::size_t columns)
+{
+	if (columns < 2 || row.cells.size() < columns || baseRow.cells.size() < columns)
+		return false;
+
+	const std::size_t nonEmpty = nonEmptyCellCount(row);
+	if (nonEmpty == 0 || nonEmpty == columns)
+		return false;
+
+	std::size_t emptyWhereBaseHasText = 0;
+	for (std::size_t column = 0; column < columns; ++column)
+	{
+		if (!cellHasText(row.cells[column]) && cellHasText(baseRow.cells[column]))
+			++emptyWhereBaseHasText;
+	}
+
+	const std::size_t requiredAnchors = (std::max)(static_cast<std::size_t>(1), columns / 3);
+	return emptyWhereBaseHasText >= requiredAnchors;
+}
+
+void appendContinuationCell(std::string &target, const std::string &continuation)
+{
+	const std::string value = trim(continuation);
+	if (value.empty())
+		return;
+	if (!trim(target).empty())
+		target += " ";
+	target += value;
+}
+
+std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1))
+		return originalTargetRow;
+
+	std::vector<Row> unwrappedRows;
+	unwrappedRows.reserve(table.rows.size());
+	std::size_t targetRow = originalTargetRow;
+	std::size_t baseRowIndex = static_cast<std::size_t>(-1);
+
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex <= table.separatorRow || baseRowIndex == static_cast<std::size_t>(-1) ||
+			!isLikelyContinuationRow(row, unwrappedRows[baseRowIndex], table.columns))
+		{
+			if (rowIndex == originalTargetRow)
+				targetRow = unwrappedRows.size();
+			if (!row.separator && rowIndex > table.separatorRow)
+				baseRowIndex = unwrappedRows.size();
+			unwrappedRows.push_back(row);
+			continue;
+		}
+
+		if (rowIndex == originalTargetRow)
+			targetRow = baseRowIndex;
+
+		Row &baseRow = unwrappedRows[baseRowIndex];
+		for (std::size_t column = 0; column < table.columns; ++column)
+			appendContinuationCell(baseRow.cells[column], row.cells[column]);
+	}
+
+	table.rows = std::move(unwrappedRows);
+	return targetRow;
 }
 
 void appendSeparatorCell(std::string &line, Align align, std::size_t width, std::size_t minimumWidth)
@@ -2144,6 +2226,7 @@ EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, i
 	if (tableColumn >= table.columns)
 		tableColumn = table.columns - 1;
 
+	tableRow = unwrapContinuationRows(table, tableRow);
 	const std::vector<std::size_t> columnWidths = targetColumnWidthsForTableWidth(table, maxTableWidth);
 	const std::size_t targetRow = wrapCellsToColumnWidths(table, tableRow, columnWidths);
 	FormatResult formatted = formatTable(table, targetRow, tableColumn, &columnWidths);

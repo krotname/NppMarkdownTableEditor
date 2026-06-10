@@ -203,10 +203,10 @@
         "| row | alpha beta gamma delta epsilon zeta eta theta |"
       ],
       "lines": [
-        "| Key | Value                          |",
-        "| --- | ------------------------------ |",
-        "| row | alpha beta gamma delta epsilon |",
-        "|     | zeta eta theta                 |"
+        "| Key | Value                  |",
+        "| --- | ---------------------- |",
+        "| row | alpha beta gamma delta |",
+        "|     | epsilon zeta eta theta |"
       ],
       "targetRow": 2,
       "targetColumn": 1
@@ -223,13 +223,13 @@
         "| code | ``alpha beta`` gamma delta epsilon zeta eta theta | tail |"
       ],
       "lines": [
-        "| Item | Text                             | Empty |",
-        "| ---- | -------------------------------- | ----- |",
-        "| link | [release notes](https://example. |       |",
-        "|      | com/path_(v1)) alpha beta gamma  |       |",
-        "|      | delta                            |       |",
-        "| code | ``alpha beta`` gamma delta       | tail  |",
-        "|      | epsilon zeta eta theta           |       |"
+        "| Item | Text                       | Empty |",
+        "| ---- | -------------------------- | ----- |",
+        "| link | [release notes](https://ex |       |",
+        "|      | ample.com/path_(v1)) alpha |       |",
+        "|      | beta gamma delta           |       |",
+        "| code | ``alpha beta`` gamma delta | tail  |",
+        "|      | epsilon zeta eta theta     |       |"
       ],
       "targetRow": 2,
       "targetColumn": 1
@@ -245,10 +245,10 @@
         "| alpha beta gamma delta epsilon zeta eta theta | tail |"
       ],
       "lines": [
-        "| H                              | V    |",
-        "| ------------------------------ | ---- |",
-        "| alpha beta gamma delta epsilon | tail |",
-        "| zeta eta theta                 |      |"
+        "| H                      | V    |",
+        "| ---------------------- | ---- |",
+        "| alpha beta gamma delta | tail |",
+        "| epsilon zeta eta theta |      |"
       ],
       "targetRow": 0,
       "targetColumn": 0

@@ -42,7 +42,7 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 - Insert, delete, and move rows.
 - Insert, delete, and move columns.
 - Sort rows by the current column in ascending or descending order.
-- Wrap long cells into continuation rows so wide registries are easier to edit in plain text, with an optional toolbar toggle for automatic wrapping after table edits.
+- Wrap long cells into continuation rows fitted to the current Notepad++ editor width so wide registries are easier to edit in plain text; if space is extremely tight, long words are split inside the cell.
 - Convert selected CSV/TSV text or the current CSV/TSV block into a Markdown table.
 - CSV/TSV block detection ignores commas inside quotes and does not capture adjacent plain text.
 - Insert a new table with a selected number of columns and rows.
@@ -96,8 +96,10 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | `Move row up` / `Move row down`                | Moves the current row                                                |
 | `Move column left` / `Move column right`       | Moves the current column                                             |
 | `Sort rows ascending` / `Sort rows descending` | Sorts rows by the current column                                     |
-| `Wrap long cells`                              | Splits long cells into continuation rows                             |
-| `Auto wrap long cells`                         | Toggles automatic long-cell wrapping after table edit commands        |
+| `Fit table to window`                          | Fits the current table to the visible width: it narrows long cells or rejoins continuation rows when the window is wider |
+| `Notepad++ word wrap (MD)`                     | Toggles Notepad++ visual word wrap next to the table-wrap button      |
+| `Table wrap (MD)`                              | Toggles table wrapping: when enabled, it fits the current table and then keeps wrapping after `Tab`/`Align table` |
+| `Auto fit on resize (MD)`                      | Toggles automatic fitting of the current table when the editor width changes |
 | `Convert CSV/TSV to table`                     | Converts selected CSV/TSV or the current block to a Markdown table   |
 | `Insert table...`                              | Inserts a new table with the requested size                          |
 
@@ -125,10 +127,21 @@ Except for the contextual `Tab`, commands use `Ctrl+Alt+Shift` with the top numb
 | `Move column right`          | `Ctrl+Alt+Shift+]` |
 | `Sort rows ascending`        | `Ctrl+Alt+Shift+=` |
 | `Sort rows descending`       | `Ctrl+Alt+Shift+-` |
-| `Wrap long cells`            | `Ctrl+Alt+Shift+W` |
-| `Auto wrap long cells`       | toolbar/menu toggle |
+| `Fit table to window`        | `Ctrl+Alt+Shift+W` |
+| `Notepad++ word wrap (MD)`   | toolbar button     |
+| `Table wrap (MD)`            | toolbar/menu toggle |
+| `Auto fit on resize (MD)`    | toolbar/menu toggle |
 | `Convert CSV/TSV to table`   | `Ctrl+Alt+Shift+0` |
 | `Insert table...`            | `Ctrl+Alt+Shift+\` |
+
+### Table Wrap and Notepad++ Word Wrap
+
+| `Table wrap (MD)` | Notepad++ `Word wrap` | Result |
+| --- | --- | --- |
+| Off | Off | The table is not reshaped, and long physical lines continue to the right. |
+| Off | On | Only Notepad++ visual wrapping is used; the file is unchanged, and wide Markdown tables can look ragged. |
+| On | Off | The plugin physically wraps text inside cells and keeps the right table edge inside the visible width while possible. |
+| On | On | The plugin keeps table lines inside the visible width; Notepad++ wrapping remains a fallback for very narrow windows or text after manual resizing. |
 
 ## Build and Tests
 

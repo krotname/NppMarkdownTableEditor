@@ -215,10 +215,10 @@ int main()
 	expectSize("wrap long cells target column", wrappedLongCells.targetColumn, 1);
 	expectLines("wrap long cells", wrappedLongCells.lines,
 		{
-			"| Key | Value                          |",
-			"| --- | ------------------------------ |",
-			"| row | alpha beta gamma delta epsilon |",
-			"|     | zeta eta theta                 |"
+			"| Key | Value                  |",
+			"| --- | ---------------------- |",
+			"| row | alpha beta gamma delta |",
+			"|     | epsilon zeta eta theta |"
 		});
 
 	const MarkdownTable::EditResult autoWrapped = MarkdownTable::applyWrappedToWidth(
@@ -236,6 +236,15 @@ int main()
 	expectTrue("auto wrap keeps following columns on first segment", autoWrapped.lines[2].find("| Task | High") != std::string::npos);
 	expectTrue("auto wrap moves text continuation inside the table", autoWrapped.lines[3].find('|') != std::string::npos);
 
+	const MarkdownTable::EditResult expandedWrapped = MarkdownTable::applyWrappedToWidth(
+		autoWrapped.lines,
+		2,
+		0,
+		150);
+	expectTrue("expanded auto wrap ok", expandedWrapped.ok);
+	expectTrue("expanded auto wrap reduces continuation rows", expandedWrapped.lines.size() < autoWrapped.lines.size());
+	expectLineLengthAtMost("expanded auto wrap keeps physical lines inside wider width", expandedWrapped.lines, 150);
+
 	const MarkdownTable::EditResult veryNarrowWrapped = MarkdownTable::applyWrappedToWidth(
 		{
 			"| A | B | C |",
@@ -248,6 +257,24 @@ int main()
 	expectTrue("very narrow auto wrap ok", veryNarrowWrapped.ok);
 	expectTrue("very narrow auto wrap splits word by letters", veryNarrowWrapped.lines.size() > 8);
 	expectLineLengthAtMost("very narrow auto wrap keeps right edge visible", veryNarrowWrapped.lines, 18);
+
+	const MarkdownTable::EditResult registryWrapped = MarkdownTable::applyWrappedToWidth(
+		{
+			"| patch_id | date | component | target_path | change | evidence | rollback | status | notes |",
+			"| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+			"| codex-admin-launcher-2026-06-01 | 2026-06-01 | Codex launcher | C:/Users/KRT/.codex/launchers/Start-Codex-Elevated.ps1 | Created local launcher that fixes RunAs shortcuts and starts Codex with elevated rights | Service mark and log file confirm successful launch | Delete managed shortcuts and use stock package | active | prefers patched local shell |"
+		},
+		2,
+		0,
+		112);
+	expectTrue("registry auto wrap ok", registryWrapped.ok);
+	expectTrue("registry auto wrap creates continuation rows", registryWrapped.lines.size() > 3);
+	expectLineLengthAtMost("registry auto wrap keeps physical lines inside width", registryWrapped.lines, 112);
+	bool registryRightEdgeVisible = true;
+	for (std::size_t i = 0; i < registryWrapped.lines.size(); ++i)
+		registryRightEdgeVisible = registryRightEdgeVisible && !registryWrapped.lines[i].empty() && registryWrapped.lines[i][registryWrapped.lines[i].size() - 1] == '|';
+	expectTrue("registry auto wrap keeps right table edge on every physical line", registryRightEdgeVisible);
+	expectTrue("registry auto wrap keeps status column on first segment", registryWrapped.lines[2].find("| active |") != std::string::npos);
 
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{
@@ -264,7 +291,7 @@ int main()
 	std::string wrappedProtectedText;
 	for (std::size_t i = 0; i < wrappedProtectedTokens.lines.size(); ++i)
 		wrappedProtectedText += wrappedProtectedTokens.lines[i] + "\n";
-	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp") != std::string::npos);
+	expectTrue("wrap splits long markdown link token", wrappedProtectedText.find("[Codex Desktop registry](") != std::string::npos);
 	expectTrue("wrap keeps markdown link remainder", wrappedProtectedText.find("/patch registry.md>)") != std::string::npos);
 	expectTrue("wrap no longer keeps overwide markdown link token", wrappedProtectedText.find("[Codex Desktop registry](<C:/tmp/patch registry.md>)") == std::string::npos);
 	expectTrue("wrap keeps code span token", wrappedProtectedText.find("``code span with spaces``") != std::string::npos);

@@ -77,6 +77,20 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		}
 		break;
 
+		case NPPN_BUFFERACTIVATED:
+		{
+			refreshNotepadWordWrapUi();
+			refreshFitToWindowOnResizeUi();
+		}
+		break;
+
+		case SCN_UPDATEUI:
+		{
+			refreshNotepadWordWrapUi();
+			maybeFitToWindowAfterUiUpdate();
+		}
+		break;
+
 		case NPPN_TBMODIFICATION:
 		case NPPN_TOOLBARICONSETCHANGED:
 		case NPPN_DARKMODECHANGED:

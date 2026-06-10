@@ -42,7 +42,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 18;
+const int nbFunc = 20;
 
 
 //
@@ -64,7 +64,10 @@ void commandMenuInit();
 
 void refreshUiLanguageFromNotepad();
 void registerToolbarIcons();
+void refreshNotepadWordWrapUi();
 void refreshAutoWrapLongCellsUi();
+void refreshFitToWindowOnResizeUi();
+void maybeFitToWindowAfterUiUpdate();
 
 //
 //Clean up your plugin commands allocation (if any)
@@ -97,7 +100,9 @@ void convertCsvTsvSelectionToTable();
 void insertTable();
 void tabOrIndent();
 void wrapLongCells();
+void toggleNotepadWordWrap();
 void toggleAutoWrapLongCells();
+void toggleFitToWindowOnResize();
 
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
@@ -116,10 +121,18 @@ const wchar_t *pluginMenuNameForTests();
 bool autoWrapLongCellsEnabledForTests();
 void setAutoWrapLongCellsEnabledForTests(bool enabled);
 bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action);
+bool fitToWindowOnResizeEnabledForTests();
+void setFitToWindowOnResizeEnabledForTests(bool enabled);
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();
+bool ensureWrapLongCellsToolbarIconsForTests();
+void destroyWrapLongCellsToolbarIconsForTests();
+bool ensureNotepadWordWrapToolbarIconsForTests();
+void destroyNotepadWordWrapToolbarIconsForTests();
 bool ensureAutoWrapToolbarIconsForTests();
 void destroyAutoWrapToolbarIconsForTests();
+bool ensureFitToWindowOnResizeToolbarIconsForTests();
+void destroyFitToWindowOnResizeToolbarIconsForTests();
 }
 #endif
 
