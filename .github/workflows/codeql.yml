@@ -17,15 +17,18 @@ permissions:
 jobs:
   analyze:
     name: Analyze (cpp)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v3
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: c-cpp
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Build plugin for analysis
+        working-directory: vs.proj
+        run: msbuild MarkdownTableEditor.vcxproj /m /p:configuration=Release /p:platform=x64
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
