@@ -188,6 +188,7 @@ std::vector<uptr_t> g_pendingInitialAutoFormatBuffers;
 HWND g_pendingFitToWindowScintilla = NULL;
 WNDPROC g_originalMainScintillaProc = NULL;
 WNDPROC g_originalSecondScintillaProc = NULL;
+WNDPROC g_originalNppProc = NULL;
 HBITMAP g_alignToolbarBmp = NULL;
 HICON g_alignToolbarIcon = NULL;
 HICON g_alignToolbarIconDarkMode = NULL;
@@ -527,7 +528,10 @@ const UiText russianUiText =
 	L"\u041F\u043E\u043C\u0435\u0441\u0442\u0438\u0442\u0435 \u043A\u0443\u0440\u0441\u043E\u0440 \u0432\u043D\u0443\u0442\u0440\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u044B \u0441 \u0432\u0435\u0440\u0442\u0438\u043A\u0430\u043B\u044C\u043D\u044B\u043C\u0438 \u0447\u0435\u0440\u0442\u0430\u043C\u0438.",
 	L"\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443.",
 	L"\u0412\u044B\u0434\u0435\u043B\u0438\u0442\u0435 CSV/TSV-\u0442\u0435\u043A\u0441\u0442 \u0438\u043B\u0438 \u043F\u043E\u043C\u0435\u0441\u0442\u0438\u0442\u0435 \u043A\u0443\u0440\u0441\u043E\u0440 \u0432\u043D\u0443\u0442\u0440\u044C CSV/TSV-\u0431\u043B\u043E\u043A\u0430.",
-	L"\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 CSV/TSV-\u0442\u0435\u043A\u0441\u0442."
+	L"\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 CSV/TSV-\u0442\u0435\u043A\u0441\u0442.",
+	L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0438 \u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A",
+	L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043A\u043B\u044E\u0447\u0451\u043D.\r\n\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0431\u0443\u0434\u0435\u0442 \u043C\u0435\u043D\u044F\u0442\u044C Markdown-\u0442\u0435\u043A\u0441\u0442 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u0448\u0438\u0440\u0438\u043D\u0443 \u043E\u043A\u043D\u0430. \u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043B\u0438\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435.",
+	L"\u0411\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C"
 };
 
 const UiText japaneseUiText = UI_TEXT_WITH_ENGLISH_MESSAGES(
@@ -1090,6 +1094,224 @@ HWND currentScintilla()
 void showMessage(const wchar_t *message)
 {
 	::MessageBox(nppData._nppHandle, message, uiText().pluginMenuName, MB_OK | MB_ICONINFORMATION);
+}
+
+std::wstring pluginConfigFilePath()
+{
+	if (!nppData._nppHandle)
+		return std::wstring();
+
+	const LRESULT required = ::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, 0, 0);
+	if (required <= 0)
+		return std::wstring();
+
+	std::vector<wchar_t> buffer(static_cast<std::size_t>(required) + 1, L'\0');
+	const LRESULT copied = ::SendMessage(
+		nppData._nppHandle,
+		NPPM_GETPLUGINSCONFIGDIR,
+		static_cast<WPARAM>(buffer.size()),
+		reinterpret_cast<LPARAM>(&buffer[0]));
+	if (copied == FALSE || buffer.empty() || buffer[0] == L'\0')
+		return std::wstring();
+
+	std::wstring path(&buffer[0]);
+	const wchar_t last = path.empty() ? L'\0' : path[path.size() - 1];
+	if (last != L'\\' && last != L'/')
+		path += L"\\";
+	path += L"MarkdownTableEditor.ini";
+	return path;
+}
+
+bool loadWordWrapAutoFitWarningSuppression()
+{
+	const std::wstring path = pluginConfigFilePath();
+	if (path.empty())
+		return false;
+
+	g_wordWrapAutoFitWarningSuppressed = ::GetPrivateProfileInt(
+		L"Warnings",
+		L"HideWordWrapAutoFitWarning",
+		0,
+		path.c_str()) != 0;
+	g_wordWrapAutoFitWarningSuppressionLoaded = true;
+	return true;
+}
+
+bool wordWrapAutoFitWarningSuppressed()
+{
+	if (!g_wordWrapAutoFitWarningSuppressionLoaded)
+		loadWordWrapAutoFitWarningSuppression();
+	return g_wordWrapAutoFitWarningSuppressed;
+}
+
+void setWordWrapAutoFitWarningSuppressed(bool suppressed)
+{
+	g_wordWrapAutoFitWarningSuppressed = suppressed;
+	g_wordWrapAutoFitWarningSuppressionLoaded = true;
+
+	const std::wstring path = pluginConfigFilePath();
+	if (path.empty())
+		return;
+
+	::WritePrivateProfileString(
+		L"Warnings",
+		L"HideWordWrapAutoFitWarning",
+		suppressed ? L"1" : L"0",
+		path.c_str());
+}
+
+bool standardWordWrapEnabledForMode(LRESULT wrapMode)
+{
+	return wrapMode != SC_WRAP_NONE;
+}
+
+bool standardWordWrapEnabled(HWND scintilla)
+{
+	if (!scintilla)
+		return false;
+
+	const LRESULT wrapMode = ::SendMessage(scintilla, SCI_GETWRAPMODE, 0, 0);
+	return standardWordWrapEnabledForMode(wrapMode);
+}
+
+bool shouldShowWordWrapAutoFitWarning(bool autoFitEnabled, bool wordWrapEnabled, bool warningSuppressed)
+{
+	return autoFitEnabled && wordWrapEnabled && !warningSuppressed;
+}
+
+LRESULT CALLBACK wordWrapAutoFitWarningDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	WordWrapAutoFitWarningDialogState *state = reinterpret_cast<WordWrapAutoFitWarningDialogState *>(::GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+	switch (message)
+	{
+		case WM_CREATE:
+		{
+			const UiText &text = uiText();
+			CREATESTRUCT *create = reinterpret_cast<CREATESTRUCT *>(lParam);
+			state = reinterpret_cast<WordWrapAutoFitWarningDialogState *>(create->lpCreateParams);
+			::SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+
+			HFONT font = reinterpret_cast<HFONT>(::GetStockObject(DEFAULT_GUI_FONT));
+			HWND messageText = ::CreateWindowEx(0, TEXT("STATIC"), text.wordWrapAutoFitWarningMessage, WS_CHILD | WS_VISIBLE | SS_LEFT, 18, 18, 404, 72, hwnd, NULL, g_moduleHandle, NULL);
+			HWND check = ::CreateWindowEx(0, TEXT("BUTTON"), text.doNotShowAgain, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 18, 100, 250, 24, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(wordWrapAutoFitDontShowAgainId)), g_moduleHandle, NULL);
+			HWND ok = ::CreateWindowEx(0, TEXT("BUTTON"), text.okButton, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 178, 136, 84, 28, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDOK)), g_moduleHandle, NULL);
+
+			HWND controls[] = { messageText, check, ok };
+			for (std::size_t i = 0; i < sizeof(controls) / sizeof(controls[0]); ++i)
+				::SendMessage(controls[i], WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+
+			::SetFocus(ok);
+			return 0;
+		}
+
+		case WM_COMMAND:
+		{
+			const int command = LOWORD(wParam);
+			if (command == IDOK)
+			{
+				const LRESULT checked = ::SendDlgItemMessage(hwnd, wordWrapAutoFitDontShowAgainId, BM_GETCHECK, 0, 0);
+				if (state)
+					state->dontShowAgain = checked == BST_CHECKED;
+				::DestroyWindow(hwnd);
+				return 0;
+			}
+			break;
+		}
+
+		case WM_CLOSE:
+			::DestroyWindow(hwnd);
+			return 0;
+	}
+
+	return ::DefWindowProc(hwnd, message, wParam, lParam);
+}
+
+bool promptWordWrapAutoFitWarning(WordWrapAutoFitWarningDialogState &state)
+{
+	if (!nppData._nppHandle)
+		return false;
+
+	const TCHAR className[] = TEXT("MarkdownTableEditorWordWrapAutoFitWarning");
+	static bool registered = false;
+	if (!registered)
+	{
+		WNDCLASS wc;
+		ZeroMemory(&wc, sizeof(wc));
+		wc.lpfnWndProc = wordWrapAutoFitWarningDialogProc;
+		wc.hInstance = g_moduleHandle;
+		wc.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+		wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+		wc.lpszClassName = className;
+		if (!::RegisterClass(&wc))
+			return false;
+		registered = true;
+	}
+
+	RECT ownerRect;
+	if (!::GetWindowRect(nppData._nppHandle, &ownerRect))
+	{
+		ownerRect.left = 100;
+		ownerRect.top = 100;
+		ownerRect.right = 700;
+		ownerRect.bottom = 500;
+	}
+
+	const int width = 460;
+	const int height = 210;
+	const int x = ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2;
+	const int y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2;
+	HWND dialog = ::CreateWindowEx(WS_EX_DLGMODALFRAME, className, uiText().wordWrapAutoFitWarningTitle, WS_CAPTION | WS_SYSMENU | WS_VISIBLE, x, y, width, height, nppData._nppHandle, NULL, g_moduleHandle, &state);
+	if (!dialog)
+		return false;
+
+	::EnableWindow(nppData._nppHandle, FALSE);
+	::ShowWindow(dialog, SW_SHOW);
+	::SetForegroundWindow(dialog);
+
+	MSG msg;
+	while (::IsWindow(dialog))
+	{
+		const BOOL messageResult = ::GetMessage(&msg, NULL, 0, 0);
+		if (messageResult <= 0)
+		{
+			if (messageResult == 0)
+				::PostQuitMessage(static_cast<int>(msg.wParam));
+			break;
+		}
+
+		if (!::IsDialogMessage(dialog, &msg))
+		{
+			::TranslateMessage(&msg);
+			::DispatchMessage(&msg);
+		}
+	}
+
+	::EnableWindow(nppData._nppHandle, TRUE);
+	::SetForegroundWindow(nppData._nppHandle);
+	return true;
+}
+
+void checkWordWrapAutoFitWarningInternal()
+{
+	const bool comboActive = g_autoFitTable && standardWordWrapEnabled(currentScintilla());
+	if (!comboActive)
+	{
+		g_wordWrapAutoFitWarningComboActive = false;
+		return;
+	}
+	if (g_wordWrapAutoFitWarningComboActive)
+		return;
+	if (!nppData._nppHandle || !::IsWindowVisible(nppData._nppHandle))
+		return;
+
+	g_wordWrapAutoFitWarningComboActive = true;
+	if (!shouldShowWordWrapAutoFitWarning(g_autoFitTable, true, wordWrapAutoFitWarningSuppressed()))
+		return;
+
+	WordWrapAutoFitWarningDialogState state;
+	if (promptWordWrapAutoFitWarning(state) && state.dontShowAgain)
+		setWordWrapAutoFitWarningSuppressed(true);
 }
 
 std::string nativeLangFileName()
@@ -1676,6 +1898,11 @@ bool alignTableCommandEnabled()
 	return !g_autoAlignTable;
 }
 
+bool autoAlignTableToggleEnabled()
+{
+	return !g_autoFitTable;
+}
+
 bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
 {
 	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
@@ -1864,6 +2091,28 @@ void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 	::SetTimer(resizedScintilla, fitToWindowResizeTimerId, fitToWindowResizeDelayMs, NULL);
 }
 
+bool shouldScheduleFitToWindowAfterResizeMessage(UINT message, WPARAM wParam, UINT windowPosFlags)
+{
+	if (message == WM_SIZE)
+		return wParam != SIZE_MINIMIZED;
+	if (message == WM_WINDOWPOSCHANGED)
+		return (windowPosFlags & SWP_NOSIZE) == 0;
+	if (message == WM_EXITSIZEMOVE || message == WM_DPICHANGED)
+		return true;
+	return false;
+}
+
+bool shouldScheduleFitToWindowAfterResizeMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UINT windowPosFlags = 0;
+	if (message == WM_WINDOWPOSCHANGED && lParam)
+	{
+		const WINDOWPOS *windowPos = reinterpret_cast<const WINDOWPOS *>(lParam);
+		windowPosFlags = windowPos->flags;
+	}
+	return shouldScheduleFitToWindowAfterResizeMessage(message, wParam, windowPosFlags);
+}
+
 void runAutoTableFormatAfterUpdate(HWND updatedScintilla, bool contentUpdated)
 {
 	HWND scintilla = currentScintilla();
@@ -1974,6 +2223,7 @@ void handleScintillaUpdateUiInternal(const SCNotification *notification)
 
 	const bool contentUpdated = (notification->updated & SC_UPDATE_CONTENT) != 0;
 	runAutoTableFormatAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
+	checkWordWrapAutoFitWarningInternal();
 }
 
 void cancelFitToWindowResizeTimer(HWND scintilla)
@@ -2017,8 +2267,20 @@ LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam
 	const LRESULT result = ::CallWindowProc(original, hwnd, message, wParam, lParam);
 	if (preserveEnterColumn)
 		restoreEnterColumn(hwnd, preservedEnterColumn);
-	if (message == WM_SIZE)
+	if (shouldScheduleFitToWindowAfterResizeMessage(message, wParam, lParam))
 		scheduleFitToWindowAfterResize(hwnd);
+	return result;
+}
+
+LRESULT CALLBACK fitToWindowNppProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	WNDPROC original = g_originalNppProc;
+	if (!original)
+		return ::DefWindowProc(hwnd, message, wParam, lParam);
+
+	const LRESULT result = ::CallWindowProc(original, hwnd, message, wParam, lParam);
+	if (shouldScheduleFitToWindowAfterResizeMessage(message, wParam, lParam))
+		scheduleFitToWindowAfterResize(currentScintilla());
 	return result;
 }
 
@@ -2031,6 +2293,17 @@ void subclassScintillaWindow(HWND hwnd, WNDPROC &original)
 		hwnd,
 		GWLP_WNDPROC,
 		reinterpret_cast<LONG_PTR>(fitToWindowScintillaProc)));
+}
+
+void subclassNppWindow()
+{
+	if (!nppData._nppHandle || g_originalNppProc)
+		return;
+
+	g_originalNppProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtr(
+		nppData._nppHandle,
+		GWLP_WNDPROC,
+		reinterpret_cast<LONG_PTR>(fitToWindowNppProc)));
 }
 
 void removeScintillaSubclass(HWND hwnd, WNDPROC &original)
@@ -2046,6 +2319,21 @@ void removeScintillaSubclass(HWND hwnd, WNDPROC &original)
 		::SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(original));
 	}
 	original = NULL;
+}
+
+void removeNppSubclass()
+{
+	if (!nppData._nppHandle || !g_originalNppProc)
+	{
+		g_originalNppProc = NULL;
+		return;
+	}
+
+	if (reinterpret_cast<WNDPROC>(::GetWindowLongPtr(nppData._nppHandle, GWLP_WNDPROC)) == fitToWindowNppProc)
+	{
+		::SetWindowLongPtr(nppData._nppHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_originalNppProc));
+	}
+	g_originalNppProc = NULL;
 }
 
 std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
@@ -3429,6 +3717,11 @@ bool runInsertTable()
 
 }
 
+void checkWordWrapAutoFitWarning()
+{
+	checkWordWrapAutoFitWarningInternal();
+}
+
 void handleScintillaUpdateUi(const SCNotification *notification)
 {
 	handleScintillaUpdateUiInternal(notification);
@@ -3493,8 +3786,13 @@ bool autoFitTableEnabledForTests()
 void setAutoFitTableEnabledForTests(bool enabled)
 {
 	g_autoFitTable = enabled;
+	if (enabled)
+		g_autoAlignTable = true;
 	if (!enabled)
+	{
 		g_lastFitToWindowColumns = 0;
+		g_wordWrapAutoFitWarningComboActive = false;
+	}
 }
 
 bool autoAlignTableEnabledForTests()
@@ -3504,6 +3802,8 @@ bool autoAlignTableEnabledForTests()
 
 void setAutoAlignTableEnabledForTests(bool enabled)
 {
+	if (g_autoFitTable && !enabled)
+		return;
 	g_autoAlignTable = enabled;
 }
 
@@ -3532,9 +3832,29 @@ bool fitTableToWindowCommandEnabledForTests()
 	return fitTableToWindowCommandEnabled();
 }
 
+bool autoAlignTableToggleEnabledForTests()
+{
+	return autoAlignTableToggleEnabled();
+}
+
+bool standardWordWrapEnabledForModeForTests(long wrapMode)
+{
+	return standardWordWrapEnabledForMode(static_cast<LRESULT>(wrapMode));
+}
+
+bool shouldShowWordWrapAutoFitWarningForTests(bool autoFitEnabled, bool wordWrapEnabled, bool warningSuppressed)
+{
+	return shouldShowWordWrapAutoFitWarning(autoFitEnabled, wordWrapEnabled, warningSuppressed);
+}
+
 bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
 {
 	return shouldRunFitToWindowAfterResize(enabled, inProgress, activeEditor, previousColumns, currentColumns);
+}
+
+bool shouldScheduleFitToWindowAfterResizeMessageForTests(bool enabled, UINT message, WPARAM wParam, UINT windowPosFlags)
+{
+	return enabled && shouldScheduleFitToWindowAfterResizeMessage(message, wParam, windowPosFlags);
 }
 
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled)
@@ -3777,6 +4097,7 @@ void refreshAutoAlignTableUi()
 		static_cast<WPARAM>(funcItem[autoAlignTableCommandIndex]._cmdID),
 		static_cast<LPARAM>(g_autoAlignTable ? TRUE : FALSE));
 	setAutoAlignTableToolbarCheckState();
+	setCommandEnabledState(autoAlignTableCommandIndex, autoAlignTableToggleEnabled());
 	setCommandEnabledState(alignCommandIndex, alignTableCommandEnabled());
 }
 
@@ -3956,23 +4277,34 @@ void wrapLongCells()
 
 void toggleAutoFitTable()
 {
+	const bool enabling = !g_autoFitTable;
 	const bool runInitialFit = shouldRunInitialFitWhenTogglingAutoFitTable(g_autoFitTable);
 	if (runInitialFit)
 		fitCurrentTableToWindow(true);
 
 	g_autoFitTable = !g_autoFitTable;
 	if (g_autoFitTable)
+	{
+		g_autoAlignTable = true;
 		rememberCurrentFitToWindowWidth();
+	}
 	else
 	{
 		cancelFitToWindowResizeTimers();
 		g_lastFitToWindowColumns = 0;
+		g_wordWrapAutoFitWarningComboActive = false;
 	}
 	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
+	if (enabling)
+		checkWordWrapAutoFitWarning();
 }
 
 void toggleAutoAlignTable()
 {
+	if (!autoAlignTableToggleEnabled())
+		return;
+
 	const bool runInitialAlign = shouldRunInitialAlignWhenTogglingAutoAlignTable(g_autoAlignTable);
 	if (runInitialAlign)
 		autoAlignCurrentTable(true);
@@ -3983,6 +4315,7 @@ void toggleAutoAlignTable()
 
 void installFitToWindowResizeHooks()
 {
+	subclassNppWindow();
 	subclassScintillaWindow(nppData._scintillaMainHandle, g_originalMainScintillaProc);
 	subclassScintillaWindow(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
 	rememberCurrentFitToWindowWidth();
@@ -3993,4 +4326,5 @@ void removeFitToWindowResizeHooks()
 	cancelFitToWindowResizeTimers();
 	removeScintillaSubclass(nppData._scintillaMainHandle, g_originalMainScintillaProc);
 	removeScintillaSubclass(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
+	removeNppSubclass();
 }

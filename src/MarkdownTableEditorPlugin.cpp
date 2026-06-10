@@ -75,6 +75,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		{
 			installFitToWindowResizeHooks();
 			refreshUiLanguageFromNotepad();
+			checkWordWrapAutoFitWarning();
 		}
 		break;
 
@@ -83,6 +84,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 			refreshAutoFitTableUi();
 			refreshAutoAlignTableUi();
 			handleInitialAutoTableFormatForBuffer(notifyCode);
+			checkWordWrapAutoFitWarning();
 		}
 		break;
 
@@ -91,6 +93,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 			refreshAutoFitTableUi();
 			refreshAutoAlignTableUi();
 			handleInitialAutoTableFormatForBuffer(notifyCode);
+			checkWordWrapAutoFitWarning();
 		}
 		break;
 
