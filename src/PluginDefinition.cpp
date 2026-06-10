@@ -1905,7 +1905,7 @@ bool autoAlignTableToggleEnabled()
 
 bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
 {
-	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
+	return enabled && !inProgress && activeEditor && currentColumns != 0 && (previousColumns == 0 || previousColumns != currentColumns);
 }
 
 bool shouldRunInitialFitWhenTogglingAutoFitTable(bool currentlyEnabled)
@@ -2060,15 +2060,11 @@ void fitToWindowAfterResize(HWND resizedScintilla)
 		return;
 
 	const std::size_t columns = availableDisplayColumns(scintilla);
-	if (g_lastFitToWindowColumns == 0)
-	{
-		g_lastFitToWindowColumns = columns;
-		return;
-	}
-	if (!shouldRunFitToWindowAfterResize(g_autoFitTable, g_fitToWindowInProgress, true, g_lastFitToWindowColumns, columns))
+	const std::size_t previousColumns = g_lastFitToWindowColumns;
+	g_lastFitToWindowColumns = columns;
+	if (!shouldRunFitToWindowAfterResize(g_autoFitTable, g_fitToWindowInProgress, true, previousColumns, columns))
 		return;
 
-	g_lastFitToWindowColumns = columns;
 	fitCurrentTableToWindow(true);
 }
 

@@ -260,7 +260,7 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto fit resize ignores disabled mode", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(false, false, true, 100, 120));
 	expectTrue(failures, "auto fit resize ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, true, true, 100, 120));
 	expectTrue(failures, "auto fit resize ignores inactive editor", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, false, 100, 120));
-	expectTrue(failures, "auto fit resize records first width without fitting", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 0, 120));
+	expectTrue(failures, "auto fit resize runs first snapped width even before width is remembered", MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 0, 120));
 	expectTrue(failures, "auto fit resize ignores unchanged width", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 120));
 	expectTrue(failures, "auto fit resize fits after active width change", MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 90));
 	expectTrue(failures, "auto fit resize schedules on restored size", MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterResizeMessageForTests(true, WM_SIZE, SIZE_RESTORED, 0));
