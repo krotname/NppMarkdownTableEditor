@@ -15,7 +15,7 @@ Markdown Table Editor для Notepad++
 `C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll`
 
 Команды доступны в меню `Plugins > Markdown Table Editor`.
-Если курсор находится внутри Markdown-таблицы, `Tab` выравнивает таблицу; вне таблицы работает обычный отступ Scintilla.
+Горячие клавиши для команд отображаются справа в меню плагина.
 
 Сборка Release x64:
 `MSBuild.exe vs.proj\MarkdownTableEditor.vcxproj /p:Configuration=Release /p:Platform=x64`

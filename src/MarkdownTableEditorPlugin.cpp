@@ -78,17 +78,30 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		}
 		break;
 
-		case NPPN_BUFFERACTIVATED:
+		case NPPN_FILEOPENED:
 		{
-			refreshNotepadWordWrapUi();
 			refreshAutoFitTableUi();
 			refreshAutoAlignTableUi();
+			handleInitialAutoTableFormatForBuffer(notifyCode);
+		}
+		break;
+
+		case NPPN_BUFFERACTIVATED:
+		{
+			refreshAutoFitTableUi();
+			refreshAutoAlignTableUi();
+			handleInitialAutoTableFormatForBuffer(notifyCode);
+		}
+		break;
+
+		case NPPN_FILECLOSED:
+		{
+			forgetInitialAutoTableFormatForBuffer(notifyCode);
 		}
 		break;
 
 		case SCN_UPDATEUI:
 		{
-			refreshNotepadWordWrapUi();
 			handleScintillaUpdateUi(notifyCode);
 		}
 		break;

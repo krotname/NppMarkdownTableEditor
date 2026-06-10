@@ -102,26 +102,24 @@ int runPluginShortcutTests()
 
 	const ExpectedCommand expected[] =
 	{
-		{ 0, "align", L"Align table (no width change)", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
-		{ 1, "auto align table", L"Auto align after edit (no width change)", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
-		{ 2, "fit table width", L"Fit table width to window", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
-		{ 3, "auto fit table", L"Auto fit table width to window", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
-		{ 4, "next cell", L"Next cell", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
-		{ 5, "previous cell", L"Previous cell", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
-		{ 6, "insert row", L"Insert row below", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
-		{ 7, "delete row", L"Delete row", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
-		{ 8, "insert column", L"Insert column right", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
-		{ 9, "delete column", L"Delete column", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
-		{ 10, "move row up", L"Move row up", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
-		{ 11, "move row down", L"Move row down", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
-		{ 12, "move column left", L"Move column left", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
-		{ 13, "move column right", L"Move column right", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
-		{ 14, "sort ascending", L"Sort rows ascending", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
-		{ 15, "sort descending", L"Sort rows descending", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
-		{ 16, "convert csv tsv", L"Convert CSV/TSV to table", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
-		{ 17, "insert table", L"Insert table...", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) },
-		{ 18, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
-		{ 19, "notepad word wrap", L"Notepad++ word wrap (MD)", toggleNotepadWordWrap, false, false, false, false, false, 0 }
+		{ 0, "align", L"Align table (no width change)\tCtrl+Alt+Shift+1", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
+		{ 1, "auto align table", L"Auto align after edit (no width change)\tCtrl+Alt+Shift+A", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
+		{ 2, "fit table width", L"Fit table width to window\tCtrl+Alt+Shift+W", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
+		{ 3, "auto fit table", L"Auto fit table width to window\tCtrl+Alt+Shift+F", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
+		{ 4, "next cell", L"Next cell\tCtrl+Alt+Shift+2", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
+		{ 5, "previous cell", L"Previous cell\tCtrl+Alt+Shift+3", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
+		{ 6, "insert row", L"Insert row below\tCtrl+Alt+Shift+4", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
+		{ 7, "delete row", L"Delete row\tCtrl+Alt+Shift+5", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
+		{ 8, "insert column", L"Insert column right\tCtrl+Alt+Shift+6", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
+		{ 9, "delete column", L"Delete column\tCtrl+Alt+Shift+7", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
+		{ 10, "move row up", L"Move row up\tCtrl+Alt+Shift+8", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
+		{ 11, "move row down", L"Move row down\tCtrl+Alt+Shift+9", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
+		{ 12, "move column left", L"Move column left\tCtrl+Alt+Shift+[", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
+		{ 13, "move column right", L"Move column right\tCtrl+Alt+Shift+]", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
+		{ 14, "sort ascending", L"Sort rows ascending\tCtrl+Alt+Shift+=", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
+		{ 15, "sort descending", L"Sort rows descending\tCtrl+Alt+Shift+-", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
+		{ 16, "convert csv tsv", L"Convert CSV/TSV to table\tCtrl+Alt+Shift+0", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
+		{ 17, "insert table", L"Insert table...\tCtrl+Alt+Shift+\\", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -163,14 +161,20 @@ int runPluginShortcutTests()
 		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0432\u043E\u0437\u0440\u0430\u0441\u0442\u0430\u043D\u0438\u044E",
 		L"\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0438 \u043F\u043E \u0443\u0431\u044B\u0432\u0430\u043D\u0438\u044E",
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
-		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
-		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
-		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)"
+		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443..."
 	};
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
 	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectWideString(failures, std::string("russian ") + expected[index].label + " name", MarkdownTablePluginTesting::commandTextForTests(expected[index].index), russianNames[index]);
+	const std::wstring russianAlignMenu = std::wstring(russianNames[0]) + L"\tCtrl+Alt+Shift+1";
+	const std::wstring russianAutoAlignMenu = std::wstring(russianNames[1]) + L"\tCtrl+Alt+Shift+A";
+	const std::wstring russianFitMenu = std::wstring(russianNames[2]) + L"\tCtrl+Alt+Shift+W";
+	const std::wstring russianAutoFitMenu = std::wstring(russianNames[3]) + L"\tCtrl+Alt+Shift+F";
+	expectWideString(failures, "russian align menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(0), russianAlignMenu.c_str());
+	expectWideString(failures, "russian auto align menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(1), russianAutoAlignMenu.c_str());
+	expectWideString(failures, "russian fit menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(2), russianFitMenu.c_str());
+	expectWideString(failures, "russian auto fit menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(3), russianAutoFitMenu.c_str());
 
 	struct LocalizedCommandSample
 	{
@@ -257,6 +261,47 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto input update runs immediate auto align", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, false, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate auto fit", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(false, true, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate combined auto mode", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, false, true, true));
+	expectTrue(failures, "initial open format ignores disabled modes", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(false, false, false, false, true, false));
+	expectTrue(failures, "initial open format ignores handled buffer", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, true, false, false, true, true));
+	expectTrue(failures, "initial open format ignores reentrant align", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, false, true, false, true, false));
+	expectTrue(failures, "initial open format ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(false, true, false, true, true, false));
+	expectTrue(failures, "initial open format ignores inactive editor", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, true, false, false, false, false));
+	expectTrue(failures, "initial open format runs auto align", MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, false, false, false, true, false));
+	expectTrue(failures, "initial open format runs auto fit", MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(false, true, false, false, true, false));
+	expectTrue(failures, "file opened queues initial auto align", MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(true, false, false));
+	expectTrue(failures, "file opened queues initial auto fit", MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(false, true, false));
+	expectTrue(failures, "file opened ignores disabled initial auto format", !MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(false, false, false));
+	expectTrue(failures, "file opened ignores handled initial auto format buffer", !MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(true, true, true));
+	const std::vector<std::string> openFileDocument =
+	{
+		"# title",
+		"",
+		"| Name | Age |",
+		"| --- | ---: |",
+		"| Anna | 20 |",
+		"| Alexander | 7 |",
+		"",
+		"tail"
+	};
+	const std::vector<std::size_t> openFileTableRanges = MarkdownTablePluginTesting::documentMarkdownTableRangeLinesForTests(openFileDocument);
+	expectSize(failures, "initial document auto format finds table below cursor range count", openFileTableRanges.size(), 2);
+	if (openFileTableRanges.size() >= 2)
+	{
+		expectSize(failures, "initial document auto format range start", openFileTableRanges[0], 2);
+		expectSize(failures, "initial document auto format range end", openFileTableRanges[1], 5);
+	}
+	const std::vector<std::string> formattedOpenFileDocument = MarkdownTablePluginTesting::autoFormatDocumentTablesForTests(openFileDocument, MarkdownTable::Action::Align, 80);
+	expectString(failures, "initial document auto format aligns header below cursor", formattedOpenFileDocument[2], "| Name      | Age |");
+	expectString(failures, "initial document auto format aligns separator below cursor", formattedOpenFileDocument[3], "| --------- | --: |");
+	expectString(failures, "initial document auto format keeps prose before table", formattedOpenFileDocument[0], "# title");
+	expectString(failures, "initial document auto format keeps prose after table", formattedOpenFileDocument[7], "tail");
+	expectTrue(failures, "unchanged replacement moves caret to wrapped logical row", MarkdownTablePluginTesting::shouldMoveCaretToTargetForTests(24, 48));
+	expectTrue(failures, "unchanged replacement leaves caret when target unchanged", !MarkdownTablePluginTesting::shouldMoveCaretToTargetForTests(48, 48));
+	expectTrue(failures, "enter preserves column in active table line", MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(true, true, true, WM_KEYDOWN, VK_RETURN));
+	expectTrue(failures, "enter column preserve ignores inactive editor", !MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(false, true, true, WM_KEYDOWN, VK_RETURN));
+	expectTrue(failures, "enter column preserve ignores selection", !MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(true, false, true, WM_KEYDOWN, VK_RETURN));
+	expectTrue(failures, "enter column preserve ignores non-table line", !MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(true, true, false, WM_KEYDOWN, VK_RETURN));
+	expectTrue(failures, "enter column preserve ignores other keys", !MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(true, true, true, WM_KEYDOWN, 'A'));
 	const std::string privet = "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
 	const std::string p = "\xD0\xBF";
 	const std::string r = "\xD1\x80";
@@ -345,15 +390,11 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto align table toggles off", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
 	expectTrue(failures, "align table command re-enabled after auto align is off", MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
 	expectTrue(failures, "align toolbar icons are created", MarkdownTablePluginTesting::ensureAlignToolbarIconsForTests());
-	expectTrue(failures, "tab toolbar icons are created", MarkdownTablePluginTesting::ensureTabToolbarIconsForTests());
 	expectTrue(failures, "fit table width toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
-	expectTrue(failures, "notepad word wrap toolbar icons are created", MarkdownTablePluginTesting::ensureNotepadWordWrapToolbarIconsForTests());
 	expectTrue(failures, "auto fit table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoFitTableToolbarIconsForTests());
 	expectTrue(failures, "auto align table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoAlignTableToolbarIconsForTests());
 	MarkdownTablePluginTesting::destroyAlignToolbarIconsForTests();
-	MarkdownTablePluginTesting::destroyTabToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
-	MarkdownTablePluginTesting::destroyNotepadWordWrapToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoFitTableToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoAlignTableToolbarIconsForTests();
 

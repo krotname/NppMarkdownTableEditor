@@ -43,7 +43,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 20;
+const int nbFunc = 18;
 
 
 //
@@ -65,10 +65,11 @@ void commandMenuInit();
 
 void refreshUiLanguageFromNotepad();
 void registerToolbarIcons();
-void refreshNotepadWordWrapUi();
 void refreshAutoFitTableUi();
 void refreshAutoAlignTableUi();
 void handleScintillaUpdateUi(const SCNotification *notification);
+void handleInitialAutoTableFormatForBuffer(const SCNotification *notification);
+void forgetInitialAutoTableFormatForBuffer(const SCNotification *notification);
 void installFitToWindowResizeHooks();
 void removeFitToWindowResizeHooks();
 
@@ -101,9 +102,7 @@ void sortRowsAscending();
 void sortRowsDescending();
 void convertCsvTsvSelectionToTable();
 void insertTable();
-void tabOrIndent();
 void wrapLongCells();
-void toggleNotepadWordWrap();
 void toggleAutoFitTable();
 void toggleAutoAlignTable();
 
@@ -128,6 +127,7 @@ ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source
 void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
 const wchar_t *commandTextForTests(std::size_t index);
+const wchar_t *commandMenuTextForTests(std::size_t index);
 bool autoFitTableEnabledForTests();
 void setAutoFitTableEnabledForTests(bool enabled);
 bool autoAlignTableEnabledForTests();
@@ -141,17 +141,19 @@ bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
+bool shouldRunInitialAutoTableFormatForBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool alreadyHandled);
+bool shouldQueueInitialAutoTableFormatForOpenedBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alreadyHandled);
+std::vector<std::size_t> documentMarkdownTableRangeLinesForTests(const std::vector<std::string> &lines);
+std::vector<std::string> autoFormatDocumentTablesForTests(const std::vector<std::string> &lines, MarkdownTable::Action action, std::size_t maxTableWidth);
+bool shouldMoveCaretToTargetForTests(std::size_t currentPosition, std::size_t targetPosition);
+bool shouldPreserveEnterColumnForTests(bool activeEditor, bool emptySelection, bool tableLine, UINT message, WPARAM key);
 UINT fitToWindowResizeDelayMsForTests();
 std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
 CellCaretPreview preservedCellCaretPositionForTests(const std::vector<std::string> &sourceLines, std::size_t row, std::size_t column, std::size_t byteColumn, const std::vector<std::string> &replacementLines);
 bool ensureAlignToolbarIconsForTests();
 void destroyAlignToolbarIconsForTests();
-bool ensureTabToolbarIconsForTests();
-void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();
 void destroyWrapLongCellsToolbarIconsForTests();
-bool ensureNotepadWordWrapToolbarIconsForTests();
-void destroyNotepadWordWrapToolbarIconsForTests();
 bool ensureAutoFitTableToolbarIconsForTests();
 void destroyAutoFitTableToolbarIconsForTests();
 bool ensureAutoAlignTableToolbarIconsForTests();
