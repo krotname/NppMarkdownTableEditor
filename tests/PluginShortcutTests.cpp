@@ -102,26 +102,26 @@ int runPluginShortcutTests()
 
 	const ExpectedCommand expected[] =
 	{
-		{ 0, "align", L"Align table", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
-		{ 1, "next cell", L"Next cell", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
-		{ 2, "previous cell", L"Previous cell", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
-		{ 3, "insert row", L"Insert row below", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
-		{ 4, "delete row", L"Delete row", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
-		{ 5, "insert column", L"Insert column right", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
-		{ 6, "delete column", L"Delete column", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
-		{ 7, "move row up", L"Move row up", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
-		{ 8, "move row down", L"Move row down", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
-		{ 9, "move column left", L"Move column left", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
-		{ 10, "move column right", L"Move column right", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
-		{ 11, "sort ascending", L"Sort rows ascending", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
-		{ 12, "sort descending", L"Sort rows descending", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
-		{ 13, "convert csv tsv", L"Convert CSV/TSV to table", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
-		{ 14, "insert table", L"Insert table...", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) },
-		{ 15, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
-		{ 16, "fit table to window", L"Fit table to window", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
-		{ 17, "notepad word wrap", L"Notepad++ word wrap (MD)", toggleNotepadWordWrap, false, false, false, false, false, 0 },
-		{ 18, "auto fit table", L"Auto fit table (MD)", toggleAutoFitTable, false, false, false, false, false, 0 },
-		{ 19, "auto align table", L"Auto align table (MD)", toggleAutoAlignTable, false, false, false, false, false, 0 }
+		{ 0, "align", L"Align table (no width change)", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
+		{ 1, "auto align table", L"Auto align after edit (no width change)", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
+		{ 2, "fit table width", L"Fit table width to window", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
+		{ 3, "auto fit table", L"Auto fit table width to window", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
+		{ 4, "next cell", L"Next cell", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
+		{ 5, "previous cell", L"Previous cell", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
+		{ 6, "insert row", L"Insert row below", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
+		{ 7, "delete row", L"Delete row", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
+		{ 8, "insert column", L"Insert column right", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
+		{ 9, "delete column", L"Delete column", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
+		{ 10, "move row up", L"Move row up", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
+		{ 11, "move row down", L"Move row down", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
+		{ 12, "move column left", L"Move column left", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
+		{ 13, "move column right", L"Move column right", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
+		{ 14, "sort ascending", L"Sort rows ascending", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
+		{ 15, "sort descending", L"Sort rows descending", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
+		{ 16, "convert csv tsv", L"Convert CSV/TSV to table", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
+		{ 17, "insert table", L"Insert table...", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) },
+		{ 18, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
+		{ 19, "notepad word wrap", L"Notepad++ word wrap (MD)", toggleNotepadWordWrap, false, false, false, false, false, 0 }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -146,7 +146,10 @@ int runPluginShortcutTests()
 
 	const wchar_t *russianNames[] =
 	{
-		L"\u0412\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
+		L"\u0412\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)",
+		L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)",
+		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0448\u0438\u0440\u0438\u043D\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
 		L"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u043D\u0438\u0436\u0435",
@@ -162,15 +165,12 @@ int runPluginShortcutTests()
 		L"\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C CSV/TSV \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443...",
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
-		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
-		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
-		L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
+		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)"
 	};
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
 	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
 	for (std::size_t index = 0; index < expectedCount; ++index)
-		expectWideString(failures, std::string("russian ") + expected[index].label + " name", funcItem[expected[index].index]._itemName, russianNames[index]);
+		expectWideString(failures, std::string("russian ") + expected[index].label + " name", MarkdownTablePluginTesting::commandTextForTests(expected[index].index), russianNames[index]);
 
 	struct LocalizedCommandSample
 	{
@@ -180,30 +180,30 @@ int runPluginShortcutTests()
 	};
 	const LocalizedCommandSample localizedSamples[] =
 	{
-		{ "chineseSimplified.xml", "mandarin chinese", L"\u5BF9\u9F50\u8868\u683C" },
-		{ "hindi.xml", "hindi", L"\u0924\u093E\u0932\u093F\u0915\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902" },
-		{ "spanish.xml", "spanish", L"Alinear tabla" },
-		{ "arabic.xml", "arabic", L"\u0645\u062D\u0627\u0630\u0627\u0629 \u0627\u0644\u062C\u062F\u0648\u0644" },
-		{ "french.xml", "french", L"Aligner le tableau" },
-		{ "bengali.xml", "bengali", L"\u099F\u09C7\u09AC\u09BF\u09B2 \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7 \u0995\u09B0\u09C1\u09A8" },
-		{ "portuguese.xml", "portuguese", L"Alinhar tabela" },
-		{ "indonesian.xml", "indonesian", L"Ratakan tabel" },
-		{ "urdu.xml", "urdu", L"\u062C\u062F\u0648\u0644 \u0633\u06CC\u062F\u06BE\u0627 \u06A9\u0631\u06CC\u06BA" },
-		{ "german.xml", "german", L"Tabelle ausrichten" },
-		{ "japanese.xml", "japanese", L"\u30C6\u30FC\u30D6\u30EB\u3092\u6574\u5217" },
-		{ "pidgin.xml", "nigerian pidgin", L"Arrange table" },
-		{ "marathi.xml", "marathi", L"\u0924\u0915\u094D\u0924\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u093E" },
-		{ "telugu.xml", "telugu", L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15\u0C28\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41" },
-		{ "turkish.xml", "turkish", L"Tabloyu hizala" },
-		{ "tamil.xml", "tamil", L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8\u0BAF\u0BC8 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1" },
-		{ "chineseTraditional.xml", "yue chinese", L"\u5C0D\u9F4A\u8868\u683C" },
-		{ "vietnamese.xml", "vietnamese", L"C\u0103n ch\u1EC9nh b\u1EA3ng" }
+		{ "chineseSimplified.xml", "mandarin chinese", L"\u5BF9\u9F50\u8868\u683C\uFF08\u4E0D\u6539\u53D8\u5BBD\u5EA6\uFF09" },
+		{ "hindi.xml", "hindi", L"\u0924\u093E\u0932\u093F\u0915\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902 (\u091A\u094C\u0921\u093C\u093E\u0908 \u0928 \u092C\u0926\u0932\u0947\u0902)" },
+		{ "spanish.xml", "spanish", L"Alinear tabla (sin cambiar ancho)" },
+		{ "arabic.xml", "arabic", L"\u0645\u062D\u0627\u0630\u0627\u0629 \u0627\u0644\u062C\u062F\u0648\u0644 (\u0628\u062F\u0648\u0646 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0639\u0631\u0636)" },
+		{ "french.xml", "french", L"Aligner le tableau (sans changer la largeur)" },
+		{ "bengali.xml", "bengali", L"\u099F\u09C7\u09AC\u09BF\u09B2 \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7 \u0995\u09B0\u09C1\u09A8 (\u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u09A8\u09BE \u09AC\u09A6\u09B2\u09C7)" },
+		{ "portuguese.xml", "portuguese", L"Alinhar tabela (sem alterar largura)" },
+		{ "indonesian.xml", "indonesian", L"Ratakan tabel (tanpa mengubah lebar)" },
+		{ "urdu.xml", "urdu", L"\u062C\u062F\u0648\u0644 \u0633\u06CC\u062F\u06BE\u0627 \u06A9\u0631\u06CC\u06BA (\u0686\u0648\u0691\u0627\u0626\u06CC \u0628\u062F\u0644\u06D2 \u0628\u063A\u06CC\u0631)" },
+		{ "german.xml", "german", L"Tabelle ausrichten (Breite unveraendert)" },
+		{ "japanese.xml", "japanese", L"\u30C6\u30FC\u30D6\u30EB\u3092\u6574\u5217\uFF08\u5E45\u3092\u5909\u66F4\u3057\u306A\u3044\uFF09" },
+		{ "pidgin.xml", "nigerian pidgin", L"Arrange table (no change width)" },
+		{ "marathi.xml", "marathi", L"\u0924\u0915\u094D\u0924\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u093E (\u0930\u0941\u0902\u0926\u0940 \u0928 \u092C\u0926\u0932\u0924\u093E)" },
+		{ "telugu.xml", "telugu", L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15\u0C28\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41 (\u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41 \u0C2E\u0C3E\u0C30\u0C4D\u0C1A\u0C15\u0C41\u0C02\u0C21\u0C3E)" },
+		{ "turkish.xml", "turkish", L"Tabloyu hizala (genisligi degistirme)" },
+		{ "tamil.xml", "tamil", L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8\u0BAF\u0BC8 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1 (\u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0BAE\u0BBE\u0BB1\u0BCD\u0BB1\u0BBE\u0BAE\u0BB2\u0BCD)" },
+		{ "chineseTraditional.xml", "yue chinese", L"\u5C0D\u9F4A\u8868\u683C\uFF08\u4E0D\u6539\u8B8A\u95CA\u5EA6\uFF09" },
+		{ "vietnamese.xml", "vietnamese", L"C\u0103n ch\u1EC9nh b\u1EA3ng (kh\u00F4ng \u0111\u1ED5i chi\u1EC1u r\u1ED9ng)" }
 	};
 	expectSize(failures, "additional localized command samples", sizeof(localizedSamples) / sizeof(localizedSamples[0]), static_cast<std::size_t>(18));
 	for (const LocalizedCommandSample &sample : localizedSamples)
 	{
 		MarkdownTablePluginTesting::applyNativeLangFileNameForTests(sample.nativeLangFileName);
-		expectWideString(failures, std::string(sample.label) + " align name", funcItem[0]._itemName, sample.alignName);
+		expectWideString(failures, std::string(sample.label) + " align name", MarkdownTablePluginTesting::commandTextForTests(0), sample.alignName);
 	}
 
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("");
@@ -211,25 +211,26 @@ int runPluginShortcutTests()
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
-	expectTrue(failures, "auto fit table starts disabled by default", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto fit table starts enabled by default", MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "fit table command starts disabled while auto fit is on by default", !MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
 	expectTrue(failures, "auto fit table default does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
 	expectTrue(failures, "fit table command aligns before visible-width wrapping", MarkdownTablePluginTesting::coreActionForPluginActionForTests(MarkdownTable::Action::WrapLongCells) == MarkdownTable::Action::Align);
 	expectTrue(failures, "fit table command always fits to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::WrapLongCells));
-	expectTrue(failures, "plain align does not fit to visible width while auto fit is off", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "plain align never fits to visible width", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
 	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
 	expectTrue(failures, "auto fit table starts disabled in test", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "auto fit table disabled does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
 	toggleAutoFitTable();
 	expectTrue(failures, "auto fit table toggles on", MarkdownTablePluginTesting::autoFitTableEnabledForTests());
-	expectTrue(failures, "auto fit table enabled fits align", MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
-	expectTrue(failures, "auto fit table enabled fits align to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto fit table enabled does not change plain align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto fit table enabled keeps plain align width", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
 	expectTrue(failures, "auto fit table enabled does not fit row insert", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
 	expectTrue(failures, "auto fit table enabled does not fit row insert to visible width", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
 	expectTrue(failures, "auto fit table does not auto-fit explicit wrap command", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::WrapLongCells));
 	toggleAutoFitTable();
 	expectTrue(failures, "auto fit table toggles off", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "auto fit table off after unpress does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
-	expectTrue(failures, "fit table command starts enabled", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
+	expectTrue(failures, "fit table command enabled after auto fit is off", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
 	expectTrue(failures, "auto fit resize uses delayed debounce", MarkdownTablePluginTesting::fitToWindowResizeDelayMsForTests() > 0);
 	expectTrue(failures, "auto fit resize ignores disabled mode", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(false, false, true, 100, 120));
 	expectTrue(failures, "auto fit resize ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, true, true, 100, 120));
@@ -246,8 +247,8 @@ int runPluginShortcutTests()
 	toggleAutoFitTable();
 	expectTrue(failures, "auto fit table toggles off after resize mode", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "fit table command re-enabled after auto fit is off", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
-	expectTrue(failures, "auto align table starts disabled", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
-	expectTrue(failures, "align table command starts enabled", MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
+	expectTrue(failures, "auto align table starts enabled by default", MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "align table command starts disabled while auto align is on by default", !MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
 	expectTrue(failures, "auto input update ignores disabled modes", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(false, false, false, false, true, true));
 	expectTrue(failures, "auto input update ignores reentrant align", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, true, false, true, true));
 	expectTrue(failures, "auto input update ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, true, true, true));
@@ -257,10 +258,15 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto input update runs immediate auto fit", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(false, true, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate combined auto mode", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, false, true, true));
 	const std::string privet = "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
+	const std::string p = "\xD0\xBF";
+	const std::string pr = "\xD0\xBF\xD1\x80";
 	const std::string pri = "\xD0\xBF\xD1\x80\xD0\xB8";
+	const std::string sourcePrLine = "| " + pr + " |";
 	const std::string sourcePrivetLine = "| " + privet + " |";
 	const std::string sourcePrivetSpaceLine = "| " + privet + "  |";
+	const std::string wrappedPLine = "| " + p + " |";
 	const std::string paddedPrivetLine = "| " + privet + "     |";
+	const std::size_t caretAfterPr = sourcePrLine.find(pr) + pr.size();
 	const std::size_t caretAfterPri = sourcePrivetLine.find(privet) + pri.size();
 	const std::size_t caretAfterPrivetSpace = sourcePrivetSpaceLine.find(privet) + privet.size() + 1;
 	expectSize(failures, "auto input preserves utf8 cell caret after same formatting",
@@ -272,6 +278,9 @@ int runPluginShortcutTests()
 	expectSize(failures, "auto input preserves utf8 trailing space between words",
 		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetSpaceLine, 0, caretAfterPrivetSpace, sourcePrivetLine),
 		sourcePrivetLine.find(privet) + privet.size() + 1);
+	expectSize(failures, "auto input does not pad shortened utf8 wrapped segment",
+		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrLine, 0, caretAfterPr, wrappedPLine),
+		wrappedPLine.find(p) + p.size());
 	expectTrue(failures, "auto align toggle runs initial align before enabling", MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(false));
 	expectTrue(failures, "auto align toggle does not run initial align when disabling", !MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(true));
 	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);
@@ -281,11 +290,13 @@ int runPluginShortcutTests()
 	toggleAutoAlignTable();
 	expectTrue(failures, "auto align table toggles off", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
 	expectTrue(failures, "align table command re-enabled after auto align is off", MarkdownTablePluginTesting::alignTableCommandEnabledForTests());
+	expectTrue(failures, "align toolbar icons are created", MarkdownTablePluginTesting::ensureAlignToolbarIconsForTests());
 	expectTrue(failures, "tab toolbar icons are created", MarkdownTablePluginTesting::ensureTabToolbarIconsForTests());
-	expectTrue(failures, "wrap long cells toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
+	expectTrue(failures, "fit table width toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
 	expectTrue(failures, "notepad word wrap toolbar icons are created", MarkdownTablePluginTesting::ensureNotepadWordWrapToolbarIconsForTests());
 	expectTrue(failures, "auto fit table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoFitTableToolbarIconsForTests());
 	expectTrue(failures, "auto align table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoAlignTableToolbarIconsForTests());
+	MarkdownTablePluginTesting::destroyAlignToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyTabToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyNotepadWordWrapToolbarIconsForTests();

@@ -120,6 +120,7 @@ ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &e
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
 void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
+const wchar_t *commandTextForTests(std::size_t index);
 bool autoFitTableEnabledForTests();
 void setAutoFitTableEnabledForTests(bool enabled);
 bool autoAlignTableEnabledForTests();
@@ -133,10 +134,12 @@ bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
-UINT fitToWindowResizeDelayMsForTests();
-std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
-bool ensureTabToolbarIconsForTests();
-void destroyTabToolbarIconsForTests();
+  UINT fitToWindowResizeDelayMsForTests();
+  std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
+  bool ensureAlignToolbarIconsForTests();
+  void destroyAlignToolbarIconsForTests();
+  bool ensureTabToolbarIconsForTests();
+  void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();
 void destroyWrapLongCellsToolbarIconsForTests();
 bool ensureNotepadWordWrapToolbarIconsForTests();

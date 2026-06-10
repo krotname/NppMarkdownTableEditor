@@ -22,7 +22,7 @@ and helps you quickly rearrange rows, columns, and data.
 
 ![Markdown table alignment example in Notepad++](docs/demo.gif)
 
-The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` file is open, and the `Align table` command is triggered from the plugin menu.
+The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` file is open, and the `Align table (no width change)` command is triggered from the plugin menu.
 
 ## Why Use It
 
@@ -88,18 +88,18 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 
 | Command                                        | What It Does                                                         |
 | ---------------------------------------------- | -------------------------------------------------------------------- |
+| `Align table (no width change)`                | Aligns the current Markdown table once without fitting it to the window |
+| `Auto align after edit (no width change)`      | Automatically aligns the table after edits; enabled on first install and disables manual align |
+| `Fit table width to window`                    | Fits the current table to the visible width once: it narrows long cells or rejoins continuation rows when the window is wider |
+| `Auto fit table width to window`               | Automatically fits the table to the editor width; enabled on first install and disables manual fit |
 | `Tab: align table or indent`                   | Aligns the table at the caret; outside tables it works as normal Tab |
-| `Align table`                                  | Aligns the current Markdown table                                    |
 | `Next cell` / `Previous cell`                  | Moves the caret between cells                                        |
 | `Insert row below` / `Delete row`              | Adds or deletes a row                                                |
 | `Insert column right` / `Delete column`        | Adds or deletes a column                                             |
 | `Move row up` / `Move row down`                | Moves the current row                                                |
 | `Move column left` / `Move column right`       | Moves the current column                                             |
 | `Sort rows ascending` / `Sort rows descending` | Sorts rows by the current column                                     |
-| `Fit table to window`                          | Fits the current table to the visible width: it narrows long cells or rejoins continuation rows when the window is wider |
-| `Notepad++ word wrap (MD)`                     | Toggles Notepad++ visual word wrap next to the table-wrap button      |
-| `Table wrap (MD)`                              | Toggles table wrapping: when enabled, it fits the current table and then keeps wrapping after `Tab`/`Align table` |
-| `Auto fit on resize (MD)`                      | Toggles automatic fitting of the current table when the editor width changes; while enabled, manual `Fit table to window` is unavailable |
+| `Notepad++ word wrap (MD)`                     | Toggles Notepad++ visual word wrap next to the width-fitting buttons  |
 | `Convert CSV/TSV to table`                     | Converts selected CSV/TSV or the current block to a Markdown table   |
 | `Insert table...`                              | Inserts a new table with the requested size                          |
 
@@ -109,34 +109,34 @@ You will get a Markdown table with `Name` and `Score` columns.
 
 Default keyboard shortcuts:
 
-Except for the contextual `Tab`, commands use `Ctrl+Alt+Shift` with the top number row and adjacent keys to avoid standard JetBrains IDE and Notepad++ shortcuts.
+Except for the contextual `Tab`, commands use `Ctrl+Alt+Shift` with the top number row, adjacent keys, and mnemonic letters for automatic modes to avoid standard JetBrains IDE and Notepad++ shortcuts.
 
-| Command                      | Shortcut           |
-| ---------------------------- | ------------------ |
-| `Tab: align table or indent` | `Tab`              |
-| `Align table`                | `Ctrl+Alt+Shift+1` |
-| `Next cell`                  | `Ctrl+Alt+Shift+2` |
-| `Previous cell`              | `Ctrl+Alt+Shift+3` |
-| `Insert row below`           | `Ctrl+Alt+Shift+4` |
-| `Delete row`                 | `Ctrl+Alt+Shift+5` |
-| `Insert column right`        | `Ctrl+Alt+Shift+6` |
-| `Delete column`              | `Ctrl+Alt+Shift+7` |
-| `Move row up`                | `Ctrl+Alt+Shift+8` |
-| `Move row down`              | `Ctrl+Alt+Shift+9` |
-| `Move column left`           | `Ctrl+Alt+Shift+[` |
-| `Move column right`          | `Ctrl+Alt+Shift+]` |
-| `Sort rows ascending`        | `Ctrl+Alt+Shift+=` |
-| `Sort rows descending`       | `Ctrl+Alt+Shift+-` |
-| `Fit table to window`        | `Ctrl+Alt+Shift+W` |
-| `Notepad++ word wrap (MD)`   | toolbar button     |
-| `Table wrap (MD)`            | toolbar/menu toggle |
-| `Auto fit on resize (MD)`    | toolbar/menu toggle |
-| `Convert CSV/TSV to table`   | `Ctrl+Alt+Shift+0` |
-| `Insert table...`            | `Ctrl+Alt+Shift+\` |
+| Command                                   | Shortcut           |
+| ----------------------------------------- | ------------------ |
+| `Align table (no width change)`           | `Ctrl+Alt+Shift+1` |
+| `Auto align after edit (no width change)` | `Ctrl+Alt+Shift+A` |
+| `Fit table width to window`               | `Ctrl+Alt+Shift+W` |
+| `Auto fit table width to window`          | `Ctrl+Alt+Shift+F` |
+| `Tab: align table or indent`              | `Tab`              |
+| `Next cell`                               | `Ctrl+Alt+Shift+2` |
+| `Previous cell`                           | `Ctrl+Alt+Shift+3` |
+| `Insert row below`                        | `Ctrl+Alt+Shift+4` |
+| `Delete row`                              | `Ctrl+Alt+Shift+5` |
+| `Insert column right`                     | `Ctrl+Alt+Shift+6` |
+| `Delete column`                           | `Ctrl+Alt+Shift+7` |
+| `Move row up`                             | `Ctrl+Alt+Shift+8` |
+| `Move row down`                           | `Ctrl+Alt+Shift+9` |
+| `Move column left`                        | `Ctrl+Alt+Shift+[` |
+| `Move column right`                       | `Ctrl+Alt+Shift+]` |
+| `Sort rows ascending`                     | `Ctrl+Alt+Shift+=` |
+| `Sort rows descending`                    | `Ctrl+Alt+Shift+-` |
+| `Notepad++ word wrap (MD)`                | toolbar button     |
+| `Convert CSV/TSV to table`                | `Ctrl+Alt+Shift+0` |
+| `Insert table...`                         | `Ctrl+Alt+Shift+\` |
 
-### Table Wrap and Notepad++ Word Wrap
+### Width Fitting and Notepad++ Word Wrap
 
-| `Table wrap (MD)` | Notepad++ `Word wrap` | Result |
+| `Auto fit table width to window` | Notepad++ `Word wrap` | Result |
 | --- | --- | --- |
 | Off | Off | The table is not reshaped, and long physical lines continue to the right. |
 | Off | On | Only Notepad++ visual wrapping is used; the file is unchanged, and wide Markdown tables can look ragged. |

@@ -77,6 +77,7 @@ struct CellCaretSnapshot
 	std::size_t row = 0;
 	std::size_t column = 0;
 	std::size_t offset = 0;
+	std::string prefix;
 };
 
 const int tableSizeColumnsId = 1001;
@@ -117,26 +118,45 @@ ShortcutKey g_convertCsvTsvShortcut = { true, true, true, '0' };
 ShortcutKey g_insertTableShortcut = { true, true, true, VK_OEM_5 };
 ShortcutKey g_tabShortcut = { false, false, false, VK_TAB };
 ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
+ShortcutKey g_autoAlignTableShortcut = { true, true, true, 'A' };
+ShortcutKey g_autoFitTableShortcut = { true, true, true, 'F' };
 
 const std::size_t alignCommandIndex = 0;
-const std::size_t tabCommandIndex = 15;
-const std::size_t wrapLongCellsCommandIndex = 16;
-const std::size_t notepadWordWrapCommandIndex = 17;
-const std::size_t autoFitTableCommandIndex = 18;
-const std::size_t autoAlignTableCommandIndex = 19;
+const std::size_t autoAlignTableCommandIndex = 1;
+const std::size_t wrapLongCellsCommandIndex = 2;
+const std::size_t autoFitTableCommandIndex = 3;
+const std::size_t nextCellCommandIndex = 4;
+const std::size_t previousCellCommandIndex = 5;
+const std::size_t insertRowCommandIndex = 6;
+const std::size_t deleteRowCommandIndex = 7;
+const std::size_t insertColumnCommandIndex = 8;
+const std::size_t deleteColumnCommandIndex = 9;
+const std::size_t moveRowUpCommandIndex = 10;
+const std::size_t moveRowDownCommandIndex = 11;
+const std::size_t moveColumnLeftCommandIndex = 12;
+const std::size_t moveColumnRightCommandIndex = 13;
+const std::size_t sortRowsAscendingCommandIndex = 14;
+const std::size_t sortRowsDescendingCommandIndex = 15;
+const std::size_t convertCsvTsvCommandIndex = 16;
+const std::size_t insertTableCommandIndex = 17;
+const std::size_t tabCommandIndex = 18;
+const std::size_t notepadWordWrapCommandIndex = 19;
 // Notepad++ IDM_VIEW_WRAP = IDM + 4000 + 22.
 const int notepadWordWrapCommandId = 44022;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
 
-bool g_autoFitTable = false;
-bool g_autoAlignTable = false;
+bool g_autoFitTable = true;
+bool g_autoAlignTable = true;
 bool g_fitToWindowInProgress = false;
 bool g_autoAlignInProgress = false;
 std::size_t g_lastFitToWindowColumns = 0;
 HWND g_pendingFitToWindowScintilla = NULL;
 WNDPROC g_originalMainScintillaProc = NULL;
 WNDPROC g_originalSecondScintillaProc = NULL;
+HBITMAP g_alignToolbarBmp = NULL;
+HICON g_alignToolbarIcon = NULL;
+HICON g_alignToolbarIconDarkMode = NULL;
 HBITMAP g_tabToolbarBmp = NULL;
 HICON g_tabToolbarIcon = NULL;
 HICON g_tabToolbarIconDarkMode = NULL;
@@ -692,12 +712,248 @@ const UiText &uiText()
 	}
 }
 
+const wchar_t *localizedSpecialCommandText(std::size_t index)
+{
+	switch (g_uiLanguage)
+	{
+	case UiLanguage::MandarinChinese:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u5BF9\u9F50\u8868\u683C\uFF08\u4E0D\u6539\u53D8\u5BBD\u5EA6\uFF09";
+		case autoAlignTableCommandIndex: return L"\u7F16\u8F91\u540E\u81EA\u52A8\u5BF9\u9F50\uFF08\u4E0D\u6539\u53D8\u5BBD\u5EA6\uFF09";
+		case wrapLongCellsCommandIndex: return L"\u5C06\u8868\u683C\u5BBD\u5EA6\u9002\u5E94\u7A97\u53E3";
+		case autoFitTableCommandIndex: return L"\u81EA\u52A8\u5C06\u8868\u683C\u5BBD\u5EA6\u9002\u5E94\u7A97\u53E3";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u81EA\u52A8\u6362\u884C (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Hindi:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0924\u093E\u0932\u093F\u0915\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902 (\u091A\u094C\u0921\u093C\u093E\u0908 \u0928 \u092C\u0926\u0932\u0947\u0902)";
+		case autoAlignTableCommandIndex: return L"\u0938\u0902\u092A\u093E\u0926\u0928 \u0915\u0947 \u092C\u093E\u0926 \u0938\u094D\u0935\u0924\u0903 \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902 (\u091A\u094C\u0921\u093C\u093E\u0908 \u0928 \u092C\u0926\u0932\u0947\u0902)";
+		case wrapLongCellsCommandIndex: return L"\u0924\u093E\u0932\u093F\u0915\u093E \u0915\u0940 \u091A\u094C\u0921\u093C\u093E\u0908 \u0915\u094B \u0935\u093F\u0902\u0921\u094B \u092E\u0947\u0902 \u092B\u093F\u091F \u0915\u0930\u0947\u0902";
+		case autoFitTableCommandIndex: return L"\u0924\u093E\u0932\u093F\u0915\u093E \u0915\u0940 \u091A\u094C\u0921\u093C\u093E\u0908 \u0915\u094B \u0935\u093F\u0902\u0921\u094B \u092E\u0947\u0902 \u0938\u094D\u0935\u0924\u0903 \u092B\u093F\u091F \u0915\u0930\u0947\u0902";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u0935\u0930\u094D\u0921 \u0930\u0948\u092A (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Spanish:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Alinear tabla (sin cambiar ancho)";
+		case autoAlignTableCommandIndex: return L"Alinear automaticamente tras editar (sin cambiar ancho)";
+		case wrapLongCellsCommandIndex: return L"Ajustar ancho de tabla a ventana";
+		case autoFitTableCommandIndex: return L"Ajustar automaticamente ancho de tabla a ventana";
+		case notepadWordWrapCommandIndex: return L"Ajuste visual de linea Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Arabic:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0645\u062D\u0627\u0630\u0627\u0629 \u0627\u0644\u062C\u062F\u0648\u0644 (\u0628\u062F\u0648\u0646 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0639\u0631\u0636)";
+		case autoAlignTableCommandIndex: return L"\u0645\u062D\u0627\u0630\u0627\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629 \u0628\u0639\u062F \u0627\u0644\u062A\u062D\u0631\u064A\u0631 (\u0628\u062F\u0648\u0646 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0639\u0631\u0636)";
+		case wrapLongCellsCommandIndex: return L"\u0645\u0644\u0627\u0621\u0645\u0629 \u0639\u0631\u0636 \u0627\u0644\u062C\u062F\u0648\u0644 \u0644\u0644\u0646\u0627\u0641\u0630\u0629";
+		case autoFitTableCommandIndex: return L"\u0645\u0644\u0627\u0621\u0645\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u062C\u062F\u0648\u0644 \u0644\u0644\u0646\u0627\u0641\u0630\u0629";
+		case notepadWordWrapCommandIndex: return L"\u0627\u0644\u062A\u0641\u0627\u0641 \u0623\u0633\u0637\u0631 Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::French:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Aligner le tableau (sans changer la largeur)";
+		case autoAlignTableCommandIndex: return L"Alignement auto apres modification (sans changer la largeur)";
+		case wrapLongCellsCommandIndex: return L"Ajuster la largeur du tableau a la fenetre";
+		case autoFitTableCommandIndex: return L"Ajustement auto de la largeur du tableau a la fenetre";
+		case notepadWordWrapCommandIndex: return L"Renvoi a la ligne Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Bengali:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u099F\u09C7\u09AC\u09BF\u09B2 \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7 \u0995\u09B0\u09C1\u09A8 (\u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u09A8\u09BE \u09AC\u09A6\u09B2\u09C7)";
+		case autoAlignTableCommandIndex: return L"\u09B8\u09AE\u09CD\u09AA\u09BE\u09A6\u09A8\u09BE\u09B0 \u09AA\u09B0\u09C7 \u09B8\u09CD\u09AC\u09AF\u09BC\u0982\u0995\u09CD\u09B0\u09BF\u09AF\u09BC \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7\u0995\u09B0\u09A3 (\u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u09A8\u09BE \u09AC\u09A6\u09B2\u09C7)";
+		case wrapLongCellsCommandIndex: return L"\u099F\u09C7\u09AC\u09BF\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u0989\u0987\u09A8\u09CD\u09A1\u09CB\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AE\u09BE\u09A8\u09BE\u09A8\u09B8\u0987 \u0995\u09B0\u09C1\u09A8";
+		case autoFitTableCommandIndex: return L"\u099F\u09C7\u09AC\u09BF\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u0989\u0987\u09A8\u09CD\u09A1\u09CB\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09B8\u09CD\u09AC\u09AF\u09BC\u0982\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09AD\u09BE\u09AC\u09C7 \u09AE\u09BE\u09A8\u09BE\u09A8\u09B8\u0987 \u0995\u09B0\u09C1\u09A8";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u09B6\u09AC\u09CD\u09A6 \u09AE\u09CB\u09A1\u09BC\u09BE\u09A8\u09CB (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Portuguese:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Alinhar tabela (sem alterar largura)";
+		case autoAlignTableCommandIndex: return L"Alinhar automaticamente apos edicao (sem alterar largura)";
+		case wrapLongCellsCommandIndex: return L"Ajustar largura da tabela a janela";
+		case autoFitTableCommandIndex: return L"Ajustar automaticamente largura da tabela a janela";
+		case notepadWordWrapCommandIndex: return L"Quebra visual do Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Russian:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0412\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)";
+		case autoAlignTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)";
+		case wrapLongCellsCommandIndex: return L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0448\u0438\u0440\u0438\u043D\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
+		case autoFitTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
+		case notepadWordWrapCommandIndex: return L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Indonesian:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Ratakan tabel (tanpa mengubah lebar)";
+		case autoAlignTableCommandIndex: return L"Ratakan otomatis setelah edit (tanpa mengubah lebar)";
+		case wrapLongCellsCommandIndex: return L"Sesuaikan lebar tabel ke jendela";
+		case autoFitTableCommandIndex: return L"Sesuaikan otomatis lebar tabel ke jendela";
+		case notepadWordWrapCommandIndex: return L"Bungkus baris Notepad++ (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Urdu:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u062C\u062F\u0648\u0644 \u0633\u06CC\u062F\u06BE\u0627 \u06A9\u0631\u06CC\u06BA (\u0686\u0648\u0691\u0627\u0626\u06CC \u0628\u062F\u0644\u06D2 \u0628\u063A\u06CC\u0631)";
+		case autoAlignTableCommandIndex: return L"\u062A\u0631\u0645\u06CC\u0645 \u06A9\u06D2 \u0628\u0639\u062F \u062E\u0648\u062F\u06A9\u0627\u0631 \u0633\u06CC\u062F\u06BE (\u0686\u0648\u0691\u0627\u0626\u06CC \u0628\u062F\u0644\u06D2 \u0628\u063A\u06CC\u0631)";
+		case wrapLongCellsCommandIndex: return L"\u062C\u062F\u0648\u0644 \u06A9\u06CC \u0686\u0648\u0691\u0627\u0626\u06CC \u0648\u0646\u0688\u0648 \u06A9\u06D2 \u0645\u0637\u0627\u0628\u0642 \u06A9\u0631\u06CC\u06BA";
+		case autoFitTableCommandIndex: return L"\u062C\u062F\u0648\u0644 \u06A9\u06CC \u0686\u0648\u0691\u0627\u0626\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0637\u0648\u0631 \u067E\u0631 \u0648\u0646\u0688\u0648 \u06A9\u06D2 \u0645\u0637\u0627\u0628\u0642 \u06A9\u0631\u06CC\u06BA";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u0644\u0641\u0638\u06CC \u0644\u067E\u06CC\u0679 (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::German:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Tabelle ausrichten (Breite unveraendert)";
+		case autoAlignTableCommandIndex: return L"Nach Bearbeitung automatisch ausrichten (Breite unveraendert)";
+		case wrapLongCellsCommandIndex: return L"Tabellenbreite ans Fenster anpassen";
+		case autoFitTableCommandIndex: return L"Tabellenbreite automatisch ans Fenster anpassen";
+		case notepadWordWrapCommandIndex: return L"Notepad++ Zeilenumbruch (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Japanese:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u30C6\u30FC\u30D6\u30EB\u3092\u6574\u5217\uFF08\u5E45\u3092\u5909\u66F4\u3057\u306A\u3044\uFF09";
+		case autoAlignTableCommandIndex: return L"\u7DE8\u96C6\u5F8C\u306B\u81EA\u52D5\u6574\u5217\uFF08\u5E45\u3092\u5909\u66F4\u3057\u306A\u3044\uFF09";
+		case wrapLongCellsCommandIndex: return L"\u30C6\u30FC\u30D6\u30EB\u5E45\u3092\u30A6\u30A3\u30F3\u30C9\u30A6\u306B\u5408\u308F\u305B\u308B";
+		case autoFitTableCommandIndex: return L"\u30C6\u30FC\u30D6\u30EB\u5E45\u3092\u30A6\u30A3\u30F3\u30C9\u30A6\u306B\u81EA\u52D5\u8ABF\u6574";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u6298\u308A\u8FD4\u3057 (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::NigerianPidgin:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Arrange table (no change width)";
+		case autoAlignTableCommandIndex: return L"Auto arrange after edit (no change width)";
+		case wrapLongCellsCommandIndex: return L"Fit table width to window";
+		case autoFitTableCommandIndex: return L"Auto fit table width to window";
+		case notepadWordWrapCommandIndex: return L"Notepad++ word wrap (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Marathi:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0924\u0915\u094D\u0924\u093E \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u093E (\u0930\u0941\u0902\u0926\u0940 \u0928 \u092C\u0926\u0932\u0924\u093E)";
+		case autoAlignTableCommandIndex: return L"\u0938\u0902\u092A\u093E\u0926\u0928\u093E\u0928\u0902\u0924\u0930 \u0938\u094D\u0935\u092F\u0902\u091A\u0932\u093F\u0924 \u0938\u0902\u0930\u0947\u0916\u0928 (\u0930\u0941\u0902\u0926\u0940 \u0928 \u092C\u0926\u0932\u0924\u093E)";
+		case wrapLongCellsCommandIndex: return L"\u0924\u0915\u094D\u0924\u094D\u092F\u093E\u091A\u0940 \u0930\u0941\u0902\u0926\u0940 \u0935\u093F\u0902\u0921\u094B\u0932\u093E \u092C\u0938\u0935\u093E";
+		case autoFitTableCommandIndex: return L"\u0924\u0915\u094D\u0924\u094D\u092F\u093E\u091A\u0940 \u0930\u0941\u0902\u0926\u0940 \u0935\u093F\u0902\u0921\u094B\u0932\u093E \u0906\u092A\u094B\u0906\u092A \u092C\u0938\u0935\u093E";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u0936\u092C\u094D\u0926 \u0917\u0941\u0902\u0921\u093E\u0933\u0923\u0940 (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Telugu:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15\u0C28\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41 (\u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41 \u0C2E\u0C3E\u0C30\u0C4D\u0C1A\u0C15\u0C41\u0C02\u0C21\u0C3E)";
+		case autoAlignTableCommandIndex: return L"\u0C38\u0C35\u0C30\u0C23 \u0C24\u0C30\u0C4D\u0C35\u0C3E\u0C24 \u0C38\u0C4D\u0C35\u0C2F\u0C02\u0C1A\u0C3E\u0C32\u0C15 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41 (\u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41 \u0C2E\u0C3E\u0C30\u0C4D\u0C1A\u0C15\u0C41\u0C02\u0C21\u0C3E)";
+		case wrapLongCellsCommandIndex: return L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15 \u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41\u0C28\u0C41 \u0C35\u0C3F\u0C02\u0C21\u0C4B\u0C15\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41";
+		case autoFitTableCommandIndex: return L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15 \u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41\u0C28\u0C41 \u0C35\u0C3F\u0C02\u0C21\u0C4B\u0C15\u0C41 \u0C38\u0C4D\u0C35\u0C2F\u0C02\u0C1A\u0C3E\u0C32\u0C15\u0C02\u0C17\u0C3E \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u0C2A\u0C26 \u0C2E\u0C21\u0C24 (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Turkish:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Tabloyu hizala (genisligi degistirme)";
+		case autoAlignTableCommandIndex: return L"Duzenlemeden sonra otomatik hizala (genisligi degistirme)";
+		case wrapLongCellsCommandIndex: return L"Tablo genisligini pencereye sigdir";
+		case autoFitTableCommandIndex: return L"Tablo genisligini pencereye otomatik sigdir";
+		case notepadWordWrapCommandIndex: return L"Notepad++ satir kaydirma (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Tamil:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8\u0BAF\u0BC8 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1 (\u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0BAE\u0BBE\u0BB1\u0BCD\u0BB1\u0BBE\u0BAE\u0BB2\u0BCD)";
+		case autoAlignTableCommandIndex: return L"\u0BA4\u0BBF\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1\u0BAA\u0BCD \u0BAA\u0BBF\u0BB1\u0B95\u0BC1 \u0BA4\u0BBE\u0BA9\u0BBE\u0B95 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1 (\u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0BAE\u0BBE\u0BB1\u0BCD\u0BB1\u0BBE\u0BAE\u0BB2\u0BCD)";
+		case wrapLongCellsCommandIndex: return L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8 \u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0B9A\u0BBE\u0BB3\u0BB0\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1 \u0BAA\u0BCA\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1";
+		case autoFitTableCommandIndex: return L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8 \u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0B9A\u0BBE\u0BB3\u0BB0\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1 \u0BA4\u0BBE\u0BA9\u0BBE\u0B95 \u0BAA\u0BCA\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u0B9A\u0BCA\u0BB2\u0BCD \u0BAE\u0B9F\u0B95\u0BCD\u0B95\u0BC1 (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::YueChinese:
+		switch (index)
+		{
+		case alignCommandIndex: return L"\u5C0D\u9F4A\u8868\u683C\uFF08\u4E0D\u6539\u8B8A\u95CA\u5EA6\uFF09";
+		case autoAlignTableCommandIndex: return L"\u7DE8\u8F2F\u5F8C\u81EA\u52D5\u5C0D\u9F4A\uFF08\u4E0D\u6539\u8B8A\u95CA\u5EA6\uFF09";
+		case wrapLongCellsCommandIndex: return L"\u5C07\u8868\u683C\u95CA\u5EA6\u914D\u5408\u8996\u7A97";
+		case autoFitTableCommandIndex: return L"\u81EA\u52D5\u5C07\u8868\u683C\u95CA\u5EA6\u914D\u5408\u8996\u7A97";
+		case notepadWordWrapCommandIndex: return L"Notepad++ \u81EA\u52D5\u63DB\u884C (MD)";
+		default: return NULL;
+		}
+	case UiLanguage::Vietnamese:
+		switch (index)
+		{
+		case alignCommandIndex: return L"C\u0103n ch\u1EC9nh b\u1EA3ng (kh\u00F4ng \u0111\u1ED5i chi\u1EC1u r\u1ED9ng)";
+		case autoAlignTableCommandIndex: return L"T\u1EF1 \u0111\u1ED9ng c\u0103n ch\u1EC9nh sau khi s\u1EEDa (kh\u00F4ng \u0111\u1ED5i chi\u1EC1u r\u1ED9ng)";
+		case wrapLongCellsCommandIndex: return L"V\u1EEBa chi\u1EC1u r\u1ED9ng b\u1EA3ng v\u1EDBi c\u1EEDa s\u1ED5";
+		case autoFitTableCommandIndex: return L"T\u1EF1 \u0111\u1ED9ng v\u1EEBa chi\u1EC1u r\u1ED9ng b\u1EA3ng v\u1EDBi c\u1EEDa s\u1ED5";
+		case notepadWordWrapCommandIndex: return L"T\u1EF1 ng\u1EAFt d\u00F2ng Notepad++ (MD)";
+		default: return NULL;
+		}
+	default:
+		switch (index)
+		{
+		case alignCommandIndex: return L"Align table (no width change)";
+		case autoAlignTableCommandIndex: return L"Auto align after edit (no width change)";
+		case wrapLongCellsCommandIndex: return L"Fit table width to window";
+		case autoFitTableCommandIndex: return L"Auto fit table width to window";
+		case notepadWordWrapCommandIndex: return L"Notepad++ word wrap (MD)";
+		default: return NULL;
+		}
+	}
+}
+
+std::size_t legacyCommandIndex(std::size_t index)
+{
+	switch (index)
+	{
+	case nextCellCommandIndex: return 1;
+	case previousCellCommandIndex: return 2;
+	case insertRowCommandIndex: return 3;
+	case deleteRowCommandIndex: return 4;
+	case insertColumnCommandIndex: return 5;
+	case deleteColumnCommandIndex: return 6;
+	case moveRowUpCommandIndex: return 7;
+	case moveRowDownCommandIndex: return 8;
+	case moveColumnLeftCommandIndex: return 9;
+	case moveColumnRightCommandIndex: return 10;
+	case sortRowsAscendingCommandIndex: return 11;
+	case sortRowsDescendingCommandIndex: return 12;
+	case convertCsvTsvCommandIndex: return 13;
+	case insertTableCommandIndex: return 14;
+	case tabCommandIndex: return 15;
+	default: return static_cast<std::size_t>(-1);
+	}
+}
+
 const wchar_t *commandText(std::size_t index)
 {
+	if (const wchar_t *special = localizedSpecialCommandText(index))
+		return special;
+
 	const UiText &localized = uiText();
-	if (index < static_cast<std::size_t>(nbFunc) && localized.commands[index])
-		return localized.commands[index];
-	return englishUiText.commands[index];
+	const std::size_t legacy = legacyCommandIndex(index);
+	if (legacy >= static_cast<std::size_t>(nbFunc))
+		return englishUiText.commands[0];
+	if (legacy < static_cast<std::size_t>(nbFunc) && localized.commands[legacy])
+		return localized.commands[legacy];
+	return englishUiText.commands[legacy];
 }
 
 std::string toLowerAscii(std::string value)
@@ -946,6 +1202,65 @@ bool updateCommandMenuItem(HMENU menu, UINT commandId, const wchar_t *text)
 	return false;
 }
 
+HMENU pluginCommandMenu(HMENU menu)
+{
+	if (!menu)
+		return NULL;
+
+	const int count = ::GetMenuItemCount(menu);
+	for (int index = 0; index < count; ++index)
+	{
+		if (isPluginCommandId(::GetMenuItemID(menu, index)))
+			return menu;
+
+		HMENU subMenu = ::GetSubMenu(menu, index);
+		if (HMENU found = pluginCommandMenu(subMenu))
+			return found;
+	}
+	return NULL;
+}
+
+int commandMenuPosition(HMENU menu, UINT commandId)
+{
+	if (!menu)
+		return -1;
+
+	const int count = ::GetMenuItemCount(menu);
+	for (int index = 0; index < count; ++index)
+	{
+		if (::GetMenuItemID(menu, index) == commandId)
+			return index;
+	}
+	return -1;
+}
+
+bool menuItemIsSeparator(HMENU menu, int position)
+{
+	if (!menu || position < 0 || position >= ::GetMenuItemCount(menu))
+		return false;
+
+	MENUITEMINFO info;
+	ZeroMemory(&info, sizeof(info));
+	info.cbSize = sizeof(info);
+	info.fMask = MIIM_FTYPE;
+	if (!::GetMenuItemInfo(menu, static_cast<UINT>(position), TRUE, &info))
+		return false;
+	return (info.fType & MFT_SEPARATOR) != 0;
+}
+
+void ensurePluginCommandSeparator(HMENU pluginsMenu)
+{
+	if (funcItem[autoFitTableCommandIndex]._cmdID == 0)
+		return;
+
+	HMENU commandMenu = pluginCommandMenu(pluginsMenu);
+	const int position = commandMenuPosition(commandMenu, static_cast<UINT>(funcItem[autoFitTableCommandIndex]._cmdID));
+	if (position < 0 || menuItemIsSeparator(commandMenu, position + 1))
+		return;
+
+	::InsertMenu(commandMenu, static_cast<UINT>(position + 1), MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+}
+
 void updateNotepadPluginMenu()
 {
 	if (!nppData._nppHandle)
@@ -961,6 +1276,7 @@ void updateNotepadPluginMenu()
 		if (funcItem[index]._cmdID != 0)
 			updateCommandMenuItem(pluginsMenu, static_cast<UINT>(funcItem[index]._cmdID), commandText(static_cast<std::size_t>(index)));
 	}
+	ensurePluginCommandSeparator(pluginsMenu);
 	::DrawMenuBar(nppData._nppHandle);
 }
 
@@ -994,8 +1310,10 @@ void drawIconVerticalLine(std::uint32_t *pixels, int x, int y1, int y2, std::uin
 enum class ToolbarIconKind
 {
 	TabAction,
-	TableWrap,
+	TableFitWidth,
+	TableAutoFitWidth,
 	TableAlign,
+	TableAutoAlign,
 	EditorWordWrap
 };
 
@@ -1066,13 +1384,37 @@ void drawAlignRows(std::uint32_t *pixels, std::uint32_t accent)
 	drawIconHorizontalLine(pixels, 3, 12, 13, accent);
 }
 
+void drawFitWidthArrows(std::uint32_t *pixels, std::uint32_t accent)
+{
+	drawIconHorizontalLine(pixels, 4, 11, 4, accent);
+	drawIconVerticalLine(pixels, 2, 3, 5, accent);
+	drawIconVerticalLine(pixels, 13, 3, 5, accent);
+	setIconPixel(pixels, 3, 4, accent);
+	setIconPixel(pixels, 4, 3, accent);
+	setIconPixel(pixels, 4, 5, accent);
+	setIconPixel(pixels, 12, 4, accent);
+	setIconPixel(pixels, 11, 3, accent);
+	setIconPixel(pixels, 11, 5, accent);
+}
+
+void drawAutoCorner(std::uint32_t *pixels, std::uint32_t accent)
+{
+	drawIconHorizontalLine(pixels, 10, 13, 1, accent);
+	drawIconVerticalLine(pixels, 13, 1, 4, accent);
+	setIconPixel(pixels, 12, 5, accent);
+	setIconPixel(pixels, 11, 4, accent);
+	setIconPixel(pixels, 10, 4, accent);
+	setIconPixel(pixels, 10, 5, accent);
+}
+
 void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
 {
 	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
 	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
 	const std::uint32_t tabAccent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
-	const std::uint32_t wrapAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
+	const std::uint32_t fitAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
 	const std::uint32_t alignAccent = darkMode ? argb(255, 155, 213, 255) : argb(255, 46, 105, 180);
+	const std::uint32_t autoAccent = darkMode ? argb(255, 255, 213, 102) : argb(255, 212, 145, 0);
 	const std::uint32_t editorAccent = darkMode ? argb(255, 255, 191, 105) : argb(255, 196, 112, 0);
 
 	clearIcon(pixels);
@@ -1081,17 +1423,21 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 		drawMdBadge(pixels, grid);
 		drawTabActionArrow(pixels, tabAccent);
 	}
-	else if (kind == ToolbarIconKind::TableWrap)
+	else if (kind == ToolbarIconKind::TableFitWidth || kind == ToolbarIconKind::TableAutoFitWidth)
 	{
 		drawMdBadge(pixels, grid);
 		drawMiniTable(pixels, grid, muted);
-		drawAutoWrapArrow(pixels, wrapAccent);
+		drawFitWidthArrows(pixels, fitAccent);
+		if (kind == ToolbarIconKind::TableAutoFitWidth)
+			drawAutoCorner(pixels, autoAccent);
 	}
-	else if (kind == ToolbarIconKind::TableAlign)
+	else if (kind == ToolbarIconKind::TableAlign || kind == ToolbarIconKind::TableAutoAlign)
 	{
 		drawMdBadge(pixels, grid);
 		drawMiniTable(pixels, grid, muted);
 		drawAlignRows(pixels, alignAccent);
+		if (kind == ToolbarIconKind::TableAutoAlign)
+			drawAutoCorner(pixels, autoAccent);
 	}
 	else
 	{
@@ -1181,9 +1527,14 @@ bool ensureTabToolbarIconHandles()
 	return ensureToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode, ToolbarIconKind::TabAction);
 }
 
+bool ensureAlignToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode, ToolbarIconKind::TableAlign);
+}
+
 bool ensureWrapLongCellsToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode, ToolbarIconKind::TableWrap);
+	return ensureToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode, ToolbarIconKind::TableFitWidth);
 }
 
 bool ensureNotepadWordWrapToolbarIconHandles()
@@ -1197,7 +1548,7 @@ bool ensureAutoFitTableToolbarIconHandles()
 		g_autoFitTableToolbarBmp,
 		g_autoFitTableToolbarIcon,
 		g_autoFitTableToolbarIconDarkMode,
-		ToolbarIconKind::TableWrap);
+		ToolbarIconKind::TableAutoFitWidth);
 }
 
 bool ensureAutoAlignTableToolbarIconHandles()
@@ -1206,12 +1557,17 @@ bool ensureAutoAlignTableToolbarIconHandles()
 		g_autoAlignTableToolbarBmp,
 		g_autoAlignTableToolbarIcon,
 		g_autoAlignTableToolbarIconDarkMode,
-		ToolbarIconKind::TableAlign);
+		ToolbarIconKind::TableAutoAlign);
 }
 
 void destroyTabToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
+}
+
+void destroyAlignToolbarIconHandles()
+{
+	destroyToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
 }
 
 void destroyWrapLongCellsToolbarIconHandles()
@@ -1332,7 +1688,8 @@ void setNotepadWordWrapToolbarCheckState()
 
 bool shouldApplyAutoFitAfterAction(MarkdownTable::Action action)
 {
-	return g_autoFitTable && action == MarkdownTable::Action::Align;
+	(void)action;
+	return false;
 }
 
 MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
@@ -1344,7 +1701,7 @@ MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
 
 bool shouldFitToWindowAfterAction(MarkdownTable::Action action)
 {
-	return action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoFitAfterAction(action);
+	return action == MarkdownTable::Action::WrapLongCells;
 }
 
 bool fitTableToWindowCommandEnabled()
@@ -1543,10 +1900,10 @@ void runAutoTableFormatAfterUpdate(HWND updatedScintilla, bool contentUpdated)
 	if (!selectionEmpty(scintilla))
 		return;
 
-	if (g_autoAlignTable)
-		autoAlignCurrentTable(true, CaretPlacement::PreserveCellOffset);
-	else
+	if (g_autoFitTable)
 		fitCurrentTableToWindow(true, CaretPlacement::PreserveCellOffset);
+	else
+		autoAlignCurrentTable(true, CaretPlacement::PreserveCellOffset);
 }
 
 void handleScintillaUpdateUiInternal(const SCNotification *notification)
@@ -1845,21 +2202,8 @@ CellCaretSnapshot captureCellCaret(const std::string &line, std::size_t row, std
 	snapshot.row = row;
 	snapshot.column = column;
 	snapshot.offset = offset;
+	snapshot.prefix = line.substr(bounds.contentStart, offset);
 	return snapshot;
-}
-
-void ensureCellCaretOffsetAvailable(std::vector<std::string> &lines, const CellCaretSnapshot &snapshot)
-{
-	if (!snapshot.valid || snapshot.row >= lines.size())
-		return;
-
-	const CellBounds bounds = cellBoundsForColumn(lines[snapshot.row], snapshot.column);
-	if (!bounds.found)
-		return;
-
-	const std::size_t targetOffset = bounds.contentStart + snapshot.offset;
-	if (targetOffset > bounds.cellEnd)
-		lines[snapshot.row].insert(bounds.cellEnd, targetOffset - bounds.cellEnd, ' ');
 }
 
 std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, const CellCaretSnapshot &snapshot, std::size_t fallback)
@@ -1871,7 +2215,13 @@ std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, cons
 	if (!bounds.found)
 		return fallback;
 
-	return (std::min)(bounds.contentStart + snapshot.offset, bounds.cellEnd);
+	const std::string &line = lines[snapshot.row];
+	if (!snapshot.prefix.empty()
+		&& bounds.contentStart + snapshot.prefix.size() <= bounds.cellEnd
+		&& line.compare(bounds.contentStart, snapshot.prefix.size(), snapshot.prefix) == 0)
+		return bounds.contentStart + snapshot.prefix.size();
+
+	return (std::min)(bounds.contentStart + snapshot.offset, bounds.contentEnd);
 }
 
 std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
@@ -2182,9 +2532,6 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	{
 		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
-	if (caretPlacement == CaretPlacement::PreserveCellOffset && preservedCaret.valid)
-		ensureCellCaretOffsetAvailable(edit.lines, preservedCaret);
-
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
 	std::size_t targetRow = edit.targetRow;
@@ -2368,6 +2715,11 @@ const wchar_t *pluginMenuNameForTests()
 	return uiText().pluginMenuName;
 }
 
+const wchar_t *commandTextForTests(std::size_t index)
+{
+	return commandText(index);
+}
+
 bool autoFitTableEnabledForTests()
 {
 	return g_autoFitTable;
@@ -2444,8 +2796,17 @@ std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine
 {
 	const CellCaretSnapshot snapshot = captureCellCaret(sourceLine, 0, column, byteColumn);
 	std::vector<std::string> lines(1, replacementLine);
-	ensureCellCaretOffsetAvailable(lines, snapshot);
 	return columnOffsetForCellCaret(lines, snapshot, static_cast<std::size_t>(-1));
+}
+
+bool ensureAlignToolbarIconsForTests()
+{
+	return ensureAlignToolbarIconHandles();
+}
+
+void destroyAlignToolbarIconsForTests()
+{
+	destroyAlignToolbarIconHandles();
 }
 
 bool ensureTabToolbarIconsForTests()
@@ -2514,6 +2875,7 @@ void pluginInit(HANDLE hModule)
 void pluginCleanUp()
 {
 	removeFitToWindowResizeHooks();
+	destroyAlignToolbarIconHandles();
 	destroyTabToolbarIconHandles();
 	destroyWrapLongCellsToolbarIconHandles();
 	destroyNotepadWordWrapToolbarIconHandles();
@@ -2536,28 +2898,28 @@ void commandMenuInit()
     //            PFUNCPLUGINCMD functionPointer, // the symbol of function (function pointer) associated with this command. The body should be defined below. See Step 4.
     //            ShortcutKey *shortcut,          // optional. Define a shortcut to trigger this command
     //            bool check0nInit                // optional. Make this menu item be checked visually
-    //            );
+	//            );
 	refreshUiLanguageState();
-	setCommand(0, commandText(0), alignTable, &g_alignShortcut, false);
-	setCommand(1, commandText(1), nextCell, &g_nextCellShortcut, false);
-	setCommand(2, commandText(2), previousCell, &g_previousCellShortcut, false);
-	setCommand(3, commandText(3), insertRowBelow, &g_insertRowShortcut, false);
-	setCommand(4, commandText(4), deleteRow, &g_deleteRowShortcut, false);
-	setCommand(5, commandText(5), insertColumnRight, &g_insertColumnShortcut, false);
-	setCommand(6, commandText(6), deleteColumn, &g_deleteColumnShortcut, false);
-	setCommand(7, commandText(7), moveRowUp, &g_moveRowUpShortcut, false);
-	setCommand(8, commandText(8), moveRowDown, &g_moveRowDownShortcut, false);
-	setCommand(9, commandText(9), moveColumnLeft, &g_moveColumnLeftShortcut, false);
-	setCommand(10, commandText(10), moveColumnRight, &g_moveColumnRightShortcut, false);
-	setCommand(11, commandText(11), sortRowsAscending, &g_sortRowsAscendingShortcut, false);
-	setCommand(12, commandText(12), sortRowsDescending, &g_sortRowsDescendingShortcut, false);
-	setCommand(13, commandText(13), convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
-	setCommand(14, commandText(14), insertTable, &g_insertTableShortcut, false);
-	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
+	setCommand(alignCommandIndex, commandText(alignCommandIndex), alignTable, &g_alignShortcut, false);
+	setCommand(autoAlignTableCommandIndex, commandText(autoAlignTableCommandIndex), toggleAutoAlignTable, &g_autoAlignTableShortcut, g_autoAlignTable);
 	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
+	setCommand(autoFitTableCommandIndex, commandText(autoFitTableCommandIndex), toggleAutoFitTable, &g_autoFitTableShortcut, g_autoFitTable);
+	setCommand(nextCellCommandIndex, commandText(nextCellCommandIndex), nextCell, &g_nextCellShortcut, false);
+	setCommand(previousCellCommandIndex, commandText(previousCellCommandIndex), previousCell, &g_previousCellShortcut, false);
+	setCommand(insertRowCommandIndex, commandText(insertRowCommandIndex), insertRowBelow, &g_insertRowShortcut, false);
+	setCommand(deleteRowCommandIndex, commandText(deleteRowCommandIndex), deleteRow, &g_deleteRowShortcut, false);
+	setCommand(insertColumnCommandIndex, commandText(insertColumnCommandIndex), insertColumnRight, &g_insertColumnShortcut, false);
+	setCommand(deleteColumnCommandIndex, commandText(deleteColumnCommandIndex), deleteColumn, &g_deleteColumnShortcut, false);
+	setCommand(moveRowUpCommandIndex, commandText(moveRowUpCommandIndex), moveRowUp, &g_moveRowUpShortcut, false);
+	setCommand(moveRowDownCommandIndex, commandText(moveRowDownCommandIndex), moveRowDown, &g_moveRowDownShortcut, false);
+	setCommand(moveColumnLeftCommandIndex, commandText(moveColumnLeftCommandIndex), moveColumnLeft, &g_moveColumnLeftShortcut, false);
+	setCommand(moveColumnRightCommandIndex, commandText(moveColumnRightCommandIndex), moveColumnRight, &g_moveColumnRightShortcut, false);
+	setCommand(sortRowsAscendingCommandIndex, commandText(sortRowsAscendingCommandIndex), sortRowsAscending, &g_sortRowsAscendingShortcut, false);
+	setCommand(sortRowsDescendingCommandIndex, commandText(sortRowsDescendingCommandIndex), sortRowsDescending, &g_sortRowsDescendingShortcut, false);
+	setCommand(convertCsvTsvCommandIndex, commandText(convertCsvTsvCommandIndex), convertCsvTsvSelectionToTable, &g_convertCsvTsvShortcut, false);
+	setCommand(insertTableCommandIndex, commandText(insertTableCommandIndex), insertTable, &g_insertTableShortcut, false);
+	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
 	setCommand(notepadWordWrapCommandIndex, commandText(notepadWordWrapCommandIndex), toggleNotepadWordWrap, NULL, notepadWordWrapEnabled());
-	setCommand(autoFitTableCommandIndex, commandText(autoFitTableCommandIndex), toggleAutoFitTable, NULL, g_autoFitTable);
-	setCommand(autoAlignTableCommandIndex, commandText(autoAlignTableCommandIndex), toggleAutoAlignTable, NULL, g_autoAlignTable);
 }
 
 void refreshUiLanguageFromNotepad()
@@ -2646,6 +3008,9 @@ void registerToolbarIcons()
 		return;
 
 	refreshUiLanguageState();
+	if (funcItem[alignCommandIndex]._cmdID != 0 && ensureAlignToolbarIconHandles())
+		registerToolbarIcon(alignCommandIndex, g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
+
 	if (funcItem[tabCommandIndex]._cmdID != 0 && ensureTabToolbarIconHandles())
 		registerToolbarIcon(tabCommandIndex, g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
 
