@@ -134,6 +134,7 @@ bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
 UINT fitToWindowResizeDelayMsForTests();
+std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();

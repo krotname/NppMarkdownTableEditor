@@ -256,6 +256,17 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto input update runs immediate auto align", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, false, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate auto fit", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(false, true, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate combined auto mode", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, false, true, true));
+	const std::string privet = "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
+	const std::string pri = "\xD0\xBF\xD1\x80\xD0\xB8";
+	const std::string sourcePrivetLine = "| " + privet + " |";
+	const std::string paddedPrivetLine = "| " + privet + "     |";
+	const std::size_t caretAfterPri = sourcePrivetLine.find(privet) + pri.size();
+	expectSize(failures, "auto input preserves utf8 cell caret after same formatting",
+		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetLine, 0, caretAfterPri, sourcePrivetLine),
+		caretAfterPri);
+	expectSize(failures, "auto input preserves utf8 cell caret after padding changes",
+		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrivetLine, 0, caretAfterPri, paddedPrivetLine),
+		paddedPrivetLine.find(privet) + pri.size());
 	expectTrue(failures, "auto align toggle runs initial align before enabling", MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(false));
 	expectTrue(failures, "auto align toggle does not run initial align when disabling", !MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(true));
 	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);

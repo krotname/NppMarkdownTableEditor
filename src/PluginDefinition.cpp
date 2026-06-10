@@ -50,10 +50,31 @@ struct TableSizeDialogState
 	bool accepted = false;
 };
 
+enum class CaretPlacement
+{
+	ActionTarget,
+	PreserveCellOffset
+};
+
 struct InsertText
 {
 	std::string text;
 	std::size_t caretDelta = 0;
+};
+
+struct CellBounds
+{
+	bool found = false;
+	std::size_t contentStart = 0;
+	std::size_t contentEnd = 0;
+};
+
+struct CellCaretSnapshot
+{
+	bool valid = false;
+	std::size_t row = 0;
+	std::size_t column = 0;
+	std::size_t offset = 0;
 };
 
 const int tableSizeColumnsId = 1001;
@@ -1410,7 +1431,7 @@ bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lin
 }
 
 int coreIndex(std::size_t value);
-bool runTableAction(MarkdownTable::Action action, bool quiet);
+bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement = CaretPlacement::ActionTarget);
 
 MarkdownTable::EditResult applyWrappedToVisibleWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
 {
@@ -1448,24 +1469,24 @@ void rememberCurrentFitToWindowWidth()
 	g_lastFitToWindowColumns = scintilla ? availableDisplayColumns(scintilla) : 0;
 }
 
-bool fitCurrentTableToWindow(bool quiet)
+bool fitCurrentTableToWindow(bool quiet, CaretPlacement caretPlacement = CaretPlacement::ActionTarget)
 {
 	if (g_fitToWindowInProgress)
 		return false;
 
 	g_fitToWindowInProgress = true;
-	const bool changed = runTableAction(MarkdownTable::Action::WrapLongCells, quiet);
+	const bool changed = runTableAction(MarkdownTable::Action::WrapLongCells, quiet, caretPlacement);
 	g_fitToWindowInProgress = false;
 	return changed;
 }
 
-bool autoAlignCurrentTable(bool quiet)
+bool autoAlignCurrentTable(bool quiet, CaretPlacement caretPlacement = CaretPlacement::ActionTarget)
 {
 	if (g_autoAlignInProgress || g_fitToWindowInProgress)
 		return false;
 
 	g_autoAlignInProgress = true;
-	const bool changed = runTableAction(MarkdownTable::Action::Align, quiet);
+	const bool changed = runTableAction(MarkdownTable::Action::Align, quiet, caretPlacement);
 	g_autoAlignInProgress = false;
 	return changed;
 }
@@ -1521,9 +1542,9 @@ void runAutoTableFormatAfterUpdate(HWND updatedScintilla, bool contentUpdated)
 		return;
 
 	if (g_autoAlignTable)
-		autoAlignCurrentTable(true);
+		autoAlignCurrentTable(true, CaretPlacement::PreserveCellOffset);
 	else
-		fitCurrentTableToWindow(true);
+		fitCurrentTableToWindow(true, CaretPlacement::PreserveCellOffset);
 }
 
 void handleScintillaUpdateUiInternal(const SCNotification *notification)
@@ -1739,6 +1760,102 @@ std::size_t offsetForLineColumn(const std::vector<std::string> &lines, const std
 	for (std::size_t i = 0; i < row && i < lines.size(); ++i)
 		offset += lines[i].size() + eol.size();
 	return offset + columnOffset;
+}
+
+bool markdownSpace(char ch)
+{
+	return ch == ' ' || ch == '\t';
+}
+
+bool escapedAt(const std::string &line, std::size_t index)
+{
+	std::size_t backslashes = 0;
+	while (index > 0 && line[index - 1] == '\\')
+	{
+		++backslashes;
+		--index;
+	}
+	return (backslashes % 2) == 1;
+}
+
+CellBounds cellBoundsForColumn(const std::string &line, std::size_t column)
+{
+	CellBounds bounds;
+	std::size_t first = 0;
+	while (first < line.size() && markdownSpace(line[first]))
+		++first;
+
+	std::size_t last = line.size();
+	while (last > first && markdownSpace(line[last - 1]))
+		--last;
+
+	if (first < last && line[first] == '|' && !escapedAt(line, first))
+		++first;
+	if (last > first && line[last - 1] == '|' && !escapedAt(line, last - 1))
+		--last;
+
+	std::size_t cellStart = first;
+	std::size_t currentColumn = 0;
+	for (std::size_t i = first; i <= last; ++i)
+	{
+		const bool atCellEnd = i == last || (line[i] == '|' && !escapedAt(line, i));
+		if (!atCellEnd)
+			continue;
+
+		if (currentColumn == column)
+		{
+			std::size_t contentStart = cellStart;
+			while (contentStart < i && markdownSpace(line[contentStart]))
+				++contentStart;
+
+			std::size_t contentEnd = i;
+			while (contentEnd > contentStart && markdownSpace(line[contentEnd - 1]))
+				--contentEnd;
+
+			bounds.found = true;
+			bounds.contentStart = contentStart;
+			bounds.contentEnd = contentEnd;
+			return bounds;
+		}
+
+		++currentColumn;
+		cellStart = i + 1;
+	}
+
+	return bounds;
+}
+
+CellCaretSnapshot captureCellCaret(const std::string &line, std::size_t row, std::size_t column, std::size_t byteColumn)
+{
+	CellCaretSnapshot snapshot;
+	const CellBounds bounds = cellBoundsForColumn(line, column);
+	if (!bounds.found)
+		return snapshot;
+
+	const std::size_t clampedColumn = (std::min)(byteColumn, line.size());
+	const std::size_t cellLength = bounds.contentEnd > bounds.contentStart ? bounds.contentEnd - bounds.contentStart : 0;
+	std::size_t offset = 0;
+	if (clampedColumn > bounds.contentStart)
+		offset = (std::min)(clampedColumn, bounds.contentEnd) - bounds.contentStart;
+
+	snapshot.valid = true;
+	snapshot.row = row;
+	snapshot.column = column;
+	snapshot.offset = (std::min)(offset, cellLength);
+	return snapshot;
+}
+
+std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, const CellCaretSnapshot &snapshot, std::size_t fallback)
+{
+	if (!snapshot.valid || snapshot.row >= lines.size())
+		return fallback;
+
+	const CellBounds bounds = cellBoundsForColumn(lines[snapshot.row], snapshot.column);
+	if (!bounds.found)
+		return fallback;
+
+	const std::size_t cellLength = bounds.contentEnd > bounds.contentStart ? bounds.contentEnd - bounds.contentStart : 0;
+	return bounds.contentStart + (std::min)(snapshot.offset, cellLength);
 }
 
 std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
@@ -1976,7 +2093,7 @@ bool promptTableSize(TableSizeDialogState &state)
 	return state.accepted;
 }
 
-bool runTableAction(MarkdownTable::Action action, bool quiet)
+bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement)
 {
 	HWND scintilla = currentScintilla();
 	if (!scintilla)
@@ -2034,6 +2151,9 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
+	const CellCaretSnapshot preservedCaret = caretPlacement == CaretPlacement::PreserveCellOffset
+		? captureCellCaret(currentLineText, row, column, byteColumn)
+		: CellCaretSnapshot();
 	const MarkdownTable::Action coreAction = coreActionForPluginAction(action);
 	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), coreAction);
 	if (!edit.ok)
@@ -2049,12 +2169,21 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
-	const std::size_t targetPosition = positionForLineColumn(scintilla, firstLine, edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
+	std::size_t targetRow = edit.targetRow;
+	std::size_t targetColumnOffset = edit.targetColumnOffset;
+	if (caretPlacement == CaretPlacement::PreserveCellOffset && preservedCaret.valid)
+	{
+		targetRow = (std::min)(preservedCaret.row, edit.lines.empty() ? static_cast<std::size_t>(0) : edit.lines.size() - 1);
+		targetColumnOffset = columnOffsetForCellCaret(edit.lines, preservedCaret, edit.targetColumnOffset);
+	}
+	const std::size_t targetPosition = positionForLineColumn(scintilla, firstLine, edit.lines, eol, targetRow, targetColumnOffset);
 	const Sci_Position replaceStart = lineStartPosition(scintilla, firstLine);
 	const Sci_Position replaceEnd = lineEndPosition(scintilla, lastLine);
 	const std::string source = getRangeText(scintilla, replaceStart, replaceEnd);
 	if (source == replacement)
 	{
+		if (caretPlacement == CaretPlacement::PreserveCellOffset)
+			return true;
 		if (static_cast<Sci_Position>(targetPosition) != currentPosResult)
 			::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
 		return true;
@@ -2291,6 +2420,12 @@ bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabl
 UINT fitToWindowResizeDelayMsForTests()
 {
 	return fitToWindowResizeDelayMs;
+}
+
+std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine)
+{
+	const CellCaretSnapshot snapshot = captureCellCaret(sourceLine, 0, column, byteColumn);
+	return columnOffsetForCellCaret(std::vector<std::string>(1, replacementLine), snapshot, static_cast<std::size_t>(-1));
 }
 
 bool ensureTabToolbarIconsForTests()
