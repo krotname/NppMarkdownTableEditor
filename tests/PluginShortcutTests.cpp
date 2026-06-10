@@ -204,10 +204,24 @@ int runPluginShortcutTests()
 		{ "vietnamese.xml", "vietnamese", L"C\u0103n ch\u1EC9nh b\u1EA3ng (kh\u00F4ng \u0111\u1ED5i chi\u1EC1u r\u1ED9ng)" }
 	};
 	expectSize(failures, "additional localized command samples", sizeof(localizedSamples) / sizeof(localizedSamples[0]), static_cast<std::size_t>(18));
+	const wchar_t *primaryCommandShortcutSuffixes[] =
+	{
+		L"\tCtrl+Alt+Shift+1",
+		L"\tCtrl+Alt+Shift+A",
+		L"\tCtrl+Alt+Shift+W",
+		L"\tCtrl+Alt+Shift+F"
+	};
 	for (const LocalizedCommandSample &sample : localizedSamples)
 	{
 		MarkdownTablePluginTesting::applyNativeLangFileNameForTests(sample.nativeLangFileName);
 		expectWideString(failures, std::string(sample.label) + " align name", MarkdownTablePluginTesting::commandTextForTests(0), sample.alignName);
+		for (std::size_t commandIndex = 0; commandIndex < 4; ++commandIndex)
+		{
+			const wchar_t *localizedCommand = MarkdownTablePluginTesting::commandTextForTests(commandIndex);
+			expectTrue(failures, std::string(sample.label) + " primary command text present " + std::to_string(commandIndex), localizedCommand != NULL && std::wcslen(localizedCommand) > 0);
+			const std::wstring expectedMenuText = std::wstring(localizedCommand ? localizedCommand : L"") + primaryCommandShortcutSuffixes[commandIndex];
+			expectWideString(failures, std::string(sample.label) + " primary command menu hotkey " + std::to_string(commandIndex), MarkdownTablePluginTesting::commandMenuTextForTests(commandIndex), expectedMenuText.c_str());
+		}
 	}
 
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("");
