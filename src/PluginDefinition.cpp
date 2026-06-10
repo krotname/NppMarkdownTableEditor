@@ -105,8 +105,6 @@ const std::size_t autoAlignTableCommandIndex = 19;
 const int notepadWordWrapCommandId = 44022;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
-const UINT_PTR autoAlignTableTimerId = 0x4D41;
-const UINT autoAlignTableDelayMs = 450;
 
 bool g_autoFitTable = false;
 bool g_autoAlignTable = false;
@@ -114,7 +112,6 @@ bool g_fitToWindowInProgress = false;
 bool g_autoAlignInProgress = false;
 std::size_t g_lastFitToWindowColumns = 0;
 HWND g_pendingFitToWindowScintilla = NULL;
-HWND g_pendingAutoAlignScintilla = NULL;
 WNDPROC g_originalMainScintillaProc = NULL;
 WNDPROC g_originalSecondScintillaProc = NULL;
 HBITMAP g_tabToolbarBmp = NULL;
@@ -1347,9 +1344,9 @@ bool shouldRunInitialFitWhenTogglingAutoFitTable(bool currentlyEnabled)
 	return !currentlyEnabled;
 }
 
-bool shouldScheduleAutoAlignAfterUpdate(bool enabled, bool inProgress, bool activeEditor, bool contentUpdated)
+bool shouldRunAutoTableFormatAfterUpdate(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated)
 {
-	return enabled && !inProgress && activeEditor && contentUpdated;
+	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress && activeEditor && contentUpdated;
 }
 
 bool shouldRunInitialAlignWhenTogglingAutoAlignTable(bool currentlyEnabled)
@@ -1505,18 +1502,6 @@ bool selectionEmpty(HWND scintilla)
 	return start == end;
 }
 
-void autoAlignTableAfterUpdate(HWND updatedScintilla)
-{
-	if (!g_autoAlignTable || g_autoAlignInProgress)
-		return;
-
-	HWND scintilla = currentScintilla();
-	if (!scintilla || scintilla != updatedScintilla || !selectionEmpty(scintilla))
-		return;
-
-	autoAlignCurrentTable(true);
-}
-
 void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 {
 	if (!g_autoFitTable || !resizedScintilla)
@@ -1526,15 +1511,19 @@ void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 	::SetTimer(resizedScintilla, fitToWindowResizeTimerId, fitToWindowResizeDelayMs, NULL);
 }
 
-void scheduleAutoAlignAfterUpdate(HWND updatedScintilla, bool contentUpdated)
+void runAutoTableFormatAfterUpdate(HWND updatedScintilla, bool contentUpdated)
 {
 	HWND scintilla = currentScintilla();
 	const bool activeEditor = scintilla && scintilla == updatedScintilla;
-	if (!shouldScheduleAutoAlignAfterUpdate(g_autoAlignTable, g_autoAlignInProgress, activeEditor, contentUpdated))
+	if (!shouldRunAutoTableFormatAfterUpdate(g_autoAlignTable, g_autoFitTable, g_autoAlignInProgress, g_fitToWindowInProgress, activeEditor, contentUpdated))
+		return;
+	if (!selectionEmpty(scintilla))
 		return;
 
-	g_pendingAutoAlignScintilla = updatedScintilla;
-	::SetTimer(updatedScintilla, autoAlignTableTimerId, autoAlignTableDelayMs, NULL);
+	if (g_autoAlignTable)
+		autoAlignCurrentTable(true);
+	else
+		fitCurrentTableToWindow(true);
 }
 
 void handleScintillaUpdateUiInternal(const SCNotification *notification)
@@ -1543,7 +1532,7 @@ void handleScintillaUpdateUiInternal(const SCNotification *notification)
 		return;
 
 	const bool contentUpdated = (notification->updated & SC_UPDATE_CONTENT) != 0;
-	scheduleAutoAlignAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
+	runAutoTableFormatAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
 }
 
 void cancelFitToWindowResizeTimer(HWND scintilla)
@@ -1554,24 +1543,10 @@ void cancelFitToWindowResizeTimer(HWND scintilla)
 		g_pendingFitToWindowScintilla = NULL;
 }
 
-void cancelAutoAlignTableTimer(HWND scintilla)
-{
-	if (scintilla)
-		::KillTimer(scintilla, autoAlignTableTimerId);
-	if (g_pendingAutoAlignScintilla == scintilla)
-		g_pendingAutoAlignScintilla = NULL;
-}
-
 void cancelFitToWindowResizeTimers()
 {
 	cancelFitToWindowResizeTimer(nppData._scintillaMainHandle);
 	cancelFitToWindowResizeTimer(nppData._scintillaSecondHandle);
-}
-
-void cancelAutoAlignTableTimers()
-{
-	cancelAutoAlignTableTimer(nppData._scintillaMainHandle);
-	cancelAutoAlignTableTimer(nppData._scintillaSecondHandle);
 }
 
 WNDPROC originalScintillaProc(HWND hwnd)
@@ -1593,12 +1568,6 @@ LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam
 	{
 		cancelFitToWindowResizeTimer(hwnd);
 		fitToWindowAfterResize(hwnd);
-		return 0;
-	}
-	if (message == WM_TIMER && wParam == autoAlignTableTimerId)
-	{
-		cancelAutoAlignTableTimer(hwnd);
-		autoAlignTableAfterUpdate(hwnd);
 		return 0;
 	}
 
@@ -2272,8 +2241,6 @@ bool autoAlignTableEnabledForTests()
 void setAutoAlignTableEnabledForTests(bool enabled)
 {
 	g_autoAlignTable = enabled;
-	if (!enabled)
-		cancelAutoAlignTableTimers();
 }
 
 MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action)
@@ -2311,9 +2278,9 @@ bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled)
 	return shouldRunInitialFitWhenTogglingAutoFitTable(currentlyEnabled);
 }
 
-bool shouldScheduleAutoAlignAfterUpdateForTests(bool enabled, bool inProgress, bool activeEditor, bool contentUpdated)
+bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated)
 {
-	return shouldScheduleAutoAlignAfterUpdate(enabled, inProgress, activeEditor, contentUpdated);
+	return shouldRunAutoTableFormatAfterUpdate(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress, activeEditor, contentUpdated);
 }
 
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled)
@@ -2324,11 +2291,6 @@ bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabl
 UINT fitToWindowResizeDelayMsForTests()
 {
 	return fitToWindowResizeDelayMs;
-}
-
-UINT autoAlignTableDelayMsForTests()
-{
-	return autoAlignTableDelayMs;
 }
 
 bool ensureTabToolbarIconsForTests()
@@ -2715,8 +2677,6 @@ void toggleAutoAlignTable()
 		autoAlignCurrentTable(true);
 
 	g_autoAlignTable = !g_autoAlignTable;
-	if (!g_autoAlignTable)
-		cancelAutoAlignTableTimers();
 	refreshAutoAlignTableUi();
 }
 
