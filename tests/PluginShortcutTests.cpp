@@ -259,6 +259,12 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto input update runs immediate combined auto mode", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, false, true, true));
 	const std::string privet = "\xD0\xBF\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
 	const std::string p = "\xD0\xBF";
+	const std::string r = "\xD1\x80";
+	const std::string iLetter = "\xD0\xB8";
+	const std::string vLetter = "\xD0\xB2";
+	const std::string eLetter = "\xD0\xB5";
+	const std::string tLetter = "\xD1\x82";
+	const std::string upperK = "\xD0\x9A";
 	const std::string pr = "\xD0\xBF\xD1\x80";
 	const std::string pri = "\xD0\xBF\xD1\x80\xD0\xB8";
 	const std::string sourcePrLine = "| " + pr + " |";
@@ -281,6 +287,54 @@ int runPluginShortcutTests()
 	expectSize(failures, "auto input does not pad shortened utf8 wrapped segment",
 		MarkdownTablePluginTesting::preservedCellCaretColumnOffsetForTests(sourcePrLine, 0, caretAfterPr, wrappedPLine),
 		wrappedPLine.find(p) + p.size());
+	const std::vector<std::string> sourceNarrowPri =
+	{
+		"| text | other |",
+		"| --- | --- |",
+		"| " + p + " | tail |",
+		"| " + r + iLetter + " | |"
+	};
+	const std::vector<std::string> replacementNarrowPri =
+	{
+		"| text | other |",
+		"| --- | --- |",
+		"| " + p + " | tail |",
+		"| " + r + " | |",
+		"| " + iLetter + " | |"
+	};
+	const std::size_t caretAfterNarrowPri = sourceNarrowPri[3].find(r + iLetter) + r.size() + iLetter.size();
+	const MarkdownTablePluginTesting::CellCaretPreview narrowPriCaret =
+		MarkdownTablePluginTesting::preservedCellCaretPositionForTests(sourceNarrowPri, 3, 0, caretAfterNarrowPri, replacementNarrowPri);
+	expectSize(failures, "auto input follows utf8 caret across narrow continuation rows", narrowPriCaret.row, 4);
+	expectSize(failures, "auto input keeps utf8 caret after wrapped continuation letter", narrowPriCaret.columnOffset, replacementNarrowPri[4].find(iLetter) + iLetter.size());
+	const std::vector<std::string> sourceNarrowNextWord =
+	{
+		"| text | other |",
+		"| --- | --- |",
+		"| " + p + " | tail |",
+		"| " + r + " | |",
+		"| " + iLetter + " | |",
+		"| " + vLetter + " | |",
+		"| " + eLetter + " | |",
+		"| " + tLetter + " " + upperK + " | |"
+	};
+	const std::vector<std::string> replacementNarrowNextWord =
+	{
+		"| text | other |",
+		"| --- | --- |",
+		"| " + p + " | tail |",
+		"| " + r + " | |",
+		"| " + iLetter + " | |",
+		"| " + vLetter + " | |",
+		"| " + eLetter + " | |",
+		"| " + tLetter + " | |",
+		"| " + upperK + " | |"
+	};
+	const std::size_t caretAfterUpperK = sourceNarrowNextWord[7].find(upperK) + upperK.size();
+	const MarkdownTablePluginTesting::CellCaretPreview narrowNextWordCaret =
+		MarkdownTablePluginTesting::preservedCellCaretPositionForTests(sourceNarrowNextWord, 7, 0, caretAfterUpperK, replacementNarrowNextWord);
+	expectSize(failures, "auto input follows utf8 caret after narrow wrapped word boundary", narrowNextWordCaret.row, 8);
+	expectSize(failures, "auto input keeps utf8 caret after next narrow word letter", narrowNextWordCaret.columnOffset, replacementNarrowNextWord[8].find(upperK) + upperK.size());
 	expectTrue(failures, "auto align toggle runs initial align before enabling", MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(false));
 	expectTrue(failures, "auto align toggle does not run initial align when disabling", !MarkdownTablePluginTesting::shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(true));
 	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);

@@ -75,9 +75,24 @@ struct CellCaretSnapshot
 {
 	bool valid = false;
 	std::size_t row = 0;
+	std::size_t logicalRow = 0;
 	std::size_t column = 0;
 	std::size_t offset = 0;
 	std::string prefix;
+};
+
+struct CellCaretPosition
+{
+	bool found = false;
+	std::size_t row = 0;
+	std::size_t columnOffset = 0;
+};
+
+struct LogicalRowMap
+{
+	std::size_t columns = 0;
+	std::vector<std::size_t> baseRowForRow;
+	std::vector<std::size_t> logicalRowForRow;
 };
 
 const int tableSizeColumnsId = 1001;
@@ -216,7 +231,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Auto fit table (MD)", L"Auto align table (MD)" }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", L"Fit table to window", L"Notepad++ word wrap (MD)", L"Auto fit table (MD)", L"Auto align table (MD)" }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -723,7 +738,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u7F16\u8F91\u540E\u81EA\u52A8\u5BF9\u9F50\uFF08\u4E0D\u6539\u53D8\u5BBD\u5EA6\uFF09";
 		case wrapLongCellsCommandIndex: return L"\u5C06\u8868\u683C\u5BBD\u5EA6\u9002\u5E94\u7A97\u53E3";
 		case autoFitTableCommandIndex: return L"\u81EA\u52A8\u5C06\u8868\u683C\u5BBD\u5EA6\u9002\u5E94\u7A97\u53E3";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u81EA\u52A8\u6362\u884C (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Hindi:
@@ -733,7 +747,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0938\u0902\u092A\u093E\u0926\u0928 \u0915\u0947 \u092C\u093E\u0926 \u0938\u094D\u0935\u0924\u0903 \u0938\u0902\u0930\u0947\u0916\u093F\u0924 \u0915\u0930\u0947\u0902 (\u091A\u094C\u0921\u093C\u093E\u0908 \u0928 \u092C\u0926\u0932\u0947\u0902)";
 		case wrapLongCellsCommandIndex: return L"\u0924\u093E\u0932\u093F\u0915\u093E \u0915\u0940 \u091A\u094C\u0921\u093C\u093E\u0908 \u0915\u094B \u0935\u093F\u0902\u0921\u094B \u092E\u0947\u0902 \u092B\u093F\u091F \u0915\u0930\u0947\u0902";
 		case autoFitTableCommandIndex: return L"\u0924\u093E\u0932\u093F\u0915\u093E \u0915\u0940 \u091A\u094C\u0921\u093C\u093E\u0908 \u0915\u094B \u0935\u093F\u0902\u0921\u094B \u092E\u0947\u0902 \u0938\u094D\u0935\u0924\u0903 \u092B\u093F\u091F \u0915\u0930\u0947\u0902";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u0935\u0930\u094D\u0921 \u0930\u0948\u092A (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Spanish:
@@ -743,7 +756,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Alinear automaticamente tras editar (sin cambiar ancho)";
 		case wrapLongCellsCommandIndex: return L"Ajustar ancho de tabla a ventana";
 		case autoFitTableCommandIndex: return L"Ajustar automaticamente ancho de tabla a ventana";
-		case notepadWordWrapCommandIndex: return L"Ajuste visual de linea Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Arabic:
@@ -753,7 +765,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0645\u062D\u0627\u0630\u0627\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629 \u0628\u0639\u062F \u0627\u0644\u062A\u062D\u0631\u064A\u0631 (\u0628\u062F\u0648\u0646 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0639\u0631\u0636)";
 		case wrapLongCellsCommandIndex: return L"\u0645\u0644\u0627\u0621\u0645\u0629 \u0639\u0631\u0636 \u0627\u0644\u062C\u062F\u0648\u0644 \u0644\u0644\u0646\u0627\u0641\u0630\u0629";
 		case autoFitTableCommandIndex: return L"\u0645\u0644\u0627\u0621\u0645\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u062C\u062F\u0648\u0644 \u0644\u0644\u0646\u0627\u0641\u0630\u0629";
-		case notepadWordWrapCommandIndex: return L"\u0627\u0644\u062A\u0641\u0627\u0641 \u0623\u0633\u0637\u0631 Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::French:
@@ -763,7 +774,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Alignement auto apres modification (sans changer la largeur)";
 		case wrapLongCellsCommandIndex: return L"Ajuster la largeur du tableau a la fenetre";
 		case autoFitTableCommandIndex: return L"Ajustement auto de la largeur du tableau a la fenetre";
-		case notepadWordWrapCommandIndex: return L"Renvoi a la ligne Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Bengali:
@@ -773,7 +783,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u09B8\u09AE\u09CD\u09AA\u09BE\u09A6\u09A8\u09BE\u09B0 \u09AA\u09B0\u09C7 \u09B8\u09CD\u09AC\u09AF\u09BC\u0982\u0995\u09CD\u09B0\u09BF\u09AF\u09BC \u09B8\u09BE\u09B0\u09BF\u09AC\u09A6\u09CD\u09A7\u0995\u09B0\u09A3 (\u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u09A8\u09BE \u09AC\u09A6\u09B2\u09C7)";
 		case wrapLongCellsCommandIndex: return L"\u099F\u09C7\u09AC\u09BF\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u0989\u0987\u09A8\u09CD\u09A1\u09CB\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09AE\u09BE\u09A8\u09BE\u09A8\u09B8\u0987 \u0995\u09B0\u09C1\u09A8";
 		case autoFitTableCommandIndex: return L"\u099F\u09C7\u09AC\u09BF\u09B2\u09C7\u09B0 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A5 \u0989\u0987\u09A8\u09CD\u09A1\u09CB\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09B8\u09CD\u09AC\u09AF\u09BC\u0982\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09AD\u09BE\u09AC\u09C7 \u09AE\u09BE\u09A8\u09BE\u09A8\u09B8\u0987 \u0995\u09B0\u09C1\u09A8";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u09B6\u09AC\u09CD\u09A6 \u09AE\u09CB\u09A1\u09BC\u09BE\u09A8\u09CB (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Portuguese:
@@ -783,7 +792,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Alinhar automaticamente apos edicao (sem alterar largura)";
 		case wrapLongCellsCommandIndex: return L"Ajustar largura da tabela a janela";
 		case autoFitTableCommandIndex: return L"Ajustar automaticamente largura da tabela a janela";
-		case notepadWordWrapCommandIndex: return L"Quebra visual do Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Russian:
@@ -793,7 +801,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)";
 		case wrapLongCellsCommandIndex: return L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0448\u0438\u0440\u0438\u043D\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
 		case autoFitTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
-		case notepadWordWrapCommandIndex: return L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Indonesian:
@@ -803,7 +810,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Ratakan otomatis setelah edit (tanpa mengubah lebar)";
 		case wrapLongCellsCommandIndex: return L"Sesuaikan lebar tabel ke jendela";
 		case autoFitTableCommandIndex: return L"Sesuaikan otomatis lebar tabel ke jendela";
-		case notepadWordWrapCommandIndex: return L"Bungkus baris Notepad++ (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Urdu:
@@ -813,7 +819,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u062A\u0631\u0645\u06CC\u0645 \u06A9\u06D2 \u0628\u0639\u062F \u062E\u0648\u062F\u06A9\u0627\u0631 \u0633\u06CC\u062F\u06BE (\u0686\u0648\u0691\u0627\u0626\u06CC \u0628\u062F\u0644\u06D2 \u0628\u063A\u06CC\u0631)";
 		case wrapLongCellsCommandIndex: return L"\u062C\u062F\u0648\u0644 \u06A9\u06CC \u0686\u0648\u0691\u0627\u0626\u06CC \u0648\u0646\u0688\u0648 \u06A9\u06D2 \u0645\u0637\u0627\u0628\u0642 \u06A9\u0631\u06CC\u06BA";
 		case autoFitTableCommandIndex: return L"\u062C\u062F\u0648\u0644 \u06A9\u06CC \u0686\u0648\u0691\u0627\u0626\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0637\u0648\u0631 \u067E\u0631 \u0648\u0646\u0688\u0648 \u06A9\u06D2 \u0645\u0637\u0627\u0628\u0642 \u06A9\u0631\u06CC\u06BA";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u0644\u0641\u0638\u06CC \u0644\u067E\u06CC\u0679 (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::German:
@@ -823,7 +828,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Nach Bearbeitung automatisch ausrichten (Breite unveraendert)";
 		case wrapLongCellsCommandIndex: return L"Tabellenbreite ans Fenster anpassen";
 		case autoFitTableCommandIndex: return L"Tabellenbreite automatisch ans Fenster anpassen";
-		case notepadWordWrapCommandIndex: return L"Notepad++ Zeilenumbruch (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Japanese:
@@ -833,7 +837,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u7DE8\u96C6\u5F8C\u306B\u81EA\u52D5\u6574\u5217\uFF08\u5E45\u3092\u5909\u66F4\u3057\u306A\u3044\uFF09";
 		case wrapLongCellsCommandIndex: return L"\u30C6\u30FC\u30D6\u30EB\u5E45\u3092\u30A6\u30A3\u30F3\u30C9\u30A6\u306B\u5408\u308F\u305B\u308B";
 		case autoFitTableCommandIndex: return L"\u30C6\u30FC\u30D6\u30EB\u5E45\u3092\u30A6\u30A3\u30F3\u30C9\u30A6\u306B\u81EA\u52D5\u8ABF\u6574";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u6298\u308A\u8FD4\u3057 (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::NigerianPidgin:
@@ -843,7 +846,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Auto arrange after edit (no change width)";
 		case wrapLongCellsCommandIndex: return L"Fit table width to window";
 		case autoFitTableCommandIndex: return L"Auto fit table width to window";
-		case notepadWordWrapCommandIndex: return L"Notepad++ word wrap (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Marathi:
@@ -853,7 +855,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0938\u0902\u092A\u093E\u0926\u0928\u093E\u0928\u0902\u0924\u0930 \u0938\u094D\u0935\u092F\u0902\u091A\u0932\u093F\u0924 \u0938\u0902\u0930\u0947\u0916\u0928 (\u0930\u0941\u0902\u0926\u0940 \u0928 \u092C\u0926\u0932\u0924\u093E)";
 		case wrapLongCellsCommandIndex: return L"\u0924\u0915\u094D\u0924\u094D\u092F\u093E\u091A\u0940 \u0930\u0941\u0902\u0926\u0940 \u0935\u093F\u0902\u0921\u094B\u0932\u093E \u092C\u0938\u0935\u093E";
 		case autoFitTableCommandIndex: return L"\u0924\u0915\u094D\u0924\u094D\u092F\u093E\u091A\u0940 \u0930\u0941\u0902\u0926\u0940 \u0935\u093F\u0902\u0921\u094B\u0932\u093E \u0906\u092A\u094B\u0906\u092A \u092C\u0938\u0935\u093E";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u0936\u092C\u094D\u0926 \u0917\u0941\u0902\u0921\u093E\u0933\u0923\u0940 (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Telugu:
@@ -863,7 +864,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0C38\u0C35\u0C30\u0C23 \u0C24\u0C30\u0C4D\u0C35\u0C3E\u0C24 \u0C38\u0C4D\u0C35\u0C2F\u0C02\u0C1A\u0C3E\u0C32\u0C15 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41 (\u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41 \u0C2E\u0C3E\u0C30\u0C4D\u0C1A\u0C15\u0C41\u0C02\u0C21\u0C3E)";
 		case wrapLongCellsCommandIndex: return L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15 \u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41\u0C28\u0C41 \u0C35\u0C3F\u0C02\u0C21\u0C4B\u0C15\u0C41 \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41";
 		case autoFitTableCommandIndex: return L"\u0C2A\u0C1F\u0C4D\u0C1F\u0C3F\u0C15 \u0C35\u0C46\u0C21\u0C32\u0C4D\u0C2A\u0C41\u0C28\u0C41 \u0C35\u0C3F\u0C02\u0C21\u0C4B\u0C15\u0C41 \u0C38\u0C4D\u0C35\u0C2F\u0C02\u0C1A\u0C3E\u0C32\u0C15\u0C02\u0C17\u0C3E \u0C38\u0C30\u0C3F\u0C2A\u0C30\u0C1A\u0C41";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u0C2A\u0C26 \u0C2E\u0C21\u0C24 (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Turkish:
@@ -873,7 +873,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Duzenlemeden sonra otomatik hizala (genisligi degistirme)";
 		case wrapLongCellsCommandIndex: return L"Tablo genisligini pencereye sigdir";
 		case autoFitTableCommandIndex: return L"Tablo genisligini pencereye otomatik sigdir";
-		case notepadWordWrapCommandIndex: return L"Notepad++ satir kaydirma (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Tamil:
@@ -883,7 +882,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0BA4\u0BBF\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1\u0BAA\u0BCD \u0BAA\u0BBF\u0BB1\u0B95\u0BC1 \u0BA4\u0BBE\u0BA9\u0BBE\u0B95 \u0B92\u0BB4\u0BC1\u0B99\u0BCD\u0B95\u0BC1\u0BAA\u0B9F\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1 (\u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0BAE\u0BBE\u0BB1\u0BCD\u0BB1\u0BBE\u0BAE\u0BB2\u0BCD)";
 		case wrapLongCellsCommandIndex: return L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8 \u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0B9A\u0BBE\u0BB3\u0BB0\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1 \u0BAA\u0BCA\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1";
 		case autoFitTableCommandIndex: return L"\u0B85\u0B9F\u0BCD\u0B9F\u0BB5\u0BA3\u0BC8 \u0B85\u0B95\u0BB2\u0BA4\u0BCD\u0BA4\u0BC8 \u0B9A\u0BBE\u0BB3\u0BB0\u0BA4\u0BCD\u0BA4\u0BBF\u0BB1\u0BCD\u0B95\u0BC1 \u0BA4\u0BBE\u0BA9\u0BBE\u0B95 \u0BAA\u0BCA\u0BB0\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u0B9A\u0BCA\u0BB2\u0BCD \u0BAE\u0B9F\u0B95\u0BCD\u0B95\u0BC1 (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::YueChinese:
@@ -893,7 +891,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u7DE8\u8F2F\u5F8C\u81EA\u52D5\u5C0D\u9F4A\uFF08\u4E0D\u6539\u8B8A\u95CA\u5EA6\uFF09";
 		case wrapLongCellsCommandIndex: return L"\u5C07\u8868\u683C\u95CA\u5EA6\u914D\u5408\u8996\u7A97";
 		case autoFitTableCommandIndex: return L"\u81EA\u52D5\u5C07\u8868\u683C\u95CA\u5EA6\u914D\u5408\u8996\u7A97";
-		case notepadWordWrapCommandIndex: return L"Notepad++ \u81EA\u52D5\u63DB\u884C (MD)";
 		default: return NULL;
 		}
 	case UiLanguage::Vietnamese:
@@ -903,7 +900,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"T\u1EF1 \u0111\u1ED9ng c\u0103n ch\u1EC9nh sau khi s\u1EEDa (kh\u00F4ng \u0111\u1ED5i chi\u1EC1u r\u1ED9ng)";
 		case wrapLongCellsCommandIndex: return L"V\u1EEBa chi\u1EC1u r\u1ED9ng b\u1EA3ng v\u1EDBi c\u1EEDa s\u1ED5";
 		case autoFitTableCommandIndex: return L"T\u1EF1 \u0111\u1ED9ng v\u1EEBa chi\u1EC1u r\u1ED9ng b\u1EA3ng v\u1EDBi c\u1EEDa s\u1ED5";
-		case notepadWordWrapCommandIndex: return L"T\u1EF1 ng\u1EAFt d\u00F2ng Notepad++ (MD)";
 		default: return NULL;
 		}
 	default:
@@ -913,7 +909,6 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Auto align after edit (no width change)";
 		case wrapLongCellsCommandIndex: return L"Fit table width to window";
 		case autoFitTableCommandIndex: return L"Auto fit table width to window";
-		case notepadWordWrapCommandIndex: return L"Notepad++ word wrap (MD)";
 		default: return NULL;
 		}
 	}
@@ -938,6 +933,7 @@ std::size_t legacyCommandIndex(std::size_t index)
 	case convertCsvTsvCommandIndex: return 13;
 	case insertTableCommandIndex: return 14;
 	case tabCommandIndex: return 15;
+	case notepadWordWrapCommandIndex: return 17;
 	default: return static_cast<std::size_t>(-1);
 	}
 }
@@ -954,6 +950,46 @@ const wchar_t *commandText(std::size_t index)
 	if (legacy < static_cast<std::size_t>(nbFunc) && localized.commands[legacy])
 		return localized.commands[legacy];
 	return englishUiText.commands[legacy];
+}
+
+const wchar_t *commandShortcutText(std::size_t index)
+{
+	switch (index)
+	{
+	case alignCommandIndex: return L"Ctrl+Alt+Shift+1";
+	case autoAlignTableCommandIndex: return L"Ctrl+Alt+Shift+A";
+	case wrapLongCellsCommandIndex: return L"Ctrl+Alt+Shift+W";
+	case autoFitTableCommandIndex: return L"Ctrl+Alt+Shift+F";
+	case nextCellCommandIndex: return L"Ctrl+Alt+Shift+2";
+	case previousCellCommandIndex: return L"Ctrl+Alt+Shift+3";
+	case insertRowCommandIndex: return L"Ctrl+Alt+Shift+4";
+	case deleteRowCommandIndex: return L"Ctrl+Alt+Shift+5";
+	case insertColumnCommandIndex: return L"Ctrl+Alt+Shift+6";
+	case deleteColumnCommandIndex: return L"Ctrl+Alt+Shift+7";
+	case moveRowUpCommandIndex: return L"Ctrl+Alt+Shift+8";
+	case moveRowDownCommandIndex: return L"Ctrl+Alt+Shift+9";
+	case moveColumnLeftCommandIndex: return L"Ctrl+Alt+Shift+[";
+	case moveColumnRightCommandIndex: return L"Ctrl+Alt+Shift+]";
+	case sortRowsAscendingCommandIndex: return L"Ctrl+Alt+Shift+=";
+	case sortRowsDescendingCommandIndex: return L"Ctrl+Alt+Shift+-";
+	case convertCsvTsvCommandIndex: return L"Ctrl+Alt+Shift+0";
+	case insertTableCommandIndex: return L"Ctrl+Alt+Shift+\\";
+	default: return NULL;
+	}
+}
+
+const wchar_t *commandMenuText(std::size_t index)
+{
+	const wchar_t *text = commandText(index);
+	const wchar_t *shortcut = commandShortcutText(index);
+	if (!shortcut || !*shortcut || index >= static_cast<std::size_t>(nbFunc))
+		return text;
+
+	static std::wstring menuText[nbFunc];
+	menuText[index] = text;
+	menuText[index] += L"\t";
+	menuText[index] += shortcut;
+	return menuText[index].c_str();
 }
 
 std::string toLowerAscii(std::string value)
@@ -1274,7 +1310,7 @@ void updateNotepadPluginMenu()
 	for (int index = 0; index < nbFunc; ++index)
 	{
 		if (funcItem[index]._cmdID != 0)
-			updateCommandMenuItem(pluginsMenu, static_cast<UINT>(funcItem[index]._cmdID), commandText(static_cast<std::size_t>(index)));
+			updateCommandMenuItem(pluginsMenu, static_cast<UINT>(funcItem[index]._cmdID), commandMenuText(static_cast<std::size_t>(index)));
 	}
 	ensurePluginCommandSeparator(pluginsMenu);
 	::DrawMenuBar(nppData._nppHandle);
@@ -1380,13 +1416,15 @@ void drawAutoWrapArrow(std::uint32_t *pixels, std::uint32_t accent)
 void drawAlignRows(std::uint32_t *pixels, std::uint32_t accent)
 {
 	drawIconHorizontalLine(pixels, 3, 12, 9, accent);
-	drawIconHorizontalLine(pixels, 3, 12, 11, accent);
+	drawIconHorizontalLine(pixels, 3, 12, 10, accent);
+	drawIconHorizontalLine(pixels, 3, 12, 12, accent);
 	drawIconHorizontalLine(pixels, 3, 12, 13, accent);
 }
 
 void drawFitWidthArrows(std::uint32_t *pixels, std::uint32_t accent)
 {
 	drawIconHorizontalLine(pixels, 4, 11, 4, accent);
+	drawIconHorizontalLine(pixels, 4, 11, 5, accent);
 	drawIconVerticalLine(pixels, 2, 3, 5, accent);
 	drawIconVerticalLine(pixels, 13, 3, 5, accent);
 	setIconPixel(pixels, 3, 4, accent);
@@ -1409,11 +1447,11 @@ void drawAutoCorner(std::uint32_t *pixels, std::uint32_t accent)
 
 void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
 {
-	const std::uint32_t grid = darkMode ? argb(255, 232, 238, 246) : argb(255, 35, 48, 61);
-	const std::uint32_t muted = darkMode ? argb(255, 142, 157, 174) : argb(255, 130, 145, 160);
+	const std::uint32_t grid = darkMode ? argb(255, 248, 250, 252) : argb(255, 12, 18, 28);
+	const std::uint32_t muted = darkMode ? argb(255, 190, 202, 216) : argb(255, 74, 85, 104);
 	const std::uint32_t tabAccent = darkMode ? argb(255, 107, 203, 255) : argb(255, 0, 120, 215);
-	const std::uint32_t fitAccent = darkMode ? argb(255, 93, 224, 164) : argb(255, 20, 145, 82);
-	const std::uint32_t alignAccent = darkMode ? argb(255, 155, 213, 255) : argb(255, 46, 105, 180);
+	const std::uint32_t fitAccent = darkMode ? argb(255, 72, 255, 160) : argb(255, 0, 174, 85);
+	const std::uint32_t alignAccent = darkMode ? argb(255, 93, 190, 255) : argb(255, 0, 102, 255);
 	const std::uint32_t autoAccent = darkMode ? argb(255, 255, 213, 102) : argb(255, 212, 145, 0);
 	const std::uint32_t editorAccent = darkMode ? argb(255, 255, 191, 105) : argb(255, 196, 112, 0);
 
@@ -1522,14 +1560,14 @@ void destroyToolbarIconHandles(HBITMAP &bitmap, HICON &icon, HICON &darkModeIcon
 	}
 }
 
-bool ensureTabToolbarIconHandles()
-{
-	return ensureToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode, ToolbarIconKind::TabAction);
-}
-
 bool ensureAlignToolbarIconHandles()
 {
 	return ensureToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode, ToolbarIconKind::TableAlign);
+}
+
+bool ensureTabToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode, ToolbarIconKind::TabAction);
 }
 
 bool ensureWrapLongCellsToolbarIconHandles()
@@ -1560,14 +1598,14 @@ bool ensureAutoAlignTableToolbarIconHandles()
 		ToolbarIconKind::TableAutoAlign);
 }
 
-void destroyTabToolbarIconHandles()
-{
-	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
-}
-
 void destroyAlignToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
+}
+
+void destroyTabToolbarIconHandles()
+{
+	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
 }
 
 void destroyWrapLongCellsToolbarIconHandles()
@@ -2137,6 +2175,214 @@ bool escapedAt(const std::string &line, std::size_t index)
 	return (backslashes % 2) == 1;
 }
 
+std::string trimMarkdownSpaces(const std::string &text)
+{
+	std::size_t first = 0;
+	while (first < text.size() && markdownSpace(text[first]))
+		++first;
+
+	std::size_t last = text.size();
+	while (last > first && markdownSpace(text[last - 1]))
+		--last;
+
+	return text.substr(first, last - first);
+}
+
+std::string trimLeadingMarkdownSpaces(const std::string &text)
+{
+	std::size_t first = 0;
+	while (first < text.size() && markdownSpace(text[first]))
+		++first;
+	return text.substr(first);
+}
+
+std::string withoutMarkdownSpaces(const std::string &text)
+{
+	std::string compact;
+	compact.reserve(text.size());
+	for (std::size_t i = 0; i < text.size(); ++i)
+	{
+		if (!markdownSpace(text[i]))
+			compact.push_back(text[i]);
+	}
+	return compact;
+}
+
+std::size_t trailingMarkdownSpaceCount(const std::string &text)
+{
+	std::size_t count = 0;
+	for (std::size_t i = text.size(); i > 0 && markdownSpace(text[i - 1]); --i)
+		++count;
+	return count;
+}
+
+std::string withoutTrailingMarkdownSpaces(const std::string &text)
+{
+	const std::size_t trailing = trailingMarkdownSpaceCount(text);
+	return trailing == 0 ? text : text.substr(0, text.size() - trailing);
+}
+
+std::size_t nextUtf8ByteOffset(const std::string &text, std::size_t offset)
+{
+	if (offset >= text.size())
+		return text.size();
+
+	const unsigned char ch = static_cast<unsigned char>(text[offset]);
+	std::size_t width = 1;
+	if ((ch & 0x80) == 0)
+		width = 1;
+	else if ((ch & 0xE0) == 0xC0)
+		width = 2;
+	else if ((ch & 0xF0) == 0xE0)
+		width = 3;
+	else if ((ch & 0xF8) == 0xF0)
+		width = 4;
+
+	if (offset + width > text.size())
+		return text.size();
+	return offset + width;
+}
+
+std::size_t originalOffsetForCompactPrefix(const std::string &text, std::size_t compactBytes)
+{
+	std::size_t offset = 0;
+	std::size_t seen = 0;
+	while (offset < text.size() && seen < compactBytes)
+	{
+		if (markdownSpace(text[offset]))
+		{
+			++offset;
+			continue;
+		}
+
+		const std::size_t next = nextUtf8ByteOffset(text, offset);
+		seen += next - offset;
+		offset = next;
+	}
+	return offset;
+}
+
+std::size_t simpleDisplayWidth(const std::string &text)
+{
+	std::size_t width = 0;
+	for (std::size_t offset = 0; offset < text.size(); offset = nextUtf8ByteOffset(text, offset))
+		++width;
+	return width;
+}
+
+bool isPluginSeparatorCell(const std::string &cell)
+{
+	const std::string value = trimMarkdownSpaces(cell);
+	bool hasDash = false;
+	for (std::size_t i = 0; i < value.size(); ++i)
+	{
+		if (value[i] == '-')
+			hasDash = true;
+		else if (value[i] != ':')
+			return false;
+	}
+	return hasDash;
+}
+
+bool isPluginSeparatorRow(const std::vector<std::string> &cells)
+{
+	if (cells.empty())
+		return false;
+	for (std::size_t i = 0; i < cells.size(); ++i)
+	{
+		if (!isPluginSeparatorCell(cells[i]))
+			return false;
+	}
+	return true;
+}
+
+bool pluginCellHasText(const std::string &cell)
+{
+	return !trimMarkdownSpaces(cell).empty();
+}
+
+std::size_t pluginNonEmptyCellCount(const std::vector<std::string> &cells)
+{
+	std::size_t count = 0;
+	for (std::size_t i = 0; i < cells.size(); ++i)
+	{
+		if (pluginCellHasText(cells[i]))
+			++count;
+	}
+	return count;
+}
+
+bool isPluginAsciiAlphaNumeric(unsigned char ch)
+{
+	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+}
+
+bool isPluginWordContinuationStart(const std::string &value)
+{
+	if (value.empty())
+		return false;
+	const unsigned char ch = static_cast<unsigned char>(value[0]);
+	return isPluginAsciiAlphaNumeric(ch) || ch == '_' || ch >= 0x80;
+}
+
+bool isPluginWordContinuationEnd(const std::string &value)
+{
+	const std::string trimmed = trimMarkdownSpaces(value);
+	if (trimmed.empty())
+		return false;
+	const unsigned char ch = static_cast<unsigned char>(trimmed[trimmed.size() - 1]);
+	return isPluginAsciiAlphaNumeric(ch) || ch == '_' || ch == '-' || ch >= 0x80;
+}
+
+std::string pluginFirstToken(const std::string &value)
+{
+	std::size_t end = 0;
+	while (end < value.size() && !markdownSpace(value[end]))
+		end = nextUtf8ByteOffset(value, end);
+	return value.substr(0, end);
+}
+
+bool pluginLooksLikeSplitWordRemainder(const std::string &token)
+{
+	if (token.empty())
+		return false;
+
+	const std::size_t width = simpleDisplayWidth(token);
+	const unsigned char first = static_cast<unsigned char>(token[0]);
+	if (first >= 0x80)
+		return width <= 4;
+	return width <= 2;
+}
+
+bool shouldJoinPluginContinuationWithoutSpace(const std::string &target, const std::string &continuation)
+{
+	const std::string targetValue = trimMarkdownSpaces(target);
+	const std::string continuationValue = trimMarkdownSpaces(continuation);
+	if (targetValue.empty() || continuationValue.empty())
+		return false;
+	if (!isPluginWordContinuationEnd(targetValue) || !isPluginWordContinuationStart(continuationValue))
+		return false;
+
+	const unsigned char targetEnd = static_cast<unsigned char>(targetValue[targetValue.size() - 1]);
+	const unsigned char continuationStart = static_cast<unsigned char>(continuationValue[0]);
+	if (targetEnd == '-' && (isPluginAsciiAlphaNumeric(continuationStart) || continuationStart >= 0x80))
+		return true;
+
+	return pluginLooksLikeSplitWordRemainder(pluginFirstToken(continuationValue));
+}
+
+void appendPluginContinuationCell(std::string &target, const std::string &continuation, bool preserveTrailingSpaces)
+{
+	const std::string value = preserveTrailingSpaces
+		? trimLeadingMarkdownSpaces(continuation)
+		: trimMarkdownSpaces(continuation);
+	if (value.empty())
+		return;
+	if (!trimMarkdownSpaces(target).empty() && !shouldJoinPluginContinuationWithoutSpace(target, value))
+		target += " ";
+	target += value;
+}
+
 CellBounds cellBoundsForColumn(const std::string &line, std::size_t column)
 {
 	CellBounds bounds;
@@ -2186,6 +2432,129 @@ CellBounds cellBoundsForColumn(const std::string &line, std::size_t column)
 	return bounds;
 }
 
+std::string fullCellValueForColumn(const std::string &line, std::size_t column)
+{
+	const CellBounds bounds = cellBoundsForColumn(line, column);
+	if (!bounds.found)
+		return std::string();
+	return line.substr(bounds.contentStart, bounds.contentEnd - bounds.contentStart);
+}
+
+std::string cellPrefixForColumn(const std::string &line, std::size_t column, std::size_t byteColumn)
+{
+	const CellBounds bounds = cellBoundsForColumn(line, column);
+	if (!bounds.found)
+		return std::string();
+
+	const std::size_t clampedColumn = (std::min)(byteColumn, line.size());
+	if (clampedColumn <= bounds.contentStart)
+		return std::string();
+
+	return line.substr(bounds.contentStart, (std::min)(clampedColumn, bounds.cellEnd) - bounds.contentStart);
+}
+
+std::size_t tableColumnCount(const std::vector<std::string> &lines)
+{
+	std::size_t columns = 0;
+	for (std::size_t row = 0; row < lines.size(); ++row)
+	{
+		for (std::size_t column = 0;; ++column)
+		{
+			if (!cellBoundsForColumn(lines[row], column).found)
+				break;
+			columns = (std::max)(columns, column + 1);
+		}
+	}
+	return columns;
+}
+
+std::vector<std::string> rowCellsForColumns(const std::string &line, std::size_t columns)
+{
+	std::vector<std::string> cells;
+	cells.reserve(columns);
+	for (std::size_t column = 0; column < columns; ++column)
+		cells.push_back(fullCellValueForColumn(line, column));
+	return cells;
+}
+
+bool isLikelyPluginContinuationRow(const std::vector<std::string> &row, const std::vector<std::string> &baseRow, std::size_t columns)
+{
+	if (columns < 2 || row.size() < columns || baseRow.size() < columns)
+		return false;
+
+	const std::size_t nonEmpty = pluginNonEmptyCellCount(row);
+	if (nonEmpty == 0 || nonEmpty == columns)
+		return false;
+
+	std::size_t emptyWhereBaseHasText = 0;
+	for (std::size_t column = 0; column < columns; ++column)
+	{
+		if (!pluginCellHasText(row[column]) && pluginCellHasText(baseRow[column]))
+			++emptyWhereBaseHasText;
+	}
+
+	const std::size_t requiredAnchors = (std::max)(static_cast<std::size_t>(1), columns / 3);
+	return emptyWhereBaseHasText >= requiredAnchors;
+}
+
+void appendPluginContinuationCells(std::vector<std::string> &target, const std::vector<std::string> &continuation, std::size_t columns)
+{
+	if (target.size() < columns)
+		target.resize(columns);
+
+	for (std::size_t column = 0; column < columns && column < continuation.size(); ++column)
+		appendPluginContinuationCell(target[column], continuation[column], false);
+}
+
+LogicalRowMap buildLogicalRowMap(const std::vector<std::string> &lines)
+{
+	LogicalRowMap map;
+	map.columns = tableColumnCount(lines);
+	map.baseRowForRow.assign(lines.size(), static_cast<std::size_t>(-1));
+	map.logicalRowForRow.assign(lines.size(), static_cast<std::size_t>(-1));
+	if (map.columns == 0)
+		return map;
+
+	std::size_t separatorRow = static_cast<std::size_t>(-1);
+	std::vector<std::vector<std::string>> cellsByRow;
+	cellsByRow.reserve(lines.size());
+	for (std::size_t row = 0; row < lines.size(); ++row)
+	{
+		cellsByRow.push_back(rowCellsForColumns(lines[row], map.columns));
+		if (separatorRow == static_cast<std::size_t>(-1) && isPluginSeparatorRow(cellsByRow.back()))
+			separatorRow = row;
+	}
+
+	std::size_t baseRow = static_cast<std::size_t>(-1);
+	std::size_t baseLogicalRow = static_cast<std::size_t>(-1);
+	std::size_t nextLogicalRow = 0;
+	std::vector<std::string> baseCells;
+	for (std::size_t row = 0; row < lines.size(); ++row)
+	{
+		const bool separator = row == separatorRow;
+		const bool canBeContinuation = separatorRow != static_cast<std::size_t>(-1)
+			&& row > separatorRow
+			&& baseRow != static_cast<std::size_t>(-1)
+			&& !separator;
+		const bool continuation = canBeContinuation && isLikelyPluginContinuationRow(cellsByRow[row], baseCells, map.columns);
+		if (continuation)
+		{
+			map.baseRowForRow[row] = baseRow;
+			map.logicalRowForRow[row] = baseLogicalRow;
+			appendPluginContinuationCells(baseCells, cellsByRow[row], map.columns);
+			continue;
+		}
+
+		baseRow = row;
+		baseLogicalRow = nextLogicalRow++;
+		baseCells = cellsByRow[row];
+		map.baseRowForRow[row] = baseRow;
+		map.logicalRowForRow[row] = baseLogicalRow;
+	}
+
+	return map;
+}
+
 CellCaretSnapshot captureCellCaret(const std::string &line, std::size_t row, std::size_t column, std::size_t byteColumn)
 {
 	CellCaretSnapshot snapshot;
@@ -2206,22 +2575,186 @@ CellCaretSnapshot captureCellCaret(const std::string &line, std::size_t row, std
 	return snapshot;
 }
 
+CellCaretSnapshot captureLogicalCellCaret(const std::vector<std::string> &lines, std::size_t row, std::size_t column, std::size_t byteColumn)
+{
+	if (row >= lines.size())
+		return CellCaretSnapshot();
+
+	CellCaretSnapshot snapshot = captureCellCaret(lines[row], row, column, byteColumn);
+	if (!snapshot.valid)
+		return snapshot;
+
+	const LogicalRowMap map = buildLogicalRowMap(lines);
+	if (row >= map.baseRowForRow.size() || map.baseRowForRow[row] == static_cast<std::size_t>(-1))
+		return snapshot;
+
+	const std::size_t baseRow = map.baseRowForRow[row];
+	snapshot.logicalRow = map.logicalRowForRow[row];
+	snapshot.prefix.clear();
+	for (std::size_t physicalRow = baseRow; physicalRow <= row && physicalRow < lines.size(); ++physicalRow)
+	{
+		if (map.baseRowForRow[physicalRow] != baseRow)
+			continue;
+		const bool current = physicalRow == row;
+		const std::string fragment = current
+			? cellPrefixForColumn(lines[physicalRow], column, byteColumn)
+			: fullCellValueForColumn(lines[physicalRow], column);
+		appendPluginContinuationCell(snapshot.prefix, fragment, current);
+	}
+	snapshot.offset = snapshot.prefix.size();
+	return snapshot;
+}
+
+CellCaretPosition cellCaretPositionInLines(const std::vector<std::string> &lines, const CellCaretSnapshot &snapshot)
+{
+	CellCaretPosition position;
+	if (!snapshot.valid || lines.empty())
+		return position;
+
+	const std::size_t trailingSpaces = trailingMarkdownSpaceCount(snapshot.prefix);
+	if (trailingSpaces > 0)
+	{
+		CellCaretSnapshot visibleSnapshot = snapshot;
+		visibleSnapshot.prefix = withoutTrailingMarkdownSpaces(snapshot.prefix);
+		visibleSnapshot.offset = visibleSnapshot.prefix.size();
+		position = cellCaretPositionInLines(lines, visibleSnapshot);
+		if (position.found && position.row < lines.size())
+		{
+			const CellBounds bounds = cellBoundsForColumn(lines[position.row], snapshot.column);
+			if (bounds.found)
+				position.columnOffset = (std::min)(position.columnOffset + trailingSpaces, bounds.cellEnd);
+		}
+		return position;
+	}
+
+	const LogicalRowMap map = buildLogicalRowMap(lines);
+	if (map.logicalRowForRow.empty())
+		return position;
+
+	std::size_t baseRow = static_cast<std::size_t>(-1);
+	for (std::size_t row = 0; row < map.logicalRowForRow.size(); ++row)
+	{
+		if (map.logicalRowForRow[row] == snapshot.logicalRow && map.baseRowForRow[row] == row)
+		{
+			baseRow = row;
+			break;
+		}
+	}
+
+	if (baseRow == static_cast<std::size_t>(-1))
+	{
+		if (snapshot.row >= lines.size())
+			return position;
+		baseRow = snapshot.row;
+	}
+
+	std::string logicalPrefix;
+	for (std::size_t row = baseRow; row < lines.size(); ++row)
+	{
+		if (row >= map.baseRowForRow.size() || map.baseRowForRow[row] != baseRow)
+			break;
+
+		const std::string value = fullCellValueForColumn(lines[row], snapshot.column);
+		if (value.empty())
+			continue;
+
+		const bool joinWithoutSpace = trimMarkdownSpaces(logicalPrefix).empty()
+			|| shouldJoinPluginContinuationWithoutSpace(logicalPrefix, value);
+		const std::string separator = joinWithoutSpace ? std::string() : std::string(" ");
+		const std::string candidate = logicalPrefix + separator + value;
+		const std::string compactSnapshotPrefix = withoutMarkdownSpaces(snapshot.prefix);
+		const std::string compactCandidate = withoutMarkdownSpaces(candidate);
+		const bool compactMatch = !compactSnapshotPrefix.empty()
+			&& compactSnapshotPrefix.size() <= compactCandidate.size()
+			&& compactCandidate.compare(0, compactSnapshotPrefix.size(), compactSnapshotPrefix) == 0;
+		if (snapshot.prefix.size() <= candidate.size()
+			&& candidate.compare(0, snapshot.prefix.size(), snapshot.prefix) == 0)
+		{
+			const std::size_t offsetInAddedText = snapshot.prefix.size() - logicalPrefix.size();
+			const std::size_t offsetInValue = offsetInAddedText > separator.size()
+				? offsetInAddedText - separator.size()
+				: 0;
+			const CellBounds bounds = cellBoundsForColumn(lines[row], snapshot.column);
+			if (!bounds.found)
+				break;
+
+			position.found = true;
+			position.row = row;
+			position.columnOffset = (std::min)(bounds.contentStart + offsetInValue, bounds.contentEnd);
+			return position;
+		}
+		if (compactMatch)
+		{
+			const std::size_t offsetInCandidate = originalOffsetForCompactPrefix(candidate, compactSnapshotPrefix.size());
+			if (offsetInCandidate >= logicalPrefix.size())
+			{
+				const std::size_t offsetInAddedText = offsetInCandidate - logicalPrefix.size();
+				const std::size_t offsetInValue = offsetInAddedText > separator.size()
+					? offsetInAddedText - separator.size()
+					: 0;
+				const CellBounds bounds = cellBoundsForColumn(lines[row], snapshot.column);
+				if (!bounds.found)
+					break;
+
+				position.found = true;
+				position.row = row;
+				position.columnOffset = (std::min)(bounds.contentStart + offsetInValue, bounds.contentEnd);
+				return position;
+			}
+		}
+
+		if (snapshot.prefix.size() >= candidate.size()
+			&& snapshot.prefix.compare(0, candidate.size(), candidate) == 0)
+		{
+			logicalPrefix = candidate;
+			continue;
+		}
+		if (compactSnapshotPrefix.size() >= compactCandidate.size()
+			&& compactSnapshotPrefix.compare(0, compactCandidate.size(), compactCandidate) == 0)
+		{
+			logicalPrefix = candidate;
+			continue;
+		}
+
+		break;
+	}
+
+	const std::size_t fallbackRow = (std::min)(baseRow, lines.size() - 1);
+	const CellBounds bounds = cellBoundsForColumn(lines[fallbackRow], snapshot.column);
+	if (!bounds.found)
+		return position;
+
+	position.found = true;
+	position.row = fallbackRow;
+	position.columnOffset = (std::min)(bounds.contentStart + snapshot.offset, bounds.contentEnd);
+	return position;
+}
+
+void ensureTrailingCellCaretSpaces(std::vector<std::string> &lines, const CellCaretSnapshot &snapshot)
+{
+	const std::size_t trailingSpaces = trailingMarkdownSpaceCount(snapshot.prefix);
+	if (trailingSpaces == 0)
+		return;
+
+	CellCaretSnapshot visibleSnapshot = snapshot;
+	visibleSnapshot.prefix = withoutTrailingMarkdownSpaces(snapshot.prefix);
+	visibleSnapshot.offset = visibleSnapshot.prefix.size();
+	const CellCaretPosition position = cellCaretPositionInLines(lines, visibleSnapshot);
+	if (!position.found || position.row >= lines.size())
+		return;
+
+	const CellBounds bounds = cellBoundsForColumn(lines[position.row], snapshot.column);
+	if (!bounds.found)
+		return;
+
+	const std::size_t insertAt = (std::min)((std::max)(position.columnOffset, bounds.contentStart), bounds.cellEnd);
+	lines[position.row].insert(insertAt, trailingSpaces, ' ');
+}
+
 std::size_t columnOffsetForCellCaret(const std::vector<std::string> &lines, const CellCaretSnapshot &snapshot, std::size_t fallback)
 {
-	if (!snapshot.valid || snapshot.row >= lines.size())
-		return fallback;
-
-	const CellBounds bounds = cellBoundsForColumn(lines[snapshot.row], snapshot.column);
-	if (!bounds.found)
-		return fallback;
-
-	const std::string &line = lines[snapshot.row];
-	if (!snapshot.prefix.empty()
-		&& bounds.contentStart + snapshot.prefix.size() <= bounds.cellEnd
-		&& line.compare(bounds.contentStart, snapshot.prefix.size(), snapshot.prefix) == 0)
-		return bounds.contentStart + snapshot.prefix.size();
-
-	return (std::min)(bounds.contentStart + snapshot.offset, bounds.contentEnd);
+	const CellCaretPosition position = cellCaretPositionInLines(lines, snapshot);
+	return position.found ? position.columnOffset : fallback;
 }
 
 std::size_t positionForLineColumn(HWND scintilla, std::size_t firstLine, const std::vector<std::string> &replacementLines, const std::string &eol, std::size_t row, std::size_t columnOffset)
@@ -2518,7 +3051,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
 	const CellCaretSnapshot preservedCaret = caretPlacement == CaretPlacement::PreserveCellOffset
-		? captureCellCaret(currentLineText, row, column, byteColumn)
+		? captureLogicalCellCaret(tableLines, row, column, byteColumn)
 		: CellCaretSnapshot();
 	const MarkdownTable::Action coreAction = coreActionForPluginAction(action);
 	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), coreAction);
@@ -2532,14 +3065,20 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	{
 		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
+	if (caretPlacement == CaretPlacement::PreserveCellOffset && preservedCaret.valid)
+		ensureTrailingCellCaretSpaces(edit.lines, preservedCaret);
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
 	const std::string replacement = joinLines(edit.lines, eol);
 	std::size_t targetRow = edit.targetRow;
 	std::size_t targetColumnOffset = edit.targetColumnOffset;
 	if (caretPlacement == CaretPlacement::PreserveCellOffset && preservedCaret.valid)
 	{
-		targetRow = (std::min)(preservedCaret.row, edit.lines.empty() ? static_cast<std::size_t>(0) : edit.lines.size() - 1);
-		targetColumnOffset = columnOffsetForCellCaret(edit.lines, preservedCaret, edit.targetColumnOffset);
+		const CellCaretPosition preservedPosition = cellCaretPositionInLines(edit.lines, preservedCaret);
+		if (preservedPosition.found)
+		{
+			targetRow = preservedPosition.row;
+			targetColumnOffset = preservedPosition.columnOffset;
+		}
 	}
 	const std::size_t targetPosition = positionForLineColumn(scintilla, firstLine, edit.lines, eol, targetRow, targetColumnOffset);
 	const Sci_Position replaceStart = lineStartPosition(scintilla, firstLine);
@@ -2796,7 +3335,23 @@ std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine
 {
 	const CellCaretSnapshot snapshot = captureCellCaret(sourceLine, 0, column, byteColumn);
 	std::vector<std::string> lines(1, replacementLine);
+	ensureTrailingCellCaretSpaces(lines, snapshot);
 	return columnOffsetForCellCaret(lines, snapshot, static_cast<std::size_t>(-1));
+}
+
+CellCaretPreview preservedCellCaretPositionForTests(const std::vector<std::string> &sourceLines, std::size_t row, std::size_t column, std::size_t byteColumn, const std::vector<std::string> &replacementLines)
+{
+	CellCaretPreview preview;
+	const CellCaretSnapshot snapshot = captureLogicalCellCaret(sourceLines, row, column, byteColumn);
+	std::vector<std::string> lines = replacementLines;
+	ensureTrailingCellCaretSpaces(lines, snapshot);
+	const CellCaretPosition position = cellCaretPositionInLines(lines, snapshot);
+	if (position.found)
+	{
+		preview.row = position.row;
+		preview.columnOffset = position.columnOffset;
+	}
+	return preview;
 }
 
 bool ensureAlignToolbarIconsForTests()
@@ -2897,7 +3452,7 @@ void commandMenuInit()
     //            TCHAR *commandName,             // the command name that you want to see in plugin menu
     //            PFUNCPLUGINCMD functionPointer, // the symbol of function (function pointer) associated with this command. The body should be defined below. See Step 4.
     //            ShortcutKey *shortcut,          // optional. Define a shortcut to trigger this command
-    //            bool check0nInit                // optional. Make this menu item be checked visually
+	//            bool check0nInit                // optional. Make this menu item be checked visually
 	//            );
 	refreshUiLanguageState();
 	setCommand(alignCommandIndex, commandText(alignCommandIndex), alignTable, &g_alignShortcut, false);
@@ -2920,6 +3475,9 @@ void commandMenuInit()
 	setCommand(insertTableCommandIndex, commandText(insertTableCommandIndex), insertTable, &g_insertTableShortcut, false);
 	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
 	setCommand(notepadWordWrapCommandIndex, commandText(notepadWordWrapCommandIndex), toggleNotepadWordWrap, NULL, notepadWordWrapEnabled());
+	refreshNotepadWordWrapUi();
+	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
 }
 
 void refreshUiLanguageFromNotepad()
@@ -2936,12 +3494,11 @@ void refreshNotepadWordWrapUi()
 	if (!nppData._nppHandle || funcItem[notepadWordWrapCommandIndex]._cmdID == 0)
 		return;
 
-	const bool enabled = notepadWordWrapEnabled();
 	::SendMessage(
 		nppData._nppHandle,
 		NPPM_SETMENUITEMCHECK,
 		static_cast<WPARAM>(funcItem[notepadWordWrapCommandIndex]._cmdID),
-		static_cast<LPARAM>(enabled ? TRUE : FALSE));
+		static_cast<LPARAM>(notepadWordWrapEnabled() ? TRUE : FALSE));
 	setNotepadWordWrapToolbarCheckState();
 }
 
@@ -3147,6 +3704,13 @@ void insertTable()
 	runInsertTable();
 }
 
+void wrapLongCells()
+{
+	if (!fitTableToWindowCommandEnabled())
+		return;
+	fitCurrentTableToWindow(false);
+}
+
 void tabOrIndent()
 {
 	if (runTableAction(MarkdownTable::Action::Align, true))
@@ -3155,13 +3719,6 @@ void tabOrIndent()
 	HWND scintilla = currentScintilla();
 	if (scintilla)
 		::SendMessage(scintilla, SCI_TAB, 0, 0);
-}
-
-void wrapLongCells()
-{
-	if (!fitTableToWindowCommandEnabled())
-		return;
-	fitCurrentTableToWindow(false);
 }
 
 void toggleNotepadWordWrap()

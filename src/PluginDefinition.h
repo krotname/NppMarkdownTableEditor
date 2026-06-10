@@ -27,6 +27,7 @@
 #include "MarkdownTableCore.h"
 #include <cstddef>
 #include <string>
+#include <vector>
 #endif
 
 //-------------------------------------//
@@ -115,6 +116,12 @@ struct ReplacementPreview
 	std::size_t caretOffset = 0;
 };
 
+struct CellCaretPreview
+{
+	std::size_t row = 0;
+	std::size_t columnOffset = 0;
+};
+
 std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback);
 ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &edit, const std::string &eol);
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
@@ -134,12 +141,13 @@ bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
-  UINT fitToWindowResizeDelayMsForTests();
-  std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
-  bool ensureAlignToolbarIconsForTests();
-  void destroyAlignToolbarIconsForTests();
-  bool ensureTabToolbarIconsForTests();
-  void destroyTabToolbarIconsForTests();
+UINT fitToWindowResizeDelayMsForTests();
+std::size_t preservedCellCaretColumnOffsetForTests(const std::string &sourceLine, std::size_t column, std::size_t byteColumn, const std::string &replacementLine);
+CellCaretPreview preservedCellCaretPositionForTests(const std::vector<std::string> &sourceLines, std::size_t row, std::size_t column, std::size_t byteColumn, const std::vector<std::string> &replacementLines);
+bool ensureAlignToolbarIconsForTests();
+void destroyAlignToolbarIconsForTests();
+bool ensureTabToolbarIconsForTests();
+void destroyTabToolbarIconsForTests();
 bool ensureWrapLongCellsToolbarIconsForTests();
 void destroyWrapLongCellsToolbarIconsForTests();
 bool ensureNotepadWordWrapToolbarIconsForTests();
