@@ -128,6 +128,7 @@ bool fitToWindowOnResizeEnabledForTests();
 void setFitToWindowOnResizeEnabledForTests(bool enabled);
 bool fitTableToWindowCommandEnabledForTests();
 bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns);
+bool shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(bool currentlyEnabled);
 UINT fitToWindowResizeDelayMsForTests();
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();

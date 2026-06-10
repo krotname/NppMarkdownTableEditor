@@ -1311,6 +1311,11 @@ bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeE
 	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
 }
 
+bool shouldRunInitialFitWhenTogglingFitToWindowOnResize(bool currentlyEnabled)
+{
+	return !currentlyEnabled;
+}
+
 int availableTextPixelWidth(HWND scintilla)
 {
 	if (!scintilla)
@@ -2166,6 +2171,11 @@ bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool
 	return shouldRunFitToWindowAfterResize(enabled, inProgress, activeEditor, previousColumns, currentColumns);
 }
 
+bool shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(bool currentlyEnabled)
+{
+	return shouldRunInitialFitWhenTogglingFitToWindowOnResize(currentlyEnabled);
+}
+
 UINT fitToWindowResizeDelayMsForTests()
 {
 	return fitToWindowResizeDelayMs;
@@ -2534,6 +2544,10 @@ void toggleAutoWrapLongCells()
 
 void toggleFitToWindowOnResize()
 {
+	const bool runInitialFit = shouldRunInitialFitWhenTogglingFitToWindowOnResize(g_fitToWindowOnResize);
+	if (runInitialFit)
+		fitCurrentTableToWindow(true);
+
 	g_fitToWindowOnResize = !g_fitToWindowOnResize;
 	if (g_fitToWindowOnResize)
 		rememberCurrentFitToWindowWidth();

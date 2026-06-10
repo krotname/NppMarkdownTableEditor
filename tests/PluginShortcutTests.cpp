@@ -238,6 +238,8 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto fit resize records first width without fitting", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 0, 120));
 	expectTrue(failures, "auto fit resize ignores unchanged width", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 120));
 	expectTrue(failures, "auto fit resize fits after active width change", MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 90));
+	expectTrue(failures, "auto fit toggle runs initial fit before enabling", MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(false));
+	expectTrue(failures, "auto fit toggle does not run initial fit when disabling", !MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(true));
 	MarkdownTablePluginTesting::setFitToWindowOnResizeEnabledForTests(false);
 	toggleFitToWindowOnResize();
 	expectTrue(failures, "auto fit on resize toggles on", MarkdownTablePluginTesting::fitToWindowOnResizeEnabledForTests());
