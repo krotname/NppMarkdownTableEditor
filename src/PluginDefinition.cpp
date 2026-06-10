@@ -1254,6 +1254,18 @@ bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
 	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
 }
 
+MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
+{
+	return action == MarkdownTable::Action::WrapLongCells
+		? MarkdownTable::Action::Align
+		: action;
+}
+
+bool shouldFitToWindowAfterAction(MarkdownTable::Action action)
+{
+	return action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoWrapAfterAction(action);
+}
+
 int availableTextPixelWidth(HWND scintilla)
 {
 	if (!scintilla)
@@ -1803,9 +1815,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
-	const MarkdownTable::Action coreAction = action == MarkdownTable::Action::WrapLongCells
-		? MarkdownTable::Action::Align
-		: action;
+	const MarkdownTable::Action coreAction = coreActionForPluginAction(action);
 	MarkdownTable::EditResult edit = MarkdownTable::apply(tableLines, coreIndex(row), coreIndex(column), coreAction);
 	if (!edit.ok)
 	{
@@ -1813,7 +1823,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 			showMessage(uiText().couldNotEditTable);
 		return false;
 	}
-	if (action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoWrapAfterAction(action))
+	if (shouldFitToWindowAfterAction(action))
 	{
 		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
@@ -1988,9 +1998,19 @@ void setAutoWrapLongCellsEnabledForTests(bool enabled)
 	g_autoWrapLongCells = enabled;
 }
 
+MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action)
+{
+	return coreActionForPluginAction(action);
+}
+
 bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action)
 {
 	return shouldApplyAutoWrapAfterAction(action);
+}
+
+bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action)
+{
+	return shouldFitToWindowAfterAction(action);
 }
 
 bool fitToWindowOnResizeEnabledForTests()

@@ -213,13 +213,18 @@ int runPluginShortcutTests()
 
 	expectTrue(failures, "table wrap starts disabled by default", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
 	expectTrue(failures, "table wrap default does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "fit table command aligns before visible-width wrapping", MarkdownTablePluginTesting::coreActionForPluginActionForTests(MarkdownTable::Action::WrapLongCells) == MarkdownTable::Action::Align);
+	expectTrue(failures, "fit table command always fits to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::WrapLongCells));
+	expectTrue(failures, "plain align does not fit to visible width while table wrap is off", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
 	MarkdownTablePluginTesting::setAutoWrapLongCellsEnabledForTests(false);
 	expectTrue(failures, "table wrap starts disabled in test", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
 	expectTrue(failures, "table wrap disabled does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
 	toggleAutoWrapLongCells();
 	expectTrue(failures, "table wrap toggles on", MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
 	expectTrue(failures, "table wrap enabled wraps align", MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "table wrap enabled fits align to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
 	expectTrue(failures, "table wrap enabled does not wrap row insert", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
+	expectTrue(failures, "table wrap enabled does not fit row insert", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
 	expectTrue(failures, "table wrap does not wrap explicit wrap command", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::WrapLongCells));
 	toggleAutoWrapLongCells();
 	expectTrue(failures, "table wrap toggles off", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
