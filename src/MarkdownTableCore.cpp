@@ -66,7 +66,7 @@ struct CodePointRange
 };
 
 const std::size_t hardWrapCellWidth = 32;
-const std::size_t minimumAutoWrapCellWidth = 10;
+const std::size_t minimumAutoWrapCellWidth = 1;
 
 std::size_t nextRowId(const Table &table);
 
@@ -988,9 +988,10 @@ std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std
 		return naturalWidths;
 
 	const std::size_t overhead = formattedTableOverhead(table);
-	if (maxTableWidth <= overhead + naturalWidths.size() * 3)
-		maxTableWidth = overhead + naturalWidths.size() * 3;
-	const std::size_t budget = maxTableWidth - overhead;
+	const std::size_t minimumBudget = naturalWidths.size();
+	const std::size_t budget = maxTableWidth > overhead
+		? (std::max)(maxTableWidth - overhead, minimumBudget)
+		: minimumBudget;
 	if (widthSum(naturalWidths) <= budget)
 		return naturalWidths;
 
@@ -1020,9 +1021,9 @@ std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std
 	if (widthSum(widths) > budget)
 	{
 		std::vector<bool> allColumns(widths.size(), true);
-		std::vector<std::size_t> hardMinimums(widths.size(), 3);
+		std::vector<std::size_t> hardMinimums(widths.size(), minimumAutoWrapCellWidth);
 		for (std::size_t column = 0; column < widths.size(); ++column)
-			hardMinimums[column] = (std::min)(widths[column], static_cast<std::size_t>(3));
+			hardMinimums[column] = (std::min)(widths[column], minimumAutoWrapCellWidth);
 		shrinkColumnsToBudget(widths, hardMinimums, allColumns, budget);
 	}
 
@@ -1088,9 +1089,25 @@ std::size_t wrapCellsToColumnWidths(Table &table, std::size_t originalTargetRow,
 	return wrappedTargetRow;
 }
 
-void appendSeparatorCell(std::string &line, Align align, std::size_t width)
+void appendSeparatorCell(std::string &line, Align align, std::size_t width, std::size_t minimumWidth)
 {
-	const std::size_t target = (std::max)(width, static_cast<std::size_t>(3));
+	const std::size_t target = (std::max)(width, minimumWidth);
+	if (target <= 1)
+	{
+		line.push_back('-');
+		return;
+	}
+	if (target == 2)
+	{
+		if (align == Align::Left || align == Align::Center)
+			line += ":-";
+		else if (align == Align::Right)
+			line += "-:";
+		else
+			line += "--";
+		return;
+	}
+
 	if (align == Align::Center)
 	{
 		line.push_back(':');
@@ -1139,7 +1156,8 @@ void appendPaddedCell(std::string &line, const std::string &cell, Align align, s
 
 FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t targetColumn, const std::vector<std::size_t> *minimumWidths)
 {
-	std::vector<std::size_t> widths(table.columns, 3);
+	const std::size_t separatorMinimumWidth = minimumWidths ? 1 : 3;
+	std::vector<std::size_t> widths(table.columns, separatorMinimumWidth);
 	std::vector<std::size_t> cellWidths(table.rows.size() * table.columns, 0);
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
@@ -1178,7 +1196,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 				++lineCapacity;
 			if (row.separator)
 			{
-				lineCapacity += (std::max)(widths[column], static_cast<std::size_t>(3));
+				lineCapacity += (std::max)(widths[column], separatorMinimumWidth);
 			}
 			else
 			{
@@ -1200,7 +1218,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 			if (row.separator)
 			{
 				const std::size_t valueStart = line.size();
-				appendSeparatorCell(line, table.alignments[column], widths[column]);
+				appendSeparatorCell(line, table.alignments[column], widths[column], separatorMinimumWidth);
 				if (rowIndex == result.targetRow && column == result.targetColumn)
 					result.targetColumnOffset = valueStart;
 			}

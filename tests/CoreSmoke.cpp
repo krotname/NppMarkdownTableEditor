@@ -236,6 +236,19 @@ int main()
 	expectTrue("auto wrap keeps following columns on first segment", autoWrapped.lines[2].find("| Task | High") != std::string::npos);
 	expectTrue("auto wrap moves text continuation inside the table", autoWrapped.lines[3].find('|') != std::string::npos);
 
+	const MarkdownTable::EditResult veryNarrowWrapped = MarkdownTable::applyWrappedToWidth(
+		{
+			"| A | B | C |",
+			"| --- | --- | --- |",
+			"| supercalifragilistic | word wrap here | tail |"
+		},
+		2,
+		0,
+		18);
+	expectTrue("very narrow auto wrap ok", veryNarrowWrapped.ok);
+	expectTrue("very narrow auto wrap splits word by letters", veryNarrowWrapped.lines.size() > 8);
+	expectLineLengthAtMost("very narrow auto wrap keeps right edge visible", veryNarrowWrapped.lines, 18);
+
 	const MarkdownTable::EditResult wrappedProtectedTokens = MarkdownTable::apply(
 		{
 			"| Key | Value | Other |",

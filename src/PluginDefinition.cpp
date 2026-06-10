@@ -1182,7 +1182,48 @@ std::size_t availableDisplayColumns(HWND scintilla)
 		return 120;
 
 	const std::size_t columns = static_cast<std::size_t>((static_cast<long long>(availableWidth) * static_cast<long long>(sample.size())) / sampleWidth);
-	return (std::max)(columns, static_cast<std::size_t>(40));
+	return (std::max)(columns, static_cast<std::size_t>(1));
+}
+
+bool tableFitsAvailableWidth(HWND scintilla, const std::vector<std::string> &lines)
+{
+	const int availableWidth = availableTextPixelWidth(scintilla);
+	if (availableWidth <= 0)
+		return true;
+
+	for (std::size_t i = 0; i < lines.size(); ++i)
+	{
+		const LRESULT width = ::SendMessage(scintilla, SCI_TEXTWIDTH, 0, reinterpret_cast<LPARAM>(lines[i].c_str()));
+		if (width > availableWidth)
+			return false;
+	}
+	return true;
+}
+
+int coreIndex(std::size_t value);
+
+MarkdownTable::EditResult applyWrappedToVisibleWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
+{
+	std::size_t columns = availableDisplayColumns(scintilla);
+	MarkdownTable::EditResult best;
+	for (std::size_t attempt = 0; attempt < 32; ++attempt)
+	{
+		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
+			edit.lines,
+			coreIndex(edit.targetRow),
+			coreIndex(edit.targetColumn),
+			columns);
+		if (!wrapped.ok)
+			break;
+
+		best = wrapped;
+		if (tableFitsAvailableWidth(scintilla, best.lines) || columns <= 1)
+			break;
+
+		const std::size_t step = (std::max)(static_cast<std::size_t>(1), columns / 8);
+		columns = columns > step ? columns - step : 1;
+	}
+	return best.ok ? best : edit;
 }
 
 int coreIndex(std::size_t value)
@@ -1631,13 +1672,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet)
 	}
 	if (shouldApplyAutoWrapAfterAction(action))
 	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
-			edit.lines,
-			coreIndex(edit.targetRow),
-			coreIndex(edit.targetColumn),
-			availableDisplayColumns(scintilla));
-		if (wrapped.ok)
-			edit = wrapped;
+		edit = applyWrappedToVisibleWidth(scintilla, edit);
 	}
 
 	const std::string eol = chooseEol(scintilla, firstLine, lastLine, lineCount);
