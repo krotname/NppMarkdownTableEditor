@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/krotname/NppMarkdownTableEditor/actions/workflows/codeql.yml?query=branch%3Amaster)
 [![Coverage](https://codecov.io/gh/krotname/NppMarkdownTableEditor/branch/master/graph/badge.svg)](https://codecov.io/gh/krotname/NppMarkdownTableEditor)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/krotname/NppMarkdownTableEditor/badge)](https://securityscorecards.dev/viewer/?uri=github.com/krotname/NppMarkdownTableEditor)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13152/badge)](https://www.bestpractices.dev/projects/13152)
 [![Release](https://img.shields.io/github/v/release/krotname/NppMarkdownTableEditor?label=release)](https://github.com/krotname/NppMarkdownTableEditor/releases/latest)
 [![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-00599C)](https://isocpp.org/)
