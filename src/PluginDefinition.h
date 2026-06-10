@@ -42,7 +42,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 20;
+const int nbFunc = 19;
 
 
 //
@@ -65,8 +65,7 @@ void commandMenuInit();
 void refreshUiLanguageFromNotepad();
 void registerToolbarIcons();
 void refreshNotepadWordWrapUi();
-void refreshAutoWrapLongCellsUi();
-void refreshFitToWindowOnResizeUi();
+void refreshAutoFitTableUi();
 void installFitToWindowResizeHooks();
 void removeFitToWindowResizeHooks();
 
@@ -102,8 +101,7 @@ void insertTable();
 void tabOrIndent();
 void wrapLongCells();
 void toggleNotepadWordWrap();
-void toggleAutoWrapLongCells();
-void toggleFitToWindowOnResize();
+void toggleAutoFitTable();
 
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
@@ -119,16 +117,14 @@ ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &e
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit);
 void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
-bool autoWrapLongCellsEnabledForTests();
-void setAutoWrapLongCellsEnabledForTests(bool enabled);
+bool autoFitTableEnabledForTests();
+void setAutoFitTableEnabledForTests(bool enabled);
 MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action);
-bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action);
+bool shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action action);
 bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action);
-bool fitToWindowOnResizeEnabledForTests();
-void setFitToWindowOnResizeEnabledForTests(bool enabled);
 bool fitTableToWindowCommandEnabledForTests();
 bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns);
-bool shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(bool currentlyEnabled);
+bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 UINT fitToWindowResizeDelayMsForTests();
 bool ensureTabToolbarIconsForTests();
 void destroyTabToolbarIconsForTests();
@@ -136,10 +132,8 @@ bool ensureWrapLongCellsToolbarIconsForTests();
 void destroyWrapLongCellsToolbarIconsForTests();
 bool ensureNotepadWordWrapToolbarIconsForTests();
 void destroyNotepadWordWrapToolbarIconsForTests();
-bool ensureAutoWrapToolbarIconsForTests();
-void destroyAutoWrapToolbarIconsForTests();
-bool ensureFitToWindowOnResizeToolbarIconsForTests();
-void destroyFitToWindowOnResizeToolbarIconsForTests();
+bool ensureAutoFitTableToolbarIconsForTests();
+void destroyAutoFitTableToolbarIconsForTests();
 }
 #endif
 

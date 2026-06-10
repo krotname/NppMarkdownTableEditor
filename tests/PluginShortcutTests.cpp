@@ -120,8 +120,7 @@ int runPluginShortcutTests()
 		{ 15, "tab", L"Tab: align table or indent (MD)", tabOrIndent, false, true, false, false, false, static_cast<UCHAR>(VK_TAB) },
 		{ 16, "fit table to window", L"Fit table to window", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
 		{ 17, "notepad word wrap", L"Notepad++ word wrap (MD)", toggleNotepadWordWrap, false, false, false, false, false, 0 },
-		{ 18, "table wrap", L"Table wrap (MD)", toggleAutoWrapLongCells, false, false, false, false, false, 0 },
-		{ 19, "auto fit on resize", L"Auto fit on resize (MD)", toggleFitToWindowOnResize, false, false, false, false, false, 0 }
+		{ 18, "auto fit table", L"Auto fit table (MD)", toggleAutoFitTable, false, false, false, false, false, 0 }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -164,8 +163,7 @@ int runPluginShortcutTests()
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
-		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0432\u043D\u0443\u0442\u0440\u0438 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u043F\u0440\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0438 \u043E\u043A\u043D\u0430 (MD)"
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
 	};
 	MarkdownTablePluginTesting::applyNativeLangFileNameForTests("russian.xml");
 	expectWideString(failures, "russian plugin menu name", MarkdownTablePluginTesting::pluginMenuNameForTests(), L"\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 Markdown-\u0442\u0430\u0431\u043B\u0438\u0446");
@@ -211,25 +209,24 @@ int runPluginShortcutTests()
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
-	expectTrue(failures, "table wrap starts disabled by default", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
-	expectTrue(failures, "table wrap default does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto fit table starts disabled by default", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto fit table default does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
 	expectTrue(failures, "fit table command aligns before visible-width wrapping", MarkdownTablePluginTesting::coreActionForPluginActionForTests(MarkdownTable::Action::WrapLongCells) == MarkdownTable::Action::Align);
 	expectTrue(failures, "fit table command always fits to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::WrapLongCells));
-	expectTrue(failures, "plain align does not fit to visible width while table wrap is off", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
-	MarkdownTablePluginTesting::setAutoWrapLongCellsEnabledForTests(false);
-	expectTrue(failures, "table wrap starts disabled in test", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
-	expectTrue(failures, "table wrap disabled does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
-	toggleAutoWrapLongCells();
-	expectTrue(failures, "table wrap toggles on", MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
-	expectTrue(failures, "table wrap enabled wraps align", MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
-	expectTrue(failures, "table wrap enabled fits align to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
-	expectTrue(failures, "table wrap enabled does not wrap row insert", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
-	expectTrue(failures, "table wrap enabled does not fit row insert", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
-	expectTrue(failures, "table wrap does not wrap explicit wrap command", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::WrapLongCells));
-	toggleAutoWrapLongCells();
-	expectTrue(failures, "table wrap toggles off", !MarkdownTablePluginTesting::autoWrapLongCellsEnabledForTests());
-	expectTrue(failures, "table wrap off after unpress does not wrap align", !MarkdownTablePluginTesting::shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action::Align));
-	expectTrue(failures, "auto fit on resize starts disabled", !MarkdownTablePluginTesting::fitToWindowOnResizeEnabledForTests());
+	expectTrue(failures, "plain align does not fit to visible width while auto fit is off", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
+	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+	expectTrue(failures, "auto fit table starts disabled in test", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto fit table disabled does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
+	toggleAutoFitTable();
+	expectTrue(failures, "auto fit table toggles on", MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto fit table enabled fits align", MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto fit table enabled fits align to visible width", MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::Align));
+	expectTrue(failures, "auto fit table enabled does not fit row insert", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
+	expectTrue(failures, "auto fit table enabled does not fit row insert to visible width", !MarkdownTablePluginTesting::shouldFitToWindowAfterActionForTests(MarkdownTable::Action::InsertRowBelow));
+	expectTrue(failures, "auto fit table does not auto-fit explicit wrap command", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::WrapLongCells));
+	toggleAutoFitTable();
+	expectTrue(failures, "auto fit table toggles off", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto fit table off after unpress does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
 	expectTrue(failures, "fit table command starts enabled", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
 	expectTrue(failures, "auto fit resize uses delayed debounce", MarkdownTablePluginTesting::fitToWindowResizeDelayMsForTests() > 0);
 	expectTrue(failures, "auto fit resize ignores disabled mode", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(false, false, true, 100, 120));
@@ -238,25 +235,23 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto fit resize records first width without fitting", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 0, 120));
 	expectTrue(failures, "auto fit resize ignores unchanged width", !MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 120));
 	expectTrue(failures, "auto fit resize fits after active width change", MarkdownTablePluginTesting::shouldRunFitToWindowAfterResizeForTests(true, false, true, 120, 90));
-	expectTrue(failures, "auto fit toggle runs initial fit before enabling", MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(false));
-	expectTrue(failures, "auto fit toggle does not run initial fit when disabling", !MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(true));
-	MarkdownTablePluginTesting::setFitToWindowOnResizeEnabledForTests(false);
-	toggleFitToWindowOnResize();
-	expectTrue(failures, "auto fit on resize toggles on", MarkdownTablePluginTesting::fitToWindowOnResizeEnabledForTests());
+	expectTrue(failures, "auto fit toggle runs initial fit before enabling", MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(false));
+	expectTrue(failures, "auto fit toggle does not run initial fit when disabling", !MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(true));
+	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+	toggleAutoFitTable();
+	expectTrue(failures, "auto fit table toggles on for resize", MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "fit table command disabled while auto fit is on", !MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
-	toggleFitToWindowOnResize();
-	expectTrue(failures, "auto fit on resize toggles off", !MarkdownTablePluginTesting::fitToWindowOnResizeEnabledForTests());
+	toggleAutoFitTable();
+	expectTrue(failures, "auto fit table toggles off after resize mode", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
 	expectTrue(failures, "fit table command re-enabled after auto fit is off", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
 	expectTrue(failures, "tab toolbar icons are created", MarkdownTablePluginTesting::ensureTabToolbarIconsForTests());
 	expectTrue(failures, "wrap long cells toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
 	expectTrue(failures, "notepad word wrap toolbar icons are created", MarkdownTablePluginTesting::ensureNotepadWordWrapToolbarIconsForTests());
-	expectTrue(failures, "auto wrap toolbar icons are created", MarkdownTablePluginTesting::ensureAutoWrapToolbarIconsForTests());
-	expectTrue(failures, "auto fit on resize toolbar icons are created", MarkdownTablePluginTesting::ensureFitToWindowOnResizeToolbarIconsForTests());
+	expectTrue(failures, "auto fit table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoFitTableToolbarIconsForTests());
 	MarkdownTablePluginTesting::destroyTabToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyNotepadWordWrapToolbarIconsForTests();
-	MarkdownTablePluginTesting::destroyAutoWrapToolbarIconsForTests();
-	MarkdownTablePluginTesting::destroyFitToWindowOnResizeToolbarIconsForTests();
+	MarkdownTablePluginTesting::destroyAutoFitTableToolbarIconsForTests();
 
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");
 	expectString(failures, "plugin eol keeps cr source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r1,2", "\n"), "\r");

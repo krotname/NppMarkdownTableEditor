@@ -98,15 +98,13 @@ ShortcutKey g_wrapLongCellsShortcut = { true, true, true, 'W' };
 const std::size_t tabCommandIndex = 15;
 const std::size_t wrapLongCellsCommandIndex = 16;
 const std::size_t notepadWordWrapCommandIndex = 17;
-const std::size_t autoWrapLongCellsCommandIndex = 18;
-const std::size_t fitToWindowOnResizeCommandIndex = 19;
+const std::size_t autoFitTableCommandIndex = 18;
 // Notepad++ IDM_VIEW_WRAP = IDM + 4000 + 22.
 const int notepadWordWrapCommandId = 44022;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
 
-bool g_autoWrapLongCells = false;
-bool g_fitToWindowOnResize = false;
+bool g_autoFitTable = false;
 bool g_fitToWindowInProgress = false;
 std::size_t g_lastFitToWindowColumns = 0;
 HWND g_pendingFitToWindowScintilla = NULL;
@@ -121,12 +119,9 @@ HICON g_wrapLongCellsToolbarIconDarkMode = NULL;
 HBITMAP g_notepadWordWrapToolbarBmp = NULL;
 HICON g_notepadWordWrapToolbarIcon = NULL;
 HICON g_notepadWordWrapToolbarIconDarkMode = NULL;
-HBITMAP g_autoWrapToolbarBmp = NULL;
-HICON g_autoWrapToolbarIcon = NULL;
-HICON g_autoWrapToolbarIconDarkMode = NULL;
-HBITMAP g_fitToWindowOnResizeToolbarBmp = NULL;
-HICON g_fitToWindowOnResizeToolbarIcon = NULL;
-HICON g_fitToWindowOnResizeToolbarIconDarkMode = NULL;
+HBITMAP g_autoFitTableToolbarBmp = NULL;
+HICON g_autoFitTableToolbarIcon = NULL;
+HICON g_autoFitTableToolbarIconDarkMode = NULL;
 
 enum class UiLanguage
 {
@@ -171,7 +166,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Table wrap (MD)", L"Auto fit on resize (MD)" }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15 L" (MD)", NULL, NULL, L"Auto fit table (MD)" }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -206,8 +201,7 @@ const UiText englishUiText =
 		L"Tab: align table or indent (MD)",
 		L"Fit table to window",
 		L"Notepad++ word wrap (MD)",
-		L"Table wrap (MD)",
-		L"Auto fit on resize (MD)"
+		L"Auto fit table (MD)"
 	},
 	L"Insert Markdown table",
 	L"Columns:",
@@ -443,8 +437,7 @@ const UiText russianUiText =
 		L"Tab: \u0432\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u0438\u043B\u0438 \u0441\u0434\u0435\u043B\u0430\u0442\u044C \u043E\u0442\u0441\u0442\u0443\u043F (MD)",
 		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ (MD)",
-		L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0432\u043D\u0443\u0442\u0440\u0438 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u043F\u0440\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0438 \u043E\u043A\u043D\u0430 (MD)"
+		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0442\u0430\u0431\u043B\u0438\u0446\u044B (MD)"
 	},
 	L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443",
 	L"\u0421\u0442\u043E\u043B\u0431\u0446\u044B:",
@@ -970,8 +963,7 @@ enum class ToolbarIconKind
 {
 	TabAction,
 	TableWrap,
-	EditorWordWrap,
-	AutoWrap
+	EditorWordWrap
 };
 
 void clearIcon(std::uint32_t *pixels)
@@ -1048,7 +1040,7 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 		drawMdBadge(pixels, grid);
 		drawTabActionArrow(pixels, tabAccent);
 	}
-	else if (kind == ToolbarIconKind::TableWrap || kind == ToolbarIconKind::AutoWrap)
+	else if (kind == ToolbarIconKind::TableWrap)
 	{
 		drawMdBadge(pixels, grid);
 		drawMiniTable(pixels, grid, muted);
@@ -1152,28 +1144,18 @@ bool ensureNotepadWordWrapToolbarIconHandles()
 	return ensureToolbarIconHandles(g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode, ToolbarIconKind::EditorWordWrap);
 }
 
-bool ensureAutoWrapToolbarIconHandles()
-{
-	return ensureToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode, ToolbarIconKind::AutoWrap);
-}
-
-bool ensureFitToWindowOnResizeToolbarIconHandles()
+bool ensureAutoFitTableToolbarIconHandles()
 {
 	return ensureToolbarIconHandles(
-		g_fitToWindowOnResizeToolbarBmp,
-		g_fitToWindowOnResizeToolbarIcon,
-		g_fitToWindowOnResizeToolbarIconDarkMode,
+		g_autoFitTableToolbarBmp,
+		g_autoFitTableToolbarIcon,
+		g_autoFitTableToolbarIconDarkMode,
 		ToolbarIconKind::TableWrap);
 }
 
 void destroyTabToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_tabToolbarBmp, g_tabToolbarIcon, g_tabToolbarIconDarkMode);
-}
-
-void destroyAutoWrapToolbarIconHandles()
-{
-	destroyToolbarIconHandles(g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
 }
 
 void destroyWrapLongCellsToolbarIconHandles()
@@ -1186,12 +1168,12 @@ void destroyNotepadWordWrapToolbarIconHandles()
 	destroyToolbarIconHandles(g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode);
 }
 
-void destroyFitToWindowOnResizeToolbarIconHandles()
+void destroyAutoFitTableToolbarIconHandles()
 {
 	destroyToolbarIconHandles(
-		g_fitToWindowOnResizeToolbarBmp,
-		g_fitToWindowOnResizeToolbarIcon,
-		g_fitToWindowOnResizeToolbarIconDarkMode);
+		g_autoFitTableToolbarBmp,
+		g_autoFitTableToolbarIcon,
+		g_autoFitTableToolbarIconDarkMode);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -1260,14 +1242,9 @@ void setCommandEnabledState(std::size_t commandIndex, bool enabled)
 	setToolbarEnabledState(commandIndex, enabled);
 }
 
-void setAutoWrapToolbarCheckState()
+void setAutoFitTableToolbarCheckState()
 {
-	setToolbarCheckState(autoWrapLongCellsCommandIndex, g_autoWrapLongCells);
-}
-
-void setFitToWindowOnResizeToolbarCheckState()
-{
-	setToolbarCheckState(fitToWindowOnResizeCommandIndex, g_fitToWindowOnResize);
+	setToolbarCheckState(autoFitTableCommandIndex, g_autoFitTable);
 }
 
 bool notepadWordWrapEnabled()
@@ -1284,9 +1261,9 @@ void setNotepadWordWrapToolbarCheckState()
 	setToolbarCheckState(notepadWordWrapCommandIndex, notepadWordWrapEnabled());
 }
 
-bool shouldApplyAutoWrapAfterAction(MarkdownTable::Action action)
+bool shouldApplyAutoFitAfterAction(MarkdownTable::Action action)
 {
-	return g_autoWrapLongCells && action == MarkdownTable::Action::Align;
+	return g_autoFitTable && action == MarkdownTable::Action::Align;
 }
 
 MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
@@ -1298,12 +1275,12 @@ MarkdownTable::Action coreActionForPluginAction(MarkdownTable::Action action)
 
 bool shouldFitToWindowAfterAction(MarkdownTable::Action action)
 {
-	return action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoWrapAfterAction(action);
+	return action == MarkdownTable::Action::WrapLongCells || shouldApplyAutoFitAfterAction(action);
 }
 
 bool fitTableToWindowCommandEnabled()
 {
-	return !g_fitToWindowOnResize;
+	return !g_autoFitTable;
 }
 
 bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns)
@@ -1311,7 +1288,7 @@ bool shouldRunFitToWindowAfterResize(bool enabled, bool inProgress, bool activeE
 	return enabled && !inProgress && activeEditor && previousColumns != 0 && previousColumns != currentColumns;
 }
 
-bool shouldRunInitialFitWhenTogglingFitToWindowOnResize(bool currentlyEnabled)
+bool shouldRunInitialFitWhenTogglingAutoFitTable(bool currentlyEnabled)
 {
 	return !currentlyEnabled;
 }
@@ -1423,7 +1400,7 @@ bool fitCurrentTableToWindow(bool quiet)
 
 void fitToWindowAfterResize(HWND resizedScintilla)
 {
-	if (!g_fitToWindowOnResize || g_fitToWindowInProgress)
+	if (!g_autoFitTable || g_fitToWindowInProgress)
 		return;
 
 	HWND scintilla = currentScintilla();
@@ -1436,7 +1413,7 @@ void fitToWindowAfterResize(HWND resizedScintilla)
 		g_lastFitToWindowColumns = columns;
 		return;
 	}
-	if (!shouldRunFitToWindowAfterResize(g_fitToWindowOnResize, g_fitToWindowInProgress, true, g_lastFitToWindowColumns, columns))
+	if (!shouldRunFitToWindowAfterResize(g_autoFitTable, g_fitToWindowInProgress, true, g_lastFitToWindowColumns, columns))
 		return;
 
 	g_lastFitToWindowColumns = columns;
@@ -1445,7 +1422,7 @@ void fitToWindowAfterResize(HWND resizedScintilla)
 
 void scheduleFitToWindowAfterResize(HWND resizedScintilla)
 {
-	if (!g_fitToWindowOnResize || !resizedScintilla)
+	if (!g_autoFitTable || !resizedScintilla)
 		return;
 
 	g_pendingFitToWindowScintilla = resizedScintilla;
@@ -2124,14 +2101,16 @@ const wchar_t *pluginMenuNameForTests()
 	return uiText().pluginMenuName;
 }
 
-bool autoWrapLongCellsEnabledForTests()
+bool autoFitTableEnabledForTests()
 {
-	return g_autoWrapLongCells;
+	return g_autoFitTable;
 }
 
-void setAutoWrapLongCellsEnabledForTests(bool enabled)
+void setAutoFitTableEnabledForTests(bool enabled)
 {
-	g_autoWrapLongCells = enabled;
+	g_autoFitTable = enabled;
+	if (!enabled)
+		g_lastFitToWindowColumns = 0;
 }
 
 MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action action)
@@ -2139,26 +2118,14 @@ MarkdownTable::Action coreActionForPluginActionForTests(MarkdownTable::Action ac
 	return coreActionForPluginAction(action);
 }
 
-bool shouldApplyAutoWrapAfterActionForTests(MarkdownTable::Action action)
+bool shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action action)
 {
-	return shouldApplyAutoWrapAfterAction(action);
+	return shouldApplyAutoFitAfterAction(action);
 }
 
 bool shouldFitToWindowAfterActionForTests(MarkdownTable::Action action)
 {
 	return shouldFitToWindowAfterAction(action);
-}
-
-bool fitToWindowOnResizeEnabledForTests()
-{
-	return g_fitToWindowOnResize;
-}
-
-void setFitToWindowOnResizeEnabledForTests(bool enabled)
-{
-	g_fitToWindowOnResize = enabled;
-	if (!enabled)
-		g_lastFitToWindowColumns = 0;
 }
 
 bool fitTableToWindowCommandEnabledForTests()
@@ -2171,9 +2138,9 @@ bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool
 	return shouldRunFitToWindowAfterResize(enabled, inProgress, activeEditor, previousColumns, currentColumns);
 }
 
-bool shouldRunInitialFitWhenTogglingFitToWindowOnResizeForTests(bool currentlyEnabled)
+bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled)
 {
-	return shouldRunInitialFitWhenTogglingFitToWindowOnResize(currentlyEnabled);
+	return shouldRunInitialFitWhenTogglingAutoFitTable(currentlyEnabled);
 }
 
 UINT fitToWindowResizeDelayMsForTests()
@@ -2211,24 +2178,14 @@ void destroyNotepadWordWrapToolbarIconsForTests()
 	destroyNotepadWordWrapToolbarIconHandles();
 }
 
-bool ensureAutoWrapToolbarIconsForTests()
+bool ensureAutoFitTableToolbarIconsForTests()
 {
-	return ensureAutoWrapToolbarIconHandles();
+	return ensureAutoFitTableToolbarIconHandles();
 }
 
-void destroyAutoWrapToolbarIconsForTests()
+void destroyAutoFitTableToolbarIconsForTests()
 {
-	destroyAutoWrapToolbarIconHandles();
-}
-
-bool ensureFitToWindowOnResizeToolbarIconsForTests()
-{
-	return ensureFitToWindowOnResizeToolbarIconHandles();
-}
-
-void destroyFitToWindowOnResizeToolbarIconsForTests()
-{
-	destroyFitToWindowOnResizeToolbarIconHandles();
+	destroyAutoFitTableToolbarIconHandles();
 }
 }
 #endif
@@ -2250,8 +2207,7 @@ void pluginCleanUp()
 	destroyTabToolbarIconHandles();
 	destroyWrapLongCellsToolbarIconHandles();
 	destroyNotepadWordWrapToolbarIconHandles();
-	destroyAutoWrapToolbarIconHandles();
-	destroyFitToWindowOnResizeToolbarIconHandles();
+	destroyAutoFitTableToolbarIconHandles();
 }
 
 //
@@ -2289,8 +2245,7 @@ void commandMenuInit()
 	setCommand(tabCommandIndex, commandText(tabCommandIndex), tabOrIndent, &g_tabShortcut, false);
 	setCommand(wrapLongCellsCommandIndex, commandText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
 	setCommand(notepadWordWrapCommandIndex, commandText(notepadWordWrapCommandIndex), toggleNotepadWordWrap, NULL, notepadWordWrapEnabled());
-	setCommand(autoWrapLongCellsCommandIndex, commandText(autoWrapLongCellsCommandIndex), toggleAutoWrapLongCells, NULL, g_autoWrapLongCells);
-	setCommand(fitToWindowOnResizeCommandIndex, commandText(fitToWindowOnResizeCommandIndex), toggleFitToWindowOnResize, NULL, g_fitToWindowOnResize);
+	setCommand(autoFitTableCommandIndex, commandText(autoFitTableCommandIndex), toggleAutoFitTable, NULL, g_autoFitTable);
 }
 
 void refreshUiLanguageFromNotepad()
@@ -2298,8 +2253,7 @@ void refreshUiLanguageFromNotepad()
 	refreshUiLanguageState();
 	updateNotepadPluginMenu();
 	refreshNotepadWordWrapUi();
-	refreshAutoWrapLongCellsUi();
-	refreshFitToWindowOnResizeUi();
+	refreshAutoFitTableUi();
 }
 
 void refreshNotepadWordWrapUi()
@@ -2316,30 +2270,17 @@ void refreshNotepadWordWrapUi()
 	setNotepadWordWrapToolbarCheckState();
 }
 
-void refreshAutoWrapLongCellsUi()
+void refreshAutoFitTableUi()
 {
-	if (!nppData._nppHandle || funcItem[autoWrapLongCellsCommandIndex]._cmdID == 0)
+	if (!nppData._nppHandle || funcItem[autoFitTableCommandIndex]._cmdID == 0)
 		return;
 
 	::SendMessage(
 		nppData._nppHandle,
 		NPPM_SETMENUITEMCHECK,
-		static_cast<WPARAM>(funcItem[autoWrapLongCellsCommandIndex]._cmdID),
-		static_cast<LPARAM>(g_autoWrapLongCells ? TRUE : FALSE));
-	setAutoWrapToolbarCheckState();
-}
-
-void refreshFitToWindowOnResizeUi()
-{
-	if (!nppData._nppHandle || funcItem[fitToWindowOnResizeCommandIndex]._cmdID == 0)
-		return;
-
-	::SendMessage(
-		nppData._nppHandle,
-		NPPM_SETMENUITEMCHECK,
-		static_cast<WPARAM>(funcItem[fitToWindowOnResizeCommandIndex]._cmdID),
-		static_cast<LPARAM>(g_fitToWindowOnResize ? TRUE : FALSE));
-	setFitToWindowOnResizeToolbarCheckState();
+		static_cast<WPARAM>(funcItem[autoFitTableCommandIndex]._cmdID),
+		static_cast<LPARAM>(g_autoFitTable ? TRUE : FALSE));
+	setAutoFitTableToolbarCheckState();
 	setCommandEnabledState(wrapLongCellsCommandIndex, fitTableToWindowCommandEnabled());
 }
 
@@ -2387,19 +2328,15 @@ void registerToolbarIcons()
 	if (funcItem[notepadWordWrapCommandIndex]._cmdID != 0 && ensureNotepadWordWrapToolbarIconHandles())
 		registerToolbarIcon(notepadWordWrapCommandIndex, g_notepadWordWrapToolbarBmp, g_notepadWordWrapToolbarIcon, g_notepadWordWrapToolbarIconDarkMode);
 
-	if (funcItem[autoWrapLongCellsCommandIndex]._cmdID != 0 && ensureAutoWrapToolbarIconHandles())
-		registerToolbarIcon(autoWrapLongCellsCommandIndex, g_autoWrapToolbarBmp, g_autoWrapToolbarIcon, g_autoWrapToolbarIconDarkMode);
-
-	if (funcItem[fitToWindowOnResizeCommandIndex]._cmdID != 0 && ensureFitToWindowOnResizeToolbarIconHandles())
+	if (funcItem[autoFitTableCommandIndex]._cmdID != 0 && ensureAutoFitTableToolbarIconHandles())
 		registerToolbarIcon(
-			fitToWindowOnResizeCommandIndex,
-			g_fitToWindowOnResizeToolbarBmp,
-			g_fitToWindowOnResizeToolbarIcon,
-			g_fitToWindowOnResizeToolbarIconDarkMode);
+			autoFitTableCommandIndex,
+			g_autoFitTableToolbarBmp,
+			g_autoFitTableToolbarIcon,
+			g_autoFitTableToolbarIconDarkMode);
 
 	refreshNotepadWordWrapUi();
-	refreshAutoWrapLongCellsUi();
-	refreshFitToWindowOnResizeUi();
+	refreshAutoFitTableUi();
 }
 
 //
@@ -2534,29 +2471,21 @@ void toggleNotepadWordWrap()
 	refreshNotepadWordWrapUi();
 }
 
-void toggleAutoWrapLongCells()
+void toggleAutoFitTable()
 {
-	g_autoWrapLongCells = !g_autoWrapLongCells;
-	refreshAutoWrapLongCellsUi();
-	if (g_autoWrapLongCells)
-		fitCurrentTableToWindow(true);
-}
-
-void toggleFitToWindowOnResize()
-{
-	const bool runInitialFit = shouldRunInitialFitWhenTogglingFitToWindowOnResize(g_fitToWindowOnResize);
+	const bool runInitialFit = shouldRunInitialFitWhenTogglingAutoFitTable(g_autoFitTable);
 	if (runInitialFit)
 		fitCurrentTableToWindow(true);
 
-	g_fitToWindowOnResize = !g_fitToWindowOnResize;
-	if (g_fitToWindowOnResize)
+	g_autoFitTable = !g_autoFitTable;
+	if (g_autoFitTable)
 		rememberCurrentFitToWindowWidth();
 	else
 	{
 		cancelFitToWindowResizeTimers();
 		g_lastFitToWindowColumns = 0;
 	}
-	refreshFitToWindowOnResizeUi();
+	refreshAutoFitTableUi();
 }
 
 void installFitToWindowResizeHooks()
