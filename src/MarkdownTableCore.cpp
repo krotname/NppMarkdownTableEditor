@@ -1125,12 +1125,71 @@ bool isLikelyContinuationRow(const Row &row, const Row &baseRow, std::size_t col
 	return emptyWhereBaseHasText >= requiredAnchors;
 }
 
+bool isAsciiAlphaNumeric(unsigned char ch)
+{
+	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
+}
+
+bool isWordContinuationStart(const std::string &value)
+{
+	if (value.empty())
+		return false;
+	const unsigned char ch = static_cast<unsigned char>(value[0]);
+	return isAsciiAlphaNumeric(ch) || ch == '_' || ch >= 0x80;
+}
+
+bool isWordContinuationEnd(const std::string &value)
+{
+	const std::string trimmed = trim(value);
+	if (trimmed.empty())
+		return false;
+	const unsigned char ch = static_cast<unsigned char>(trimmed[trimmed.size() - 1]);
+	return isAsciiAlphaNumeric(ch) || ch == '_' || ch == '-' || ch >= 0x80;
+}
+
+std::string firstToken(const std::string &value)
+{
+	std::size_t end = 0;
+	while (end < value.size() && !isSpace(static_cast<unsigned char>(value[end])))
+		end = nextUtf8Offset(value, end);
+	return value.substr(0, end);
+}
+
+bool looksLikeSplitWordRemainder(const std::string &token)
+{
+	if (token.empty())
+		return false;
+
+	const std::size_t width = displayWidth(token);
+	const unsigned char first = static_cast<unsigned char>(token[0]);
+	if (first >= 0x80)
+		return width <= 4;
+	return width <= 2;
+}
+
+bool shouldJoinContinuationWithoutSpace(const std::string &target, const std::string &continuation)
+{
+	const std::string targetValue = trim(target);
+	const std::string continuationValue = trim(continuation);
+	if (targetValue.empty() || continuationValue.empty())
+		return false;
+	if (!isWordContinuationEnd(targetValue) || !isWordContinuationStart(continuationValue))
+		return false;
+
+	const unsigned char targetEnd = static_cast<unsigned char>(targetValue[targetValue.size() - 1]);
+	const unsigned char continuationStart = static_cast<unsigned char>(continuationValue[0]);
+	if (targetEnd == '-' && (isAsciiAlphaNumeric(continuationStart) || continuationStart >= 0x80))
+		return true;
+
+	return looksLikeSplitWordRemainder(firstToken(continuationValue));
+}
+
 void appendContinuationCell(std::string &target, const std::string &continuation)
 {
 	const std::string value = trim(continuation);
 	if (value.empty())
 		return;
-	if (!trim(target).empty())
+	if (!trim(target).empty() && !shouldJoinContinuationWithoutSpace(target, value))
 		target += " ";
 	target += value;
 }

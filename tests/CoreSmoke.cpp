@@ -258,6 +258,34 @@ int main()
 	expectTrue("very narrow auto wrap splits word by letters", veryNarrowWrapped.lines.size() > 8);
 	expectLineLengthAtMost("very narrow auto wrap keeps right edge visible", veryNarrowWrapped.lines, 18);
 
+	const MarkdownTable::EditResult joinedSplitWord = MarkdownTable::applyWrappedToWidth(
+		{
+			"| A | B |",
+			"| --- | --- |",
+			"| scrip | keep |",
+			"| t already | |"
+		},
+		2,
+		0,
+		80);
+	expectTrue("expanded auto wrap rejoins split word ok", joinedSplitWord.ok);
+	expectTrue("expanded auto wrap rejoins split word without inserted space", joinedSplitWord.lines[2].find("script already") != std::string::npos);
+	expectTrue("expanded auto wrap does not keep split word space", joinedSplitWord.lines[2].find("scrip t") == std::string::npos);
+
+	const MarkdownTable::EditResult joinedSpacedWords = MarkdownTable::applyWrappedToWidth(
+		{
+			"| A | B |",
+			"| --- | --- |",
+			"| word | keep |",
+			"| wrap here | |"
+		},
+		2,
+		0,
+		80);
+	expectTrue("expanded auto wrap preserves word-boundary space ok", joinedSpacedWords.ok);
+	expectTrue("expanded auto wrap preserves word-boundary space", joinedSpacedWords.lines[2].find("word wrap here") != std::string::npos);
+	expectTrue("expanded auto wrap does not join separate words", joinedSpacedWords.lines[2].find("wordwrap") == std::string::npos);
+
 	const MarkdownTable::EditResult registryWrapped = MarkdownTable::applyWrappedToWidth(
 		{
 			"| patch_id | date | component | target_path | change | evidence | rollback | status | notes |",
