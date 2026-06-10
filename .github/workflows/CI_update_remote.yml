@@ -8,6 +8,9 @@ on:
   ##schedule:
   ##  - cron: "0 0 * * *" #< every day at 00:00 UTC
 
+permissions:
+  contents: read
+
 jobs:
   update:
     # Keep the upstream sync limited to the canonical project repository.
@@ -20,10 +23,10 @@ jobs:
 
     steps:
     - name: Checkout Markdown Table Editor repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
     - name: Checkout N++ repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       with:
         repository: notepad-plus-plus/notepad-plus-plus
         path: npp_repo
@@ -75,14 +78,14 @@ jobs:
         git status
 
     - name: Commit any updates to the repo
-      uses: stefanzweifel/git-auto-commit-action@v7
+      uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
       with:
         # GitHub will auto-link the upstream ref to the corresponding commit
         commit_message: Sync Notepad++ interface files with notepad-plus-plus/notepad-plus-plus@${{ steps.diff_step.outputs.HEAD_REF }}
 
     - name: If ANY_DIFFERENCE then add MSBuild to PATH
       if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
-      uses: microsoft/setup-msbuild@v3
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
     - name: If ANY_DIFFERENCE then run MSBuild of plugin dll
       if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
@@ -90,7 +93,7 @@ jobs:
 
     - name: Release
       if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
       with:
         name: Markdown Table Editor Notepad++ interface sync v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
         tag_name: v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
