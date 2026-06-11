@@ -113,9 +113,9 @@ int runPluginShortcutTests()
 	const ExpectedCommand expected[] =
 	{
 		{ 0, "align", L"Align table (no width change)\tCtrl+Alt+Shift+1", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
-		{ 1, "auto align table", L"Auto align after edit (no width change)\tCtrl+Alt+Shift+A", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
+		{ 1, "auto align table", L"Light Auto align after edit (no width change)\tCtrl+Alt+Shift+A", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
 		{ 2, "fit table width", L"Fit table width to window\tCtrl+Alt+Shift+W", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
-		{ 3, "auto fit table", L"Auto fit table width to window\tCtrl+Alt+Shift+F", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
+		{ 3, "auto fit table", L"Power Auto fit table width to window\tCtrl+Alt+Shift+F", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
 		{ 4, "next cell", L"Next cell\tCtrl+Alt+Shift+2", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
 		{ 5, "previous cell", L"Previous cell\tCtrl+Alt+Shift+3", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
 		{ 6, "insert row", L"Insert row below\tCtrl+Alt+Shift+4", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
@@ -155,9 +155,9 @@ int runPluginShortcutTests()
 	const wchar_t *russianNames[] =
 	{
 		L"\u0412\u044B\u0440\u043E\u0432\u043D\u044F\u0442\u044C \u0442\u0430\u0431\u043B\u0438\u0446\u0443 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)",
-		L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)",
+		L"Light \u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)",
 		L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0448\u0438\u0440\u0438\u043D\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
-		L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
+		L"Power \u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E",
 		L"\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
 		L"\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u043D\u0438\u0436\u0435",

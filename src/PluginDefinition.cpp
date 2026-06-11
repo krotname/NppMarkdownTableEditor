@@ -264,8 +264,8 @@ struct UiText
 	L"Could not edit the Markdown table.", \
 	L"Select CSV/TSV text or put the caret inside a CSV/TSV block first.", \
 	L"Could not convert the selected CSV/TSV text.", \
-	L"Auto fit and Notepad++ Word Wrap", \
-	L"Notepad++ Word Wrap is on.\r\nAuto fit will edit Markdown table text to fit the window. Word Wrap only changes screen display.", \
+	L"Power Auto fit and Notepad++ Word Wrap", \
+	L"Notepad++ Word Wrap is on.\r\nPower Auto fit will edit Markdown table text to fit the window. Word Wrap only changes screen display.", \
 	L"Do not show again" \
 }
 
@@ -302,8 +302,8 @@ const UiText englishUiText =
 	L"Could not edit the Markdown table.",
 	L"Select CSV/TSV text or put the caret inside a CSV/TSV block first.",
 	L"Could not convert the selected CSV/TSV text.",
-	L"Auto fit and Notepad++ Word Wrap",
-	L"Notepad++ Word Wrap is on.\r\nAuto fit will edit Markdown table text to fit the window. Word Wrap only changes screen display.",
+	L"Power Auto fit and Notepad++ Word Wrap",
+	L"Notepad++ Word Wrap is on.\r\nPower Auto fit will edit Markdown table text to fit the window. Word Wrap only changes screen display.",
 	L"Do not show again"
 };
 
@@ -530,8 +530,8 @@ const UiText russianUiText =
 	L"\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C Markdown-\u0442\u0430\u0431\u043B\u0438\u0446\u0443.",
 	L"\u0412\u044B\u0434\u0435\u043B\u0438\u0442\u0435 CSV/TSV-\u0442\u0435\u043A\u0441\u0442 \u0438\u043B\u0438 \u043F\u043E\u043C\u0435\u0441\u0442\u0438\u0442\u0435 \u043A\u0443\u0440\u0441\u043E\u0440 \u0432\u043D\u0443\u0442\u0440\u044C CSV/TSV-\u0431\u043B\u043E\u043A\u0430.",
 	L"\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u044C \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 CSV/TSV-\u0442\u0435\u043A\u0441\u0442.",
-	L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0438 \u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A",
-	L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043A\u043B\u044E\u0447\u0451\u043D.\r\n\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0431\u0443\u0434\u0435\u0442 \u043C\u0435\u043D\u044F\u0442\u044C Markdown-\u0442\u0435\u043A\u0441\u0442 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u0448\u0438\u0440\u0438\u043D\u0443 \u043E\u043A\u043D\u0430. \u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043B\u0438\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435.",
+	L"Power \u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0438 \u043F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A",
+	L"\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043A\u043B\u044E\u0447\u0451\u043D.\r\nPower \u0430\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0431\u0443\u0434\u0435\u0442 \u043C\u0435\u043D\u044F\u0442\u044C Markdown-\u0442\u0435\u043A\u0441\u0442 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u0448\u0438\u0440\u0438\u043D\u0443 \u043E\u043A\u043D\u0430. \u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A Notepad++ \u0432\u043B\u0438\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435.",
 	L"\u0411\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C"
 };
 
@@ -923,6 +923,29 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 	}
 }
 
+const wchar_t *autoModeCommandText(std::size_t index, const wchar_t *text)
+{
+	if (!text)
+		return text;
+	const wchar_t *prefix = NULL;
+	switch (index)
+	{
+	case autoAlignTableCommandIndex:
+		prefix = L"Light ";
+		break;
+	case autoFitTableCommandIndex:
+		prefix = L"Power ";
+		break;
+	default:
+		return text;
+	}
+
+	static std::wstring modeText[nbFunc];
+	modeText[index] = prefix;
+	modeText[index] += text;
+	return modeText[index].c_str();
+}
+
 std::size_t legacyCommandIndex(std::size_t index)
 {
 	switch (index)
@@ -948,15 +971,15 @@ std::size_t legacyCommandIndex(std::size_t index)
 const wchar_t *commandText(std::size_t index)
 {
 	if (const wchar_t *special = localizedSpecialCommandText(index))
-		return special;
+		return autoModeCommandText(index, special);
 
 	const UiText &localized = uiText();
 	const std::size_t legacy = legacyCommandIndex(index);
 	if (legacy >= static_cast<std::size_t>(nbFunc))
-		return englishUiText.commands[0];
+		return autoModeCommandText(index, englishUiText.commands[0]);
 	if (legacy < static_cast<std::size_t>(nbFunc) && localized.commands[legacy])
-		return localized.commands[legacy];
-	return englishUiText.commands[legacy];
+		return autoModeCommandText(index, localized.commands[legacy]);
+	return autoModeCommandText(index, englishUiText.commands[legacy]);
 }
 
 const wchar_t *commandShortcutText(std::size_t index)
