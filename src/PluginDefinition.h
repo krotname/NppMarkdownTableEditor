@@ -151,6 +151,7 @@ bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
 bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
 bool scintillaModificationShouldRunAutoTableFormatForTests(int modificationType);
 bool shouldRunAutoFitAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor);
+bool shouldScheduleFitToWindowAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor);
 bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
 bool shouldRunInitialAutoTableFormatForBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool alreadyHandled);

@@ -1926,6 +1926,14 @@ bool scintillaModificationShouldRunAutoTableFormat(int modificationType)
 
 bool shouldRunAutoFitAfterZoom(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
 {
+	(void)autoFitEnabled;
+	(void)fitInProgress;
+	(void)activeEditor;
+	return false;
+}
+
+bool shouldScheduleFitToWindowAfterZoom(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
+{
 	return autoFitEnabled && !fitInProgress && activeEditor;
 }
 
@@ -2307,13 +2315,12 @@ void handleScintillaZoomInternal(const SCNotification *notification)
 {
 	HWND scintilla = currentScintilla();
 	const bool activeEditor = notification && scintilla && scintilla == reinterpret_cast<HWND>(notification->nmhdr.hwndFrom);
-	if (!shouldRunAutoFitAfterZoom(g_autoFitTable, g_fitToWindowInProgress, activeEditor))
+	if (!shouldScheduleFitToWindowAfterZoom(g_autoFitTable, g_fitToWindowInProgress, activeEditor))
 		return;
 	if (!selectionEmpty(scintilla))
 		return;
 
-	fitCurrentTableToWindow(true, CaretPlacement::PreserveCellOffset);
-	rememberCurrentFitToWindowWidth();
+	scheduleFitToWindowAfterResize(scintilla);
 }
 
 void handleGlobalModifiedInternal()
@@ -3990,6 +3997,11 @@ bool scintillaModificationShouldRunAutoTableFormatForTests(int modificationType)
 bool shouldRunAutoFitAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
 {
 	return shouldRunAutoFitAfterZoom(autoFitEnabled, fitInProgress, activeEditor);
+}
+
+bool shouldScheduleFitToWindowAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
+{
+	return shouldScheduleFitToWindowAfterZoom(autoFitEnabled, fitInProgress, activeEditor);
 }
 
 bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress)

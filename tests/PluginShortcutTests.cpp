@@ -295,7 +295,11 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto fit zoom ignores disabled mode", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(false, false, true));
 	expectTrue(failures, "auto fit zoom ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, true, true));
 	expectTrue(failures, "auto fit zoom ignores inactive editor", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, false, false));
-	expectTrue(failures, "auto fit zoom runs after active zoom", MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, false, true));
+	expectTrue(failures, "auto fit zoom does not run immediate fit before zoom settles", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, false, true));
+	expectTrue(failures, "auto fit zoom schedule ignores disabled mode", !MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterZoomForTests(false, false, true));
+	expectTrue(failures, "auto fit zoom schedule ignores reentrant fit", !MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterZoomForTests(true, true, true));
+	expectTrue(failures, "auto fit zoom schedule ignores inactive editor", !MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterZoomForTests(true, false, false));
+	expectTrue(failures, "auto fit zoom schedules delayed fit after active zoom", MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterZoomForTests(true, false, true));
 	expectTrue(failures, "auto fit toggle runs initial fit before enabling", MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(false));
 	expectTrue(failures, "auto fit toggle does not run initial fit when disabling", !MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(true));
 	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
