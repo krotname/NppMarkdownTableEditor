@@ -73,8 +73,12 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		case NPPN_READY:
 		case NPPN_NATIVELANGCHANGED:
 		{
+			if (notifyCode->nmhdr.code == NPPN_READY && nppData._nppHandle)
+				::SendMessage(nppData._nppHandle, NPPM_ADDSCNMODIFIEDFLAGS, 0, SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT | SC_PERFORMED_UNDO | SC_PERFORMED_REDO);
 			installFitToWindowResizeHooks();
 			refreshUiLanguageFromNotepad();
+			if (notifyCode->nmhdr.code == NPPN_READY)
+				handleInitialAutoTableFormatForCurrentBuffer();
 			checkWordWrapAutoFitWarning();
 		}
 		break;
@@ -106,6 +110,24 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 		case SCN_UPDATEUI:
 		{
 			handleScintillaUpdateUi(notifyCode);
+		}
+		break;
+
+		case SCN_MODIFIED:
+		{
+			handleScintillaModified(notifyCode);
+		}
+		break;
+
+		case SCN_ZOOM:
+		{
+			handleScintillaZoom(notifyCode);
+		}
+		break;
+
+		case NPPN_GLOBALMODIFIED:
+		{
+			handleGlobalModified();
 		}
 		break;
 

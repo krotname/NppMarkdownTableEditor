@@ -58,6 +58,16 @@ void expectString(int &failures, const std::string &name, const std::string &act
 	fail(failures, name, std::string("expected \"") + expected + "\", got \"" + actual + "\"");
 }
 
+void expectLines(int &failures, const std::string &name, const std::vector<std::string> &actual, const std::vector<std::string> &expected)
+{
+	if (actual == expected)
+		return;
+
+	std::ostringstream message;
+	message << "expected " << expected.size() << " lines, got " << actual.size();
+	fail(failures, name, message.str());
+}
+
 void expectCommandName(int &failures, const ExpectedCommand &expected, const FuncItem &actual)
 {
 	if (std::wcscmp(actual._itemName, expected.itemName) == 0)
@@ -282,6 +292,10 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto fit resize schedules on snapped window position size", MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterResizeMessageForTests(true, WM_WINDOWPOSCHANGED, 0, 0));
 	expectTrue(failures, "auto fit resize ignores move-only window position", !MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterResizeMessageForTests(true, WM_WINDOWPOSCHANGED, 0, SWP_NOSIZE));
 	expectTrue(failures, "auto fit resize ignores snap messages while disabled", !MarkdownTablePluginTesting::shouldScheduleFitToWindowAfterResizeMessageForTests(false, WM_WINDOWPOSCHANGED, 0, 0));
+	expectTrue(failures, "auto fit zoom ignores disabled mode", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(false, false, true));
+	expectTrue(failures, "auto fit zoom ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, true, true));
+	expectTrue(failures, "auto fit zoom ignores inactive editor", !MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, false, false));
+	expectTrue(failures, "auto fit zoom runs after active zoom", MarkdownTablePluginTesting::shouldRunAutoFitAfterZoomForTests(true, false, true));
 	expectTrue(failures, "auto fit toggle runs initial fit before enabling", MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(false));
 	expectTrue(failures, "auto fit toggle does not run initial fit when disabling", !MarkdownTablePluginTesting::shouldRunInitialFitWhenTogglingAutoFitTableForTests(true));
 	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
@@ -301,6 +315,17 @@ int runPluginShortcutTests()
 	expectTrue(failures, "auto input update runs immediate auto align", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, false, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate auto fit", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(false, true, false, false, true, true));
 	expectTrue(failures, "auto input update runs immediate combined auto mode", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterUpdateForTests(true, true, false, false, true, true));
+	expectTrue(failures, "auto input modified runs after inserted text", MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_MOD_INSERTTEXT));
+	expectTrue(failures, "auto input modified runs after deleted text", MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_MOD_DELETETEXT));
+	expectTrue(failures, "auto input modified runs after combined content edit", MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT));
+	expectTrue(failures, "auto input modified runs after undo", MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_PERFORMED_UNDO));
+	expectTrue(failures, "auto input modified runs after redo", MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_PERFORMED_REDO));
+	expectTrue(failures, "auto input modified ignores indicator-only edits", !MarkdownTablePluginTesting::scintillaModificationShouldRunAutoTableFormatForTests(SC_MOD_CHANGEINDICATOR));
+	expectTrue(failures, "global modified ignores disabled modes", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterGlobalModifiedForTests(false, false, false, false));
+	expectTrue(failures, "global modified ignores reentrant align", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterGlobalModifiedForTests(true, false, true, false));
+	expectTrue(failures, "global modified ignores reentrant fit", !MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterGlobalModifiedForTests(true, true, false, true));
+	expectTrue(failures, "global modified runs auto align", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterGlobalModifiedForTests(true, false, false, false));
+	expectTrue(failures, "global modified runs auto fit", MarkdownTablePluginTesting::shouldRunAutoTableFormatAfterGlobalModifiedForTests(false, true, false, false));
 	expectTrue(failures, "initial open format ignores disabled modes", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(false, false, false, false, true, false));
 	expectTrue(failures, "initial open format ignores handled buffer", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, true, false, false, true, true));
 	expectTrue(failures, "initial open format ignores reentrant align", !MarkdownTablePluginTesting::shouldRunInitialAutoTableFormatForBufferForTests(true, false, true, false, true, false));
@@ -335,6 +360,19 @@ int runPluginShortcutTests()
 	expectString(failures, "initial document auto format aligns separator below cursor", formattedOpenFileDocument[3], "| --------- | --: |");
 	expectString(failures, "initial document auto format keeps prose before table", formattedOpenFileDocument[0], "# title");
 	expectString(failures, "initial document auto format keeps prose after table", formattedOpenFileDocument[7], "tail");
+	const std::vector<std::string> wideRegistryDocument =
+	{
+		"# registry",
+		"",
+		"| patch_id | date | component | target_path | change | evidence | rollback | status | notes |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+		"| codex-admin-launcher-2026-06-01 | 2026-06-01 | Codex launcher | C:/Users/KRT/.codex/launchers/Start-Codex-Elevated.ps1 | Created local launcher that fixes RunAs shortcuts and starts Codex with elevated rights | Service mark and log file confirm successful launch | Delete managed shortcuts and use stock package | active | prefers patched local shell |",
+		"",
+		"tail"
+	};
+	const std::vector<std::string> firstFitDocument = MarkdownTablePluginTesting::autoFormatDocumentTablesForTests(wideRegistryDocument, MarkdownTable::Action::WrapLongCells, 112);
+	const std::vector<std::string> secondFitDocument = MarkdownTablePluginTesting::autoFormatDocumentTablesForTests(firstFitDocument, MarkdownTable::Action::WrapLongCells, 112);
+	expectLines(failures, "manual fit document is idempotent after first pass", secondFitDocument, firstFitDocument);
 	expectTrue(failures, "unchanged replacement moves caret to wrapped logical row", MarkdownTablePluginTesting::shouldMoveCaretToTargetForTests(24, 48));
 	expectTrue(failures, "unchanged replacement leaves caret when target unchanged", !MarkdownTablePluginTesting::shouldMoveCaretToTargetForTests(48, 48));
 	expectTrue(failures, "enter preserves column in active table line", MarkdownTablePluginTesting::shouldPreserveEnterColumnForTests(true, true, true, WM_KEYDOWN, VK_RETURN));

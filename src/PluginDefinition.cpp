@@ -174,6 +174,7 @@ const std::size_t convertCsvTsvCommandIndex = 16;
 const std::size_t insertTableCommandIndex = 17;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
+const std::size_t wrapStabilizationPassLimit = 8;
 
 bool g_autoFitTable = true;
 bool g_autoAlignTable = true;
@@ -1918,6 +1919,21 @@ bool shouldRunAutoTableFormatAfterUpdate(bool autoAlignEnabled, bool autoFitEnab
 	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress && activeEditor && contentUpdated;
 }
 
+bool scintillaModificationShouldRunAutoTableFormat(int modificationType)
+{
+	return (modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT | SC_PERFORMED_UNDO | SC_PERFORMED_REDO)) != 0;
+}
+
+bool shouldRunAutoFitAfterZoom(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
+{
+	return autoFitEnabled && !fitInProgress && activeEditor;
+}
+
+bool shouldRunAutoTableFormatAfterGlobalModified(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress)
+{
+	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress;
+}
+
 bool shouldRunInitialAlignWhenTogglingAutoAlignTable(bool currentlyEnabled)
 {
 	return !currentlyEnabled;
@@ -1992,13 +2008,38 @@ int coreIndex(std::size_t value);
 bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement = CaretPlacement::ActionTarget);
 bool runAutoTableFormatForDocument(MarkdownTable::Action action);
 
+MarkdownTable::EditResult applyWrappedToWidthUntilStable(const std::vector<std::string> &lines, int row, int column, std::size_t maxTableWidth)
+{
+	MarkdownTable::EditResult current = MarkdownTable::applyWrappedToWidth(lines, row, column, maxTableWidth);
+	if (!current.ok)
+		return current;
+
+	for (std::size_t pass = 1; pass < wrapStabilizationPassLimit; ++pass)
+	{
+		MarkdownTable::EditResult next = MarkdownTable::applyWrappedToWidth(
+			current.lines,
+			coreIndex(current.targetRow),
+			coreIndex(current.targetColumn),
+			maxTableWidth);
+		if (!next.ok)
+			break;
+
+		const bool stable = next.lines == current.lines;
+		current = next;
+		if (stable)
+			break;
+	}
+
+	return current;
+}
+
 MarkdownTable::EditResult applyWrappedToVisibleWidth(HWND scintilla, const MarkdownTable::EditResult &edit)
 {
 	std::size_t columns = availableDisplayColumns(scintilla);
 	MarkdownTable::EditResult best;
 	for (std::size_t attempt = 0; attempt < 32; ++attempt)
 	{
-		MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(
+		MarkdownTable::EditResult wrapped = applyWrappedToWidthUntilStable(
 			edit.lines,
 			coreIndex(edit.targetRow),
 			coreIndex(edit.targetColumn),
@@ -2046,6 +2087,26 @@ bool autoAlignCurrentTable(bool quiet, CaretPlacement caretPlacement = CaretPlac
 
 	g_autoAlignInProgress = true;
 	const bool changed = runTableAction(MarkdownTable::Action::Align, quiet, caretPlacement);
+	g_autoAlignInProgress = false;
+	return changed;
+}
+
+bool autoFormatCurrentDocumentAfterGlobalEdit()
+{
+	if (!shouldRunAutoTableFormatAfterGlobalModified(g_autoAlignTable, g_autoFitTable, g_autoAlignInProgress, g_fitToWindowInProgress))
+		return false;
+
+	if (g_autoFitTable)
+	{
+		g_fitToWindowInProgress = true;
+		const bool changed = runAutoTableFormatForDocument(MarkdownTable::Action::WrapLongCells);
+		g_fitToWindowInProgress = false;
+		rememberCurrentFitToWindowWidth();
+		return changed;
+	}
+
+	g_autoAlignInProgress = true;
+	const bool changed = runAutoTableFormatForDocument(MarkdownTable::Action::Align);
 	g_autoAlignInProgress = false;
 	return changed;
 }
@@ -2212,6 +2273,18 @@ void runInitialAutoTableFormatForBuffer(const SCNotification *notification)
 	}
 }
 
+void runInitialAutoTableFormatForCurrentBuffer()
+{
+	const uptr_t bufferId = currentBufferId();
+	if (bufferId == 0)
+		return;
+
+	const bool alreadyHandled = initialAutoFormatBufferHandled(bufferId);
+	if (shouldQueueInitialAutoTableFormatForOpenedBuffer(g_autoAlignTable, g_autoFitTable, alreadyHandled))
+		queueInitialAutoFormatBuffer(bufferId);
+	runInitialAutoTableFormatForBuffer(NULL);
+}
+
 void handleScintillaUpdateUiInternal(const SCNotification *notification)
 {
 	if (!notification)
@@ -2220,6 +2293,32 @@ void handleScintillaUpdateUiInternal(const SCNotification *notification)
 	const bool contentUpdated = (notification->updated & SC_UPDATE_CONTENT) != 0;
 	runAutoTableFormatAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
 	checkWordWrapAutoFitWarningInternal();
+}
+
+void handleScintillaModifiedInternal(const SCNotification *notification)
+{
+	if (!notification || !scintillaModificationShouldRunAutoTableFormat(notification->modificationType))
+		return;
+
+	runAutoTableFormatAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), true);
+}
+
+void handleScintillaZoomInternal(const SCNotification *notification)
+{
+	HWND scintilla = currentScintilla();
+	const bool activeEditor = notification && scintilla && scintilla == reinterpret_cast<HWND>(notification->nmhdr.hwndFrom);
+	if (!shouldRunAutoFitAfterZoom(g_autoFitTable, g_fitToWindowInProgress, activeEditor))
+		return;
+	if (!selectionEmpty(scintilla))
+		return;
+
+	fitCurrentTableToWindow(true, CaretPlacement::PreserveCellOffset);
+	rememberCurrentFitToWindowWidth();
+}
+
+void handleGlobalModifiedInternal()
+{
+	autoFormatCurrentDocumentAfterGlobalEdit();
 }
 
 void cancelFitToWindowResizeTimer(HWND scintilla)
@@ -3723,9 +3822,29 @@ void handleScintillaUpdateUi(const SCNotification *notification)
 	handleScintillaUpdateUiInternal(notification);
 }
 
+void handleScintillaModified(const SCNotification *notification)
+{
+	handleScintillaModifiedInternal(notification);
+}
+
+void handleScintillaZoom(const SCNotification *notification)
+{
+	handleScintillaZoomInternal(notification);
+}
+
+void handleGlobalModified()
+{
+	handleGlobalModifiedInternal();
+}
+
 void handleInitialAutoTableFormatForBuffer(const SCNotification *notification)
 {
 	runInitialAutoTableFormatForBuffer(notification);
+}
+
+void handleInitialAutoTableFormatForCurrentBuffer()
+{
+	runInitialAutoTableFormatForCurrentBuffer();
 }
 
 void forgetInitialAutoTableFormatForBuffer(const SCNotification *notification)
@@ -3863,6 +3982,21 @@ bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool aut
 	return shouldRunAutoTableFormatAfterUpdate(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress, activeEditor, contentUpdated);
 }
 
+bool scintillaModificationShouldRunAutoTableFormatForTests(int modificationType)
+{
+	return scintillaModificationShouldRunAutoTableFormat(modificationType);
+}
+
+bool shouldRunAutoFitAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor)
+{
+	return shouldRunAutoFitAfterZoom(autoFitEnabled, fitInProgress, activeEditor);
+}
+
+bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress)
+{
+	return shouldRunAutoTableFormatAfterGlobalModified(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress);
+}
+
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled)
 {
 	return shouldRunInitialAlignWhenTogglingAutoAlignTable(currentlyEnabled);
@@ -3910,7 +4044,7 @@ std::vector<std::string> autoFormatDocumentTablesForTests(const std::vector<std:
 		if (shouldFitToWindowAfterAction(action))
 		{
 			const std::size_t width = (std::max)(static_cast<std::size_t>(1), maxTableWidth);
-			const MarkdownTable::EditResult wrapped = MarkdownTable::applyWrappedToWidth(edit.lines, 0, 0, width);
+			const MarkdownTable::EditResult wrapped = applyWrappedToWidthUntilStable(edit.lines, 0, 0, width);
 			if (wrapped.ok)
 				edit = wrapped;
 		}
@@ -4087,14 +4221,14 @@ void refreshAutoAlignTableUi()
 	if (!nppData._nppHandle || funcItem[autoAlignTableCommandIndex]._cmdID == 0)
 		return;
 
+	setCommandEnabledState(autoAlignTableCommandIndex, autoAlignTableToggleEnabled());
+	setCommandEnabledState(alignCommandIndex, alignTableCommandEnabled());
 	::SendMessage(
 		nppData._nppHandle,
 		NPPM_SETMENUITEMCHECK,
 		static_cast<WPARAM>(funcItem[autoAlignTableCommandIndex]._cmdID),
 		static_cast<LPARAM>(g_autoAlignTable ? TRUE : FALSE));
 	setAutoAlignTableToolbarCheckState();
-	setCommandEnabledState(autoAlignTableCommandIndex, autoAlignTableToggleEnabled());
-	setCommandEnabledState(alignCommandIndex, alignTableCommandEnabled());
 }
 
 void registerToolbarIcon(std::size_t commandIndex, HBITMAP bitmap, HICON icon, HICON darkModeIcon)
