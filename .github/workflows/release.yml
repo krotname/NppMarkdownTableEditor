@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   version:
-    runs-on: windows-latest
+    runs-on: windows-2022
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -44,7 +44,7 @@ jobs:
 
   build:
     needs: version
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
 
   compatibility-smoke:
     needs: version
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -104,7 +104,7 @@ jobs:
       - version
       - build
       - compatibility-smoke
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       contents: write
       id-token: write

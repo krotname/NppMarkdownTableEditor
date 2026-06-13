@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: write
 
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
     - name: Checkout Markdown Table Editor repo

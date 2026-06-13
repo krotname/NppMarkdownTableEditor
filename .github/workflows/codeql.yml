@@ -15,7 +15,7 @@ permissions:
 jobs:
   analyze:
     name: Analyze (cpp)
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       actions: read
       contents: read
