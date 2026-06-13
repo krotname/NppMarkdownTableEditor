@@ -119,12 +119,18 @@ jobs:
       - name: Generate release checksums
         shell: bash
         run: |
-          mapfile -t files < <(find release-assets -type f -name '*.zip' | sort)
-          if [ "${#files[@]}" -eq 0 ]; then
+          mkdir -p release-files
+          mapfile -t downloaded_files < <(find release-assets -type f -name '*.zip' | sort)
+          if [ "${#downloaded_files[@]}" -eq 0 ]; then
             echo "No release ZIP files were downloaded." >&2
             exit 1
           fi
 
+          for file in "${downloaded_files[@]}"; do
+            cp "$file" "release-files/$(basename "$file")"
+          done
+
+          mapfile -t files < <(find release-files -maxdepth 1 -type f -name '*.zip' | sort)
           sha256sum "${files[@]}" > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -140,13 +146,11 @@ jobs:
           TAG_NAME: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mapfile -t files < <(find release-assets -type f -name '*.zip' | sort)
+          mapfile -t files < <(find release-files -maxdepth 1 -type f -name '*.zip' | sort)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release ZIP files were downloaded." >&2
             exit 1
           fi
-
-          sha256sum "${files[@]}" > SHA256SUMS.txt
           cat > release-notes.md <<EOF
           ## What's Changed
 
