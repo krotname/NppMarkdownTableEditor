@@ -94,6 +94,7 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 | `Next cell` / `Previous cell`                  | Перемещает курсор между ячейками                                         |
 | `Insert row below` / `Delete row`              | Добавляет или удаляет строку                                             |
 | `Insert column right` / `Delete column`        | Добавляет или удаляет колонку                                            |
+| `Narrow column` / `Widen column`               | Сужает или расширяет текущую колонку на одну экранную позицию            |
 | `Move row up` / `Move row down`                | Перемещает текущую строку                                                |
 | `Move column left` / `Move column right`       | Перемещает текущую колонку                                               |
 | `Sort rows ascending` / `Sort rows descending` | Сортирует строки по текущей колонке                                      |
@@ -120,6 +121,8 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 | `Delete row`                                   | `Ctrl+Alt+Shift+5` |
 | `Insert column right`                          | `Ctrl+Alt+Shift+6` |
 | `Delete column`                                | `Ctrl+Alt+Shift+7` |
+| `Narrow column`                                | `Ctrl+Alt+Shift+,` |
+| `Widen column`                                 | `Ctrl+Alt+Shift+.` |
 | `Move row up`                                  | `Ctrl+Alt+Shift+8` |
 | `Move row down`                                | `Ctrl+Alt+Shift+9` |
 | `Move column left`                             | `Ctrl+Alt+Shift+[` |

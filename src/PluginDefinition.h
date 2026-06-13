@@ -43,7 +43,7 @@ const TCHAR NPP_PLUGIN_NAME[] = TEXT("Markdown Table Editor");
 //
 // Here define the number of your plugin commands
 //
-const int nbFunc = 18;
+const int nbFunc = 20;
 
 
 //
@@ -99,6 +99,8 @@ void insertRowBelow();
 void deleteRow();
 void insertColumnRight();
 void deleteColumn();
+void narrowColumn();
+void widenColumn();
 void moveRowUp();
 void moveRowDown();
 void moveColumnLeft();
@@ -156,6 +158,8 @@ bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, 
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
 bool shouldRunInitialAutoTableFormatForBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool alreadyHandled);
 bool shouldQueueInitialAutoTableFormatForOpenedBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alreadyHandled);
+bool shouldTryQueuedInitialAutoTableFormatForNotificationForTests(UINT notificationCode);
+bool shouldDeferInitialAutoTableFormatForDocumentLengthForTests(long textLength);
 std::vector<std::size_t> documentMarkdownTableRangeLinesForTests(const std::vector<std::string> &lines);
 std::vector<std::string> autoFormatDocumentTablesForTests(const std::vector<std::string> &lines, MarkdownTable::Action action, std::size_t maxTableWidth);
 bool shouldMoveCaretToTargetForTests(std::size_t currentPosition, std::size_t targetPosition);
@@ -171,6 +175,10 @@ bool ensureAutoFitTableToolbarIconsForTests();
 void destroyAutoFitTableToolbarIconsForTests();
 bool ensureAutoAlignTableToolbarIconsForTests();
 void destroyAutoAlignTableToolbarIconsForTests();
+bool ensureNarrowColumnToolbarIconsForTests();
+void destroyNarrowColumnToolbarIconsForTests();
+bool ensureWidenColumnToolbarIconsForTests();
+void destroyWidenColumnToolbarIconsForTests();
 }
 #endif
 

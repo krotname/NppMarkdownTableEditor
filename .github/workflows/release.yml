@@ -150,15 +150,13 @@ jobs:
           cat > release-notes.md <<EOF
           ## What's Changed
 
-          - Supersedes 9.0.0 as the current stable release.
-          - Added localized plugin menu, command, dialog, and message text for 20 popular Notepad++ locales.
-          - Improved large-table performance by reducing table parsing, display-width, formatting, sorting, and row/column edit overhead.
-          - Added release-blocking Java/C++ core performance benchmarks to CI.
-          - Preserved Java/C++ core parity for trimmed pipe rows, escaped pipes, Unicode/CJK width, CSV/TSV conversion, sorting, and row/column edits.
-          - Kept the non-conflicting Tab plus Ctrl+Alt+Shift shortcut scheme from 9.0.0.
+          - Added Narrow column and Widen column commands with Ctrl+Alt+Shift+, and Ctrl+Alt+Shift+. shortcuts.
+          - Added toolbar icons for narrowing and widening the current Markdown table column.
+          - Kept Java/C++ wrapping behavior in sync for manual column resizing, long-cell continuation rows, protected Markdown links, code spans, and narrow-width hard wrapping.
+          - Fixed queued startup auto-format so files opened into Notepad++ are formatted only after Scintilla has loaded the document text.
+          - Preserved alignment, sorting, CSV/TSV conversion, escaped pipes, UTF-8/CJK width handling, caret placement, and row/column edits.
           - Built Notepad++ plugin packages for x86, x64, and arm64 on GitHub Actions.
           - Published Plugin Admin ZIP files with MarkdownTableEditor.dll at the archive root.
-          - Use the native Notepad++ Tab action outside Markdown tables.
           - Added compatibility smoke coverage for Notepad++ 7.5.9 x86 and 8.3.1 x64.
           - Included SHA-256 sums for Plugin Admin verification.
 

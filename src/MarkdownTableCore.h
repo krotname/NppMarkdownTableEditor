@@ -19,6 +19,8 @@ enum class Action
 	DeleteRow,
 	InsertColumnRight,
 	DeleteColumn,
+	NarrowColumn,
+	WidenColumn,
 	MoveRowUp,
 	MoveRowDown,
 	MoveColumnLeft,

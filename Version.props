@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup>
-    <MarkdownTableEditorVersionMajor Condition="'$(MarkdownTableEditorVersionMajor)'==''">10</MarkdownTableEditorVersionMajor>
-    <MarkdownTableEditorVersionMinor Condition="'$(MarkdownTableEditorVersionMinor)'==''">4</MarkdownTableEditorVersionMinor>
-    <MarkdownTableEditorVersionPatch Condition="'$(MarkdownTableEditorVersionPatch)'==''">1</MarkdownTableEditorVersionPatch>
+    <MarkdownTableEditorVersionMajor Condition="'$(MarkdownTableEditorVersionMajor)'==''">11</MarkdownTableEditorVersionMajor>
+    <MarkdownTableEditorVersionMinor Condition="'$(MarkdownTableEditorVersionMinor)'==''">0</MarkdownTableEditorVersionMinor>
+    <MarkdownTableEditorVersionPatch Condition="'$(MarkdownTableEditorVersionPatch)'==''">0</MarkdownTableEditorVersionPatch>
     <MarkdownTableEditorVersionBuild Condition="'$(MarkdownTableEditorVersionBuild)'==''">0</MarkdownTableEditorVersionBuild>
     <MarkdownTableEditorVersion Condition="'$(MarkdownTableEditorVersion)'==''">$(MarkdownTableEditorVersionMajor).$(MarkdownTableEditorVersionMinor).$(MarkdownTableEditorVersionPatch)</MarkdownTableEditorVersion>
   </PropertyGroup>

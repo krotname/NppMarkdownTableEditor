@@ -122,14 +122,16 @@ int runPluginShortcutTests()
 		{ 7, "delete row", L"Delete row\tCtrl+Alt+Shift+5", deleteRow, false, true, true, true, true, static_cast<UCHAR>('5') },
 		{ 8, "insert column", L"Insert column right\tCtrl+Alt+Shift+6", insertColumnRight, false, true, true, true, true, static_cast<UCHAR>('6') },
 		{ 9, "delete column", L"Delete column\tCtrl+Alt+Shift+7", deleteColumn, false, true, true, true, true, static_cast<UCHAR>('7') },
-		{ 10, "move row up", L"Move row up\tCtrl+Alt+Shift+8", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
-		{ 11, "move row down", L"Move row down\tCtrl+Alt+Shift+9", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
-		{ 12, "move column left", L"Move column left\tCtrl+Alt+Shift+[", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
-		{ 13, "move column right", L"Move column right\tCtrl+Alt+Shift+]", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
-		{ 14, "sort ascending", L"Sort rows ascending\tCtrl+Alt+Shift+=", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
-		{ 15, "sort descending", L"Sort rows descending\tCtrl+Alt+Shift+-", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
-		{ 16, "convert csv tsv", L"Convert CSV/TSV to table\tCtrl+Alt+Shift+0", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
-		{ 17, "insert table", L"Insert table...\tCtrl+Alt+Shift+\\", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) }
+		{ 10, "narrow column", L"Narrow column\tCtrl+Alt+Shift+,", narrowColumn, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_COMMA) },
+		{ 11, "widen column", L"Widen column\tCtrl+Alt+Shift+.", widenColumn, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PERIOD) },
+		{ 12, "move row up", L"Move row up\tCtrl+Alt+Shift+8", moveRowUp, false, true, true, true, true, static_cast<UCHAR>('8') },
+		{ 13, "move row down", L"Move row down\tCtrl+Alt+Shift+9", moveRowDown, false, true, true, true, true, static_cast<UCHAR>('9') },
+		{ 14, "move column left", L"Move column left\tCtrl+Alt+Shift+[", moveColumnLeft, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_4) },
+		{ 15, "move column right", L"Move column right\tCtrl+Alt+Shift+]", moveColumnRight, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_6) },
+		{ 16, "sort ascending", L"Sort rows ascending\tCtrl+Alt+Shift+=", sortRowsAscending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_PLUS) },
+		{ 17, "sort descending", L"Sort rows descending\tCtrl+Alt+Shift+-", sortRowsDescending, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_MINUS) },
+		{ 18, "convert csv tsv", L"Convert CSV/TSV to table\tCtrl+Alt+Shift+0", convertCsvTsvSelectionToTable, false, true, true, true, true, static_cast<UCHAR>('0') },
+		{ 19, "insert table", L"Insert table...\tCtrl+Alt+Shift+\\", insertTable, false, true, true, true, true, static_cast<UCHAR>(VK_OEM_5) }
 	};
 
 	const std::size_t expectedCount = sizeof(expected) / sizeof(expected[0]);
@@ -164,6 +166,8 @@ int runPluginShortcutTests()
 		L"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443",
 		L"\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446 \u0441\u043F\u0440\u0430\u0432\u0430",
 		L"\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
+		L"\u0421\u0443\u0437\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
+		L"\u0420\u0430\u0441\u0448\u0438\u0440\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
 		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u0432\u0435\u0440\u0445",
 		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u043D\u0438\u0437",
 		L"\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446 \u0432\u043B\u0435\u0432\u043E",
@@ -181,10 +185,14 @@ int runPluginShortcutTests()
 	const std::wstring russianAutoAlignMenu = std::wstring(russianNames[1]) + L"\tCtrl+Alt+Shift+A";
 	const std::wstring russianFitMenu = std::wstring(russianNames[2]) + L"\tCtrl+Alt+Shift+W";
 	const std::wstring russianAutoFitMenu = std::wstring(russianNames[3]) + L"\tCtrl+Alt+Shift+F";
+	const std::wstring russianNarrowColumnMenu = std::wstring(russianNames[10]) + L"\tCtrl+Alt+Shift+,";
+	const std::wstring russianWidenColumnMenu = std::wstring(russianNames[11]) + L"\tCtrl+Alt+Shift+.";
 	expectWideString(failures, "russian align menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(0), russianAlignMenu.c_str());
 	expectWideString(failures, "russian auto align menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(1), russianAutoAlignMenu.c_str());
 	expectWideString(failures, "russian fit menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(2), russianFitMenu.c_str());
 	expectWideString(failures, "russian auto fit menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(3), russianAutoFitMenu.c_str());
+	expectWideString(failures, "russian narrow column menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(10), russianNarrowColumnMenu.c_str());
+	expectWideString(failures, "russian widen column menu hotkey", MarkdownTablePluginTesting::commandMenuTextForTests(11), russianWidenColumnMenu.c_str());
 
 	struct LocalizedCommandSample
 	{
@@ -341,6 +349,11 @@ int runPluginShortcutTests()
 	expectTrue(failures, "file opened queues initial auto fit", MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(false, true, false));
 	expectTrue(failures, "file opened ignores disabled initial auto format", !MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(false, false, false));
 	expectTrue(failures, "file opened ignores handled initial auto format buffer", !MarkdownTablePluginTesting::shouldQueueInitialAutoTableFormatForOpenedBufferForTests(true, true, true));
+	expectTrue(failures, "file opened queues without immediate initial format attempt", !MarkdownTablePluginTesting::shouldTryQueuedInitialAutoTableFormatForNotificationForTests(NPPN_FILEOPENED));
+	expectTrue(failures, "buffer activated runs queued initial format", MarkdownTablePluginTesting::shouldTryQueuedInitialAutoTableFormatForNotificationForTests(NPPN_BUFFERACTIVATED));
+	expectTrue(failures, "content update runs queued initial format", MarkdownTablePluginTesting::shouldTryQueuedInitialAutoTableFormatForNotificationForTests(SCN_UPDATEUI));
+	expectTrue(failures, "initial open defers while scintilla text is still empty", MarkdownTablePluginTesting::shouldDeferInitialAutoTableFormatForDocumentLengthForTests(0));
+	expectTrue(failures, "initial open can run after file text is loaded", !MarkdownTablePluginTesting::shouldDeferInitialAutoTableFormatForDocumentLengthForTests(1));
 	const std::vector<std::string> openFileDocument =
 	{
 		"# title",
@@ -475,10 +488,14 @@ int runPluginShortcutTests()
 	expectTrue(failures, "fit table width toolbar icons are created", MarkdownTablePluginTesting::ensureWrapLongCellsToolbarIconsForTests());
 	expectTrue(failures, "auto fit table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoFitTableToolbarIconsForTests());
 	expectTrue(failures, "auto align table toolbar icons are created", MarkdownTablePluginTesting::ensureAutoAlignTableToolbarIconsForTests());
+	expectTrue(failures, "narrow column toolbar icons are created", MarkdownTablePluginTesting::ensureNarrowColumnToolbarIconsForTests());
+	expectTrue(failures, "widen column toolbar icons are created", MarkdownTablePluginTesting::ensureWidenColumnToolbarIconsForTests());
 	MarkdownTablePluginTesting::destroyAlignToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoFitTableToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoAlignTableToolbarIconsForTests();
+	MarkdownTablePluginTesting::destroyNarrowColumnToolbarIconsForTests();
+	MarkdownTablePluginTesting::destroyWidenColumnToolbarIconsForTests();
 
 	expectString(failures, "plugin eol keeps crlf source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r\n1,2", "\n"), "\r\n");
 	expectString(failures, "plugin eol keeps cr source", MarkdownTablePluginTesting::chooseEolFromTextForTests("A,B\r1,2", "\n"), "\r");

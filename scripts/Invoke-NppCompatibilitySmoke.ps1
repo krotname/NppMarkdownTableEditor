@@ -192,7 +192,7 @@ function Invoke-ConvertSmoke([string]$Name, [string]$ExePath) {
         $convertId = $null
         for ($i = 0; $i -lt 40; $i++) {
             Start-Sleep -Milliseconds 250
-            $convertId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Convert CSV/TSV to table"
+            $convertId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "CSV/TSV"
             if ($null -ne $convertId) {
                 break
             }
@@ -239,6 +239,63 @@ function Invoke-ConvertSmoke([string]$Name, [string]$ExePath) {
     }
 }
 
+function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath) {
+    $inputText = "# title`r`n`r`n| Name | Age |`r`n| --- | ---: |`r`n| Anna | 20 |`r`n| Alexander | 7 |`r`n"
+    $expectedLine = "| Name      | Age |"
+    $testFile = Join-Path (Split-Path $ExePath -Parent) "mte-startup-auto.md"
+    Set-Content -LiteralPath $testFile -Value $inputText -Encoding UTF8 -NoNewline
+
+    $process = Start-Process -FilePath $ExePath -ArgumentList @("-multiInst", "-nosession", $testFile) -WindowStyle Normal -PassThru
+    try {
+        $mainWindow = [IntPtr]::Zero
+        for ($i = 0; $i -lt 80; $i++) {
+            Start-Sleep -Milliseconds 250
+            $process.Refresh()
+            if ($process.MainWindowHandle -ne 0) {
+                $mainWindow = [IntPtr]$process.MainWindowHandle
+                break
+            }
+        }
+        if ($mainWindow -eq [IntPtr]::Zero) {
+            throw "${Name}: Notepad++ main window was not found"
+        }
+
+        Start-Sleep -Seconds 3
+
+        $dialogs = @(Get-ProcessDialogs $process.Id)
+        foreach ($dialog in $dialogs) {
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage($dialog.Handle, $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero)
+        }
+        if ($dialogs.Count -gt 0) {
+            $titles = ($dialogs | ForEach-Object { $_.Title }) -join "; "
+            throw "${Name}: unexpected dialog after startup auto format: $titles"
+        }
+
+        $saveId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Save" -Exact
+        if ($null -eq $saveId) {
+            throw "${Name}: save menu item was not found"
+        }
+        [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$saveId, [IntPtr]::Zero)
+        Start-Sleep -Seconds 1
+
+        $actual = (Get-Content -LiteralPath $testFile -Raw -Encoding UTF8) -replace "`r`n", "`n"
+        if ($actual -notlike "*$expectedLine*") {
+            throw "${Name}: startup auto format did not align the current file.`nExpected line:`n$expectedLine`nActual:`n$actual"
+        }
+
+        Write-Host "${Name}: startup auto format smoke passed"
+    }
+    finally {
+        if (-not $process.HasExited) {
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage([IntPtr]$process.MainWindowHandle, $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero)
+            if (-not $process.WaitForExit(3000)) {
+                $process.Kill()
+                $process.WaitForExit()
+            }
+        }
+    }
+}
+
 Reset-Directory $WorkDir
 
 $npp759 = Download-And-Extract "npp-7.5.9-x86" $Notepad759Url "npp.7.5.9.bin.zip"
@@ -252,4 +309,6 @@ Copy-Item -LiteralPath $Win32PluginPath -Destination (Join-Path $plugins759 "Mar
 Copy-Item -LiteralPath $X64PluginPath -Destination (Join-Path $plugins831 "MarkdownTableEditor.dll") -Force
 
 Invoke-ConvertSmoke "Notepad++ 7.5.9 x86" $npp759
+Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759
 Invoke-ConvertSmoke "Notepad++ 8.3.1 x64" $npp831
+Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831

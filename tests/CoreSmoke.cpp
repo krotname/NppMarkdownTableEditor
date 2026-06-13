@@ -221,6 +221,54 @@ int main()
 			"|     | epsilon zeta eta theta |"
 		});
 
+	const MarkdownTable::EditResult narrowedColumn = MarkdownTable::apply(
+		{
+			"| Key | Value |",
+			"| --- | --- |",
+			"| row | alpha beta gamma |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::NarrowColumn);
+	expectTrue("narrow column ok", narrowedColumn.ok);
+	expectSize("narrow column target row", narrowedColumn.targetRow, 2);
+	expectSize("narrow column target column", narrowedColumn.targetColumn, 1);
+	expectLines("narrow column wraps current column", narrowedColumn.lines,
+		{
+			"| Key | Value           |",
+			"| --- | --------------- |",
+			"| row | alpha beta      |",
+			"|     | gamma           |"
+		});
+
+	const MarkdownTable::EditResult widenedColumn = MarkdownTable::apply(narrowedColumn.lines, 2, 1, MarkdownTable::Action::WidenColumn);
+	expectTrue("widen column ok", widenedColumn.ok);
+	expectLines("widen column rejoins current column", widenedColumn.lines,
+		{
+			"| Key | Value            |",
+			"| --- | ---------------- |",
+			"| row | alpha beta gamma |"
+		});
+
+	const std::string cjkWord = "\xE6\xBC\xA2\xE5\xAD\x97";
+	const MarkdownTable::EditResult narrowedCjkColumn = MarkdownTable::apply(
+		{
+			"| A | B |",
+			"| --- | --- |",
+			"| x | " + cjkWord + " alpha |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::NarrowColumn);
+	expectTrue("narrow column cjk ok", narrowedCjkColumn.ok);
+	expectLines("narrow column uses cjk display width", narrowedCjkColumn.lines,
+		{
+			"| A   | B         |",
+			"| --- | --------- |",
+			"| x   | " + cjkWord + "      |",
+			"|     | alpha     |"
+		});
+
 	const MarkdownTable::EditResult autoWrapped = MarkdownTable::applyWrappedToWidth(
 		{
 			"| Summary | Type | Priority | Reason | Id |",

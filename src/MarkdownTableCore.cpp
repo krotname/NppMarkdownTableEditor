@@ -69,6 +69,7 @@ const std::size_t hardWrapCellWidth = 26;
 const std::size_t minimumAutoWrapCellWidth = 1;
 
 std::size_t nextRowId(const Table &table);
+std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow);
 
 bool isSpace(unsigned char ch)
 {
@@ -864,6 +865,18 @@ std::vector<std::size_t> naturalColumnWidths(const Table &table)
 	return widths;
 }
 
+std::vector<std::size_t> currentColumnWidths(const Table &table)
+{
+	std::vector<std::size_t> widths(table.columns, 1);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		for (std::size_t column = 0; column < table.columns && column < row.cells.size(); ++column)
+			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+	}
+	return widths;
+}
+
 std::vector<std::size_t> headerColumnWidths(const Table &table)
 {
 	std::vector<std::size_t> widths(table.columns, 3);
@@ -1087,6 +1100,39 @@ std::size_t wrapCellsToColumnWidths(Table &table, std::size_t originalTargetRow,
 
 	table.rows = std::move(wrappedRows);
 	return wrappedTargetRow;
+}
+
+std::size_t minimumManualColumnWidth(const Table &table, std::size_t column, const std::vector<std::size_t> &naturalWidths)
+{
+	const std::vector<std::size_t> headerWidths = headerColumnWidths(table);
+	const std::size_t headerWidth = column < headerWidths.size() ? headerWidths[column] : static_cast<std::size_t>(3);
+	const std::size_t naturalWidth = column < naturalWidths.size() ? naturalWidths[column] : headerWidth;
+	return (std::min)(naturalWidth, (std::max)(headerWidth, static_cast<std::size_t>(3)));
+}
+
+std::size_t resizeColumnWidth(Table &table, std::size_t originalTargetRow, std::size_t column, bool widen, std::vector<std::size_t> &columnWidths)
+{
+	if (table.separatorRow == static_cast<std::size_t>(-1) || column >= table.columns)
+		return originalTargetRow;
+
+	columnWidths = currentColumnWidths(table);
+	originalTargetRow = unwrapContinuationRows(table, originalTargetRow);
+	if (column >= columnWidths.size())
+		return originalTargetRow;
+
+	const std::vector<std::size_t> naturalWidths = naturalColumnWidths(table);
+	if (widen)
+	{
+		++columnWidths[column];
+	}
+	else
+	{
+		const std::size_t minimumWidth = minimumManualColumnWidth(table, column, naturalWidths);
+		if (columnWidths[column] > minimumWidth)
+			--columnWidths[column];
+	}
+
+	return wrapCellsToColumnWidths(table, originalTargetRow, columnWidths);
 }
 
 bool cellHasText(const std::string &cell)
@@ -2142,6 +2188,7 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 	std::size_t targetRow = tableRow;
 	std::size_t targetColumn = tableColumn;
 	const std::size_t currentRowId = table.rows[tableRow].id;
+	std::vector<std::size_t> minimumWidths;
 
 	switch (action)
 	{
@@ -2196,6 +2243,14 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 			targetColumn = tableColumn >= table.columns ? table.columns - 1 : tableColumn;
 			break;
 
+		case Action::NarrowColumn:
+			targetRow = resizeColumnWidth(table, tableRow, tableColumn, false, minimumWidths);
+			break;
+
+		case Action::WidenColumn:
+			targetRow = resizeColumnWidth(table, tableRow, tableColumn, true, minimumWidths);
+			break;
+
 		case Action::MoveRowUp:
 			if (tableRow > 0 && !table.rows[tableRow].separator && !table.rows[tableRow - 1].separator)
 			{
@@ -2244,7 +2299,9 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 			break;
 	}
 
-	FormatResult formatted = formatTable(table, targetRow, targetColumn);
+	FormatResult formatted = minimumWidths.empty()
+		? formatTable(table, targetRow, targetColumn)
+		: formatTable(table, targetRow, targetColumn, &minimumWidths);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
 	result.changed = true;

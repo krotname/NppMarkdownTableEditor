@@ -142,6 +142,8 @@ ShortcutKey g_insertRowShortcut = { true, true, true, '4' };
 ShortcutKey g_deleteRowShortcut = { true, true, true, '5' };
 ShortcutKey g_insertColumnShortcut = { true, true, true, '6' };
 ShortcutKey g_deleteColumnShortcut = { true, true, true, '7' };
+ShortcutKey g_narrowColumnShortcut = { true, true, true, VK_OEM_COMMA };
+ShortcutKey g_widenColumnShortcut = { true, true, true, VK_OEM_PERIOD };
 ShortcutKey g_moveRowUpShortcut = { true, true, true, '8' };
 ShortcutKey g_moveRowDownShortcut = { true, true, true, '9' };
 ShortcutKey g_moveColumnLeftShortcut = { true, true, true, VK_OEM_4 };
@@ -164,14 +166,16 @@ const std::size_t insertRowCommandIndex = 6;
 const std::size_t deleteRowCommandIndex = 7;
 const std::size_t insertColumnCommandIndex = 8;
 const std::size_t deleteColumnCommandIndex = 9;
-const std::size_t moveRowUpCommandIndex = 10;
-const std::size_t moveRowDownCommandIndex = 11;
-const std::size_t moveColumnLeftCommandIndex = 12;
-const std::size_t moveColumnRightCommandIndex = 13;
-const std::size_t sortRowsAscendingCommandIndex = 14;
-const std::size_t sortRowsDescendingCommandIndex = 15;
-const std::size_t convertCsvTsvCommandIndex = 16;
-const std::size_t insertTableCommandIndex = 17;
+const std::size_t narrowColumnCommandIndex = 10;
+const std::size_t widenColumnCommandIndex = 11;
+const std::size_t moveRowUpCommandIndex = 12;
+const std::size_t moveRowDownCommandIndex = 13;
+const std::size_t moveColumnLeftCommandIndex = 14;
+const std::size_t moveColumnRightCommandIndex = 15;
+const std::size_t sortRowsAscendingCommandIndex = 16;
+const std::size_t sortRowsDescendingCommandIndex = 17;
+const std::size_t convertCsvTsvCommandIndex = 18;
+const std::size_t insertTableCommandIndex = 19;
 const UINT_PTR fitToWindowResizeTimerId = 0x4D54;
 const UINT fitToWindowResizeDelayMs = 160;
 const std::size_t wrapStabilizationPassLimit = 8;
@@ -202,6 +206,12 @@ HICON g_autoFitTableToolbarIconDarkMode = NULL;
 HBITMAP g_autoAlignTableToolbarBmp = NULL;
 HICON g_autoAlignTableToolbarIcon = NULL;
 HICON g_autoAlignTableToolbarIconDarkMode = NULL;
+HBITMAP g_narrowColumnToolbarBmp = NULL;
+HICON g_narrowColumnToolbarIcon = NULL;
+HICON g_narrowColumnToolbarIconDarkMode = NULL;
+HBITMAP g_widenColumnToolbarBmp = NULL;
+HICON g_widenColumnToolbarIcon = NULL;
+HICON g_widenColumnToolbarIconDarkMode = NULL;
 
 bool shouldPreserveEnterColumn(bool activeEditor, bool emptySelection, bool tableLine, UINT message, WPARAM key);
 bool captureEnterColumnToPreserve(HWND hwnd, UINT message, WPARAM key, std::size_t &column);
@@ -253,7 +263,7 @@ struct UiText
 #define UI_TEXT_WITH_ENGLISH_MESSAGES(menuName, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14) \
 { \
 	menuName, \
-	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, NULL, NULL, NULL }, \
+	{ c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, NULL, NULL, NULL, NULL, NULL }, \
 	L"Insert Markdown table", \
 	L"Columns:", \
 	L"Data rows:", \
@@ -288,6 +298,8 @@ const UiText englishUiText =
 		L"Sort rows descending",
 		L"Convert CSV/TSV to table",
 		L"Insert table...",
+		L"Narrow column",
+		L"Widen column",
 		NULL,
 		NULL,
 		NULL
@@ -810,6 +822,8 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u0432\u044B\u0440\u0430\u0432\u043D\u0438\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043A\u0438 (\u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0448\u0438\u0440\u0438\u043D\u044B)";
 		case wrapLongCellsCommandIndex: return L"\u041F\u043E\u0434\u043E\u0433\u043D\u0430\u0442\u044C \u0448\u0438\u0440\u0438\u043D\u0443 \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
 		case autoFitTableCommandIndex: return L"\u0410\u0432\u0442\u043E\u043F\u043E\u0434\u0433\u043E\u043D\u043A\u0430 \u0448\u0438\u0440\u0438\u043D\u044B \u0442\u0430\u0431\u043B\u0438\u0446\u044B \u043F\u043E\u0434 \u043E\u043A\u043D\u043E";
+		case narrowColumnCommandIndex: return L"\u0421\u0443\u0437\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446";
+		case widenColumnCommandIndex: return L"\u0420\u0430\u0441\u0448\u0438\u0440\u0438\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446";
 		default: return NULL;
 		}
 	case UiLanguage::Indonesian:
@@ -918,6 +932,8 @@ const wchar_t *localizedSpecialCommandText(std::size_t index)
 		case autoAlignTableCommandIndex: return L"Auto align after edit (no width change)";
 		case wrapLongCellsCommandIndex: return L"Fit table width to window";
 		case autoFitTableCommandIndex: return L"Auto fit table width to window";
+		case narrowColumnCommandIndex: return L"Narrow column";
+		case widenColumnCommandIndex: return L"Widen column";
 		default: return NULL;
 		}
 	}
@@ -956,6 +972,8 @@ std::size_t legacyCommandIndex(std::size_t index)
 	case deleteRowCommandIndex: return 4;
 	case insertColumnCommandIndex: return 5;
 	case deleteColumnCommandIndex: return 6;
+	case narrowColumnCommandIndex: return 15;
+	case widenColumnCommandIndex: return 16;
 	case moveRowUpCommandIndex: return 7;
 	case moveRowDownCommandIndex: return 8;
 	case moveColumnLeftCommandIndex: return 9;
@@ -996,6 +1014,8 @@ const wchar_t *commandShortcutText(std::size_t index)
 	case deleteRowCommandIndex: return L"Ctrl+Alt+Shift+5";
 	case insertColumnCommandIndex: return L"Ctrl+Alt+Shift+6";
 	case deleteColumnCommandIndex: return L"Ctrl+Alt+Shift+7";
+	case narrowColumnCommandIndex: return L"Ctrl+Alt+Shift+,";
+	case widenColumnCommandIndex: return L"Ctrl+Alt+Shift+.";
 	case moveRowUpCommandIndex: return L"Ctrl+Alt+Shift+8";
 	case moveRowDownCommandIndex: return L"Ctrl+Alt+Shift+9";
 	case moveColumnLeftCommandIndex: return L"Ctrl+Alt+Shift+[";
@@ -1596,7 +1616,9 @@ enum class ToolbarIconKind
 	TableFitWidth,
 	TableAutoFitWidth,
 	TableAlign,
-	TableAutoAlign
+	TableAutoAlign,
+	TableNarrowColumn,
+	TableWidenColumn
 };
 
 void clearIcon(std::uint32_t *pixels)
@@ -1662,6 +1684,26 @@ void drawAutoCorner(std::uint32_t *pixels, std::uint32_t accent)
 	setIconPixel(pixels, 10, 5, accent);
 }
 
+void drawColumnResizeArrows(std::uint32_t *pixels, std::uint32_t accent, bool widen)
+{
+	drawIconHorizontalLine(pixels, 2, 6, 4, accent);
+	drawIconHorizontalLine(pixels, 9, 13, 4, accent);
+	if (widen)
+	{
+		setIconPixel(pixels, 3, 3, accent);
+		setIconPixel(pixels, 3, 5, accent);
+		setIconPixel(pixels, 12, 3, accent);
+		setIconPixel(pixels, 12, 5, accent);
+	}
+	else
+	{
+		setIconPixel(pixels, 5, 3, accent);
+		setIconPixel(pixels, 5, 5, accent);
+		setIconPixel(pixels, 10, 3, accent);
+		setIconPixel(pixels, 10, 5, accent);
+	}
+}
+
 void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
 {
 	const std::uint32_t grid = darkMode ? argb(255, 248, 250, 252) : argb(255, 12, 18, 28);
@@ -1685,6 +1727,12 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 		drawAlignRows(pixels, alignAccent);
 		if (kind == ToolbarIconKind::TableAutoAlign)
 			drawAutoCorner(pixels, fitAccent);
+	}
+	else if (kind == ToolbarIconKind::TableNarrowColumn || kind == ToolbarIconKind::TableWidenColumn)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawColumnResizeArrows(pixels, fitAccent, kind == ToolbarIconKind::TableWidenColumn);
 	}
 }
 
@@ -1792,6 +1840,24 @@ bool ensureAutoAlignTableToolbarIconHandles()
 		ToolbarIconKind::TableAutoAlign);
 }
 
+bool ensureNarrowColumnToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(
+		g_narrowColumnToolbarBmp,
+		g_narrowColumnToolbarIcon,
+		g_narrowColumnToolbarIconDarkMode,
+		ToolbarIconKind::TableNarrowColumn);
+}
+
+bool ensureWidenColumnToolbarIconHandles()
+{
+	return ensureToolbarIconHandles(
+		g_widenColumnToolbarBmp,
+		g_widenColumnToolbarIcon,
+		g_widenColumnToolbarIconDarkMode,
+		ToolbarIconKind::TableWidenColumn);
+}
+
 void destroyAlignToolbarIconHandles()
 {
 	destroyToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
@@ -1816,6 +1882,22 @@ void destroyAutoAlignTableToolbarIconHandles()
 		g_autoAlignTableToolbarBmp,
 		g_autoAlignTableToolbarIcon,
 		g_autoAlignTableToolbarIconDarkMode);
+}
+
+void destroyNarrowColumnToolbarIconHandles()
+{
+	destroyToolbarIconHandles(
+		g_narrowColumnToolbarBmp,
+		g_narrowColumnToolbarIcon,
+		g_narrowColumnToolbarIconDarkMode);
+}
+
+void destroyWidenColumnToolbarIconHandles()
+{
+	destroyToolbarIconHandles(
+		g_widenColumnToolbarBmp,
+		g_widenColumnToolbarIcon,
+		g_widenColumnToolbarIconDarkMode);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -1978,6 +2060,16 @@ bool shouldRunInitialAutoTableFormatForBuffer(bool autoAlignEnabled, bool autoFi
 bool shouldQueueInitialAutoTableFormatForOpenedBuffer(bool autoAlignEnabled, bool autoFitEnabled, bool alreadyHandled)
 {
 	return (autoAlignEnabled || autoFitEnabled) && !alreadyHandled;
+}
+
+bool shouldTryQueuedInitialAutoTableFormatForNotification(UINT notificationCode)
+{
+	return notificationCode != NPPN_FILEOPENED;
+}
+
+bool shouldDeferInitialAutoTableFormatForDocumentLength(LRESULT textLength)
+{
+	return textLength <= 0;
 }
 
 int availableTextPixelWidth(HWND scintilla)
@@ -2270,6 +2362,8 @@ void runInitialAutoTableFormatForBuffer(const SCNotification *notification)
 		if (shouldQueueInitialAutoTableFormatForOpenedBuffer(g_autoAlignTable, g_autoFitTable, alreadyHandled))
 			queueInitialAutoFormatBuffer(bufferId);
 	}
+	if (notification && !shouldTryQueuedInitialAutoTableFormatForNotification(notification->nmhdr.code))
+		return;
 	if (!initialAutoFormatBufferPending(bufferId))
 		return;
 
@@ -2284,10 +2378,13 @@ void runInitialAutoTableFormatForBuffer(const SCNotification *notification)
 		alreadyHandled);
 	if (!shouldRun)
 		return;
-	removePendingInitialAutoFormatBuffer(bufferId);
-	markInitialAutoFormatBufferHandled(bufferId);
+	const LRESULT textLength = scintilla ? ::SendMessage(scintilla, SCI_GETLENGTH, 0, 0) : 0;
+	if (shouldDeferInitialAutoTableFormatForDocumentLength(textLength))
+		return;
 	if (!selectionEmpty(scintilla))
 		return;
+	removePendingInitialAutoFormatBuffer(bufferId);
+	markInitialAutoFormatBufferHandled(bufferId);
 
 	if (g_autoFitTable)
 	{
@@ -2302,6 +2399,14 @@ void runInitialAutoTableFormatForBuffer(const SCNotification *notification)
 		runAutoTableFormatForDocument(MarkdownTable::Action::Align);
 		g_autoAlignInProgress = false;
 	}
+}
+
+void runPendingInitialAutoTableFormatForCurrentBuffer()
+{
+	const uptr_t bufferId = currentBufferId();
+	if (bufferId == 0 || !initialAutoFormatBufferPending(bufferId))
+		return;
+	runInitialAutoTableFormatForBuffer(NULL);
 }
 
 void runInitialAutoTableFormatForCurrentBuffer()
@@ -2322,6 +2427,8 @@ void handleScintillaUpdateUiInternal(const SCNotification *notification)
 		return;
 
 	const bool contentUpdated = (notification->updated & SC_UPDATE_CONTENT) != 0;
+	if (contentUpdated)
+		runPendingInitialAutoTableFormatForCurrentBuffer();
 	runAutoTableFormatAfterUpdate(reinterpret_cast<HWND>(notification->nmhdr.hwndFrom), contentUpdated);
 	checkWordWrapAutoFitWarningInternal();
 }
@@ -4047,6 +4154,16 @@ bool shouldQueueInitialAutoTableFormatForOpenedBufferForTests(bool autoAlignEnab
 	return shouldQueueInitialAutoTableFormatForOpenedBuffer(autoAlignEnabled, autoFitEnabled, alreadyHandled);
 }
 
+bool shouldTryQueuedInitialAutoTableFormatForNotificationForTests(UINT notificationCode)
+{
+	return shouldTryQueuedInitialAutoTableFormatForNotification(notificationCode);
+}
+
+bool shouldDeferInitialAutoTableFormatForDocumentLengthForTests(long textLength)
+{
+	return shouldDeferInitialAutoTableFormatForDocumentLength(static_cast<LRESULT>(textLength));
+}
+
 std::vector<std::size_t> documentMarkdownTableRangeLinesForTests(const std::vector<std::string> &lines)
 {
 	std::vector<std::size_t> result;
@@ -4167,6 +4284,26 @@ void destroyAutoAlignTableToolbarIconsForTests()
 {
 	destroyAutoAlignTableToolbarIconHandles();
 }
+
+bool ensureNarrowColumnToolbarIconsForTests()
+{
+	return ensureNarrowColumnToolbarIconHandles();
+}
+
+void destroyNarrowColumnToolbarIconsForTests()
+{
+	destroyNarrowColumnToolbarIconHandles();
+}
+
+bool ensureWidenColumnToolbarIconsForTests()
+{
+	return ensureWidenColumnToolbarIconHandles();
+}
+
+void destroyWidenColumnToolbarIconsForTests()
+{
+	destroyWidenColumnToolbarIconHandles();
+}
 }
 #endif
 
@@ -4188,6 +4325,8 @@ void pluginCleanUp()
 	destroyWrapLongCellsToolbarIconHandles();
 	destroyAutoFitTableToolbarIconHandles();
 	destroyAutoAlignTableToolbarIconHandles();
+	destroyNarrowColumnToolbarIconHandles();
+	destroyWidenColumnToolbarIconHandles();
 }
 
 //
@@ -4217,6 +4356,8 @@ void commandMenuInit()
 	setCommand(deleteRowCommandIndex, commandMenuText(deleteRowCommandIndex), deleteRow, &g_deleteRowShortcut, false);
 	setCommand(insertColumnCommandIndex, commandMenuText(insertColumnCommandIndex), insertColumnRight, &g_insertColumnShortcut, false);
 	setCommand(deleteColumnCommandIndex, commandMenuText(deleteColumnCommandIndex), deleteColumn, &g_deleteColumnShortcut, false);
+	setCommand(narrowColumnCommandIndex, commandMenuText(narrowColumnCommandIndex), narrowColumn, &g_narrowColumnShortcut, false);
+	setCommand(widenColumnCommandIndex, commandMenuText(widenColumnCommandIndex), widenColumn, &g_widenColumnShortcut, false);
 	setCommand(moveRowUpCommandIndex, commandMenuText(moveRowUpCommandIndex), moveRowUp, &g_moveRowUpShortcut, false);
 	setCommand(moveRowDownCommandIndex, commandMenuText(moveRowDownCommandIndex), moveRowDown, &g_moveRowDownShortcut, false);
 	setCommand(moveColumnLeftCommandIndex, commandMenuText(moveColumnLeftCommandIndex), moveColumnLeft, &g_moveColumnLeftShortcut, false);
@@ -4321,6 +4462,12 @@ void registerToolbarIcons()
 			g_autoFitTableToolbarIcon,
 			g_autoFitTableToolbarIconDarkMode);
 
+	if (funcItem[narrowColumnCommandIndex]._cmdID != 0 && ensureNarrowColumnToolbarIconHandles())
+		registerToolbarIcon(narrowColumnCommandIndex, g_narrowColumnToolbarBmp, g_narrowColumnToolbarIcon, g_narrowColumnToolbarIconDarkMode);
+
+	if (funcItem[widenColumnCommandIndex]._cmdID != 0 && ensureWidenColumnToolbarIconHandles())
+		registerToolbarIcon(widenColumnCommandIndex, g_widenColumnToolbarBmp, g_widenColumnToolbarIcon, g_widenColumnToolbarIconDarkMode);
+
 	refreshAutoFitTableUi();
 	refreshAutoAlignTableUi();
 }
@@ -4391,6 +4538,16 @@ void insertColumnRight()
 void deleteColumn()
 {
 	runTableAction(MarkdownTable::Action::DeleteColumn, false);
+}
+
+void narrowColumn()
+{
+	runTableAction(MarkdownTable::Action::NarrowColumn, false);
+}
+
+void widenColumn()
+{
+	runTableAction(MarkdownTable::Action::WidenColumn, false);
 }
 
 void moveRowUp()

@@ -93,6 +93,7 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | `Next cell` / `Previous cell`                  | Moves the caret between cells                                        |
 | `Insert row below` / `Delete row`              | Adds or deletes a row                                                |
 | `Insert column right` / `Delete column`        | Adds or deletes a column                                             |
+| `Narrow column` / `Widen column`               | Shrinks or expands the current column by one display column          |
 | `Move row up` / `Move row down`                | Moves the current row                                                |
 | `Move column left` / `Move column right`       | Moves the current column                                             |
 | `Sort rows ascending` / `Sort rows descending` | Sorts rows by the current column                                     |
@@ -119,6 +120,8 @@ Commands use `Ctrl+Alt+Shift` with the top number row, adjacent keys, and mnemon
 | `Delete row`                              | `Ctrl+Alt+Shift+5` |
 | `Insert column right`                     | `Ctrl+Alt+Shift+6` |
 | `Delete column`                           | `Ctrl+Alt+Shift+7` |
+| `Narrow column`                           | `Ctrl+Alt+Shift+,` |
+| `Widen column`                            | `Ctrl+Alt+Shift+.` |
 | `Move row up`                             | `Ctrl+Alt+Shift+8` |
 | `Move row down`                           | `Ctrl+Alt+Shift+9` |
 | `Move column left`                        | `Ctrl+Alt+Shift+[` |
