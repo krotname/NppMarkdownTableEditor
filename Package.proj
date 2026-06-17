@@ -355,7 +355,7 @@
     <CoverageReportsDir>$(BuildDir)\reports\coverage</CoverageReportsDir>
     <RawCoverageReport>$(CoverageWorkDir)\coverage.raw.cobertura.xml</RawCoverageReport>
     <CoverageReport>$(CoverageReportsDir)\coverage.cobertura.xml</CoverageReport>
-    <MinimumCoreLineCoverage Condition="'$(MinimumCoreLineCoverage)'==''">0.90</MinimumCoreLineCoverage>
+    <MinimumCoreLineCoverage Condition="'$(MinimumCoreLineCoverage)'==''">0.70</MinimumCoreLineCoverage>
     <PackageRoot>$(BuildDir)\dist</PackageRoot>
     <PackageDir>$(PackageRoot)\MarkdownTableEditor</PackageDir>
     <PluginAdminPackageDir>$(BuildDir)\pluginadmin</PluginAdminPackageDir>

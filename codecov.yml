@@ -1,0 +1,8 @@
+ignore:
+  - "src/DockingFeature/**/*"
+  - "src/MarkdownTableEditorPlugin.cpp"
+  - "src/PluginDefinition.cpp"
+  - "src/*.h"
+  - "src/*.rc"
+  - "tests/**/*"
+  - "vs.proj/**/*"
