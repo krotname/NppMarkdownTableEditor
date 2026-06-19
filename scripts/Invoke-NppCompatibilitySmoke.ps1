@@ -89,7 +89,8 @@ function Reset-Directory([string]$Path) {
         throw "Refusing to remove path outside WorkDir: $resolved"
     }
     if (Test-Path -LiteralPath $resolved) {
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+        $removeArgs = @{ Recurse = $true; Force = $true }
+        Remove-Item -LiteralPath $resolved @removeArgs
     }
     New-Item -ItemType Directory -Path $resolved | Out-Null
 }
@@ -125,8 +126,8 @@ function Find-MenuItemId([IntPtr]$Menu, [string]$Needle, [switch]$Exact) {
     for ($i = 0; $i -lt $count; $i++) {
         $text = Get-MenuText $Menu $i
         $id = [MarkdownTableEditorNppSmokeNative]::GetMenuItemID($Menu, $i)
-        $matches = if ($Exact) { $text -eq $Needle } else { $text -like "*$Needle*" }
-        if ($id -ne -1 -and $matches) {
+        $isMatch = if ($Exact) { $text -eq $Needle } else { $text -like "*$Needle*" }
+        if ($id -ne -1 -and $isMatch) {
             return $id
         }
 

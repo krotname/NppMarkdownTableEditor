@@ -31,6 +31,7 @@ jobs:
         repository: notepad-plus-plus/notepad-plus-plus
         path: npp_repo
         filter: 'blob:none'
+        persist-credentials: false
 
     - name: Diff the hashes
       id: diff_step
