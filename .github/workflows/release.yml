@@ -124,6 +124,8 @@ jobs:
 
       - name: Generate release checksums
         shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           mkdir -p release-files
           mapfile -t downloaded_files < <(find release-assets -type f -name '*.zip' | sort)
@@ -136,15 +138,37 @@ jobs:
             cp "$file" "release-files/$(basename "$file")"
           done
 
-          mapfile -t files < <(find release-files -maxdepth 1 -type f -name '*.zip' | sort)
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > "release-files/MarkdownTableEditor-$VERSION-sbom.cdx.json" <<EOF
+          {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+              "timestamp": "$timestamp",
+              "component": {
+                "type": "application",
+                "name": "NppMarkdownTableEditor",
+                "version": "$VERSION",
+                "purl": "pkg:github/krotname/NppMarkdownTableEditor@v$VERSION"
+              }
+            }
+          }
+          EOF
+
+          mapfile -t files < <(find release-files -maxdepth 1 -type f \( -name '*.zip' -o -name '*-sbom.cdx.json' \) | sort)
           sha256sum "${files[@]}" > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Generate release provenance attestation
-        continue-on-error: true
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-checksums: SHA256SUMS.txt
+      - name: Generate release SBOM attestation
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        with:
+          subject-path: release-files/*.zip
+          sbom-path: release-files/*-sbom.cdx.json
 
       - name: Publish GitHub release
         shell: bash
@@ -153,7 +177,7 @@ jobs:
           TAG_NAME: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mapfile -t files < <(find release-files -maxdepth 1 -type f -name '*.zip' | sort)
+          mapfile -t files < <(find release-files -maxdepth 1 -type f \( -name '*.zip' -o -name '*-sbom.cdx.json' \) | sort)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release ZIP files were downloaded." >&2
             exit 1
@@ -163,7 +187,7 @@ jobs:
 
           - Hardened GitHub Actions permissions, dependency review, CodeQL, Scorecard, release packaging, and remote-update checks after repository audit.
           - Refreshed compatibility smoke scripts and packaging targets for the current Notepad++ plugin release baseline.
-          - Rebuilt x86, x64, and arm64 plugin ZIPs plus Plugin Admin ZIPs with SHA-256 sums.
+          - Rebuilt x86, x64, and arm64 plugin ZIPs plus Plugin Admin ZIPs with SHA-256 sums, SBOM, and GitHub attestations.
 
           ## Validation
 
