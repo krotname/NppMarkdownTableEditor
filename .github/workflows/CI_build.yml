@@ -46,7 +46,6 @@ jobs:
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
       with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           files: build/reports/coverage/coverage.cobertura.xml
           disable_search: true
           flags: cpp-core
