@@ -68,6 +68,16 @@ If Windows does not allow writing to `Program Files`, install the plugin in the 
 %LOCALAPPDATA%\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 ```
 
+## Release Verification
+
+Each release publishes x86/x64/arm64 ZIP archives, Plugin Admin ZIPs,
+`SHA256SUMS.txt`, CycloneDX SBOM, and GitHub attestations.
+
+```bash
+sha256sum -c SHA256SUMS.txt
+gh attestation verify MarkdownTableEditor-*-x64.zip --repo krotname/NppMarkdownTableEditor
+```
+
 ## Publication
 
 - Official Notepad++ Plugin List pull request: https://github.com/notepad-plus-plus/nppPluginList/pull/1115

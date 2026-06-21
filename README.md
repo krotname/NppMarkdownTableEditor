@@ -69,6 +69,16 @@ C:\Program Files\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 %LOCALAPPDATA%\Notepad++\plugins\MarkdownTableEditor\MarkdownTableEditor.dll
 ```
 
+## Проверка Релиза
+
+Каждый release публикует ZIP-архивы для x86/x64/arm64, Plugin Admin ZIP,
+`SHA256SUMS.txt`, CycloneDX SBOM и GitHub attestations.
+
+```bash
+sha256sum -c SHA256SUMS.txt
+gh attestation verify MarkdownTableEditor-*-x64.zip --repo krotname/NppMarkdownTableEditor
+```
+
 ## Публикация
 
 - PR в официальный Notepad++ Plugin List: https://github.com/notepad-plus-plus/nppPluginList/pull/1115
