@@ -163,7 +163,9 @@ jobs:
       - name: Generate release provenance attestation
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
-          subject-checksums: SHA256SUMS.txt
+          subject-path: |
+            release-files/*.zip
+            release-files/*-sbom.cdx.json
       - name: Generate release SBOM attestation
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
