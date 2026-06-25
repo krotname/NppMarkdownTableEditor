@@ -434,6 +434,16 @@
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)scripts\Invoke-NppCompatibilitySmoke.ps1&quot; -Win32PluginPath &quot;$(ProjectRoot)bin\MarkdownTableEditor.dll&quot; -X64PluginPath &quot;$(ProjectRoot)bin64\MarkdownTableEditor.dll&quot;" />
   </Target>
 
+  <Target Name="BuildNppLatestSmokePlugin">
+    <MSBuild Projects="$(MSBuildThisFileFullPath)"
+             Targets="BuildPlugin"
+             Properties="Configuration=Release;Platform=x64" />
+  </Target>
+
+  <Target Name="NppLatestSmoke" DependsOnTargets="BuildNppLatestSmokePlugin">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)scripts\Invoke-NppCompatibilitySmoke.ps1&quot; -LatestOnly -X64PluginPath &quot;$(ProjectRoot)bin64\MarkdownTableEditor.dll&quot;" />
+  </Target>
+
   <Target Name="BuildReleaseAllPlatforms">
     <ItemGroup>
       <ReleaseBuildPlatform Include="Win32" />

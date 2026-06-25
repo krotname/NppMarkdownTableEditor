@@ -3,14 +3,18 @@ param(
     [string]$Win32PluginPath = "",
     [string]$X64PluginPath = "",
     [string]$Notepad759Url = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v7.5.9/npp.7.5.9.bin.zip",
-    [string]$Notepad831Url = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.3.1/npp.8.3.1.portable.x64.zip"
+    [string]$Notepad831Url = "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.3.1/npp.8.3.1.portable.x64.zip",
+    [string]$NotepadLatestApiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest",
+    [string]$NotepadLatestPortableUrl = "",
+    [switch]$IncludeLatest,
+    [switch]$LatestOnly
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 if (-not $WorkDir) {
-    $WorkDir = Join-Path $projectRoot "build\npp-compat"
+    $WorkDir = Join-Path $projectRoot ($(if ($LatestOnly) { "build\npp-latest" } else { "build\npp-compat" }))
 } elseif (-not [IO.Path]::IsPathRooted($WorkDir)) {
     $WorkDir = Join-Path $projectRoot $WorkDir
 }
@@ -29,7 +33,7 @@ if (-not $X64PluginPath) {
 
 $Win32PluginPath = [IO.Path]::GetFullPath($Win32PluginPath)
 $X64PluginPath = [IO.Path]::GetFullPath($X64PluginPath)
-if (-not (Test-Path -LiteralPath $Win32PluginPath)) {
+if (-not $LatestOnly -and -not (Test-Path -LiteralPath $Win32PluginPath)) {
     throw "Win32 plugin DLL not found: $Win32PluginPath"
 }
 if (-not (Test-Path -LiteralPath $X64PluginPath)) {
@@ -111,10 +115,54 @@ function Download-And-Extract([string]$Name, [string]$Url, [string]$ZipName) {
     return $exe.FullName
 }
 
-function Get-MenuText([IntPtr]$Menu, [int]$Position) {
+function Resolve-LatestNotepadPortable {
+    if ($NotepadLatestPortableUrl) {
+        $uri = [Uri]$NotepadLatestPortableUrl
+        $assetName = [IO.Path]::GetFileName($uri.AbsolutePath)
+        if (-not $assetName) {
+            $assetName = "npp.latest.portable.x64.zip"
+        }
+        return [pscustomobject]@{
+            Tag = "custom"
+            Name = "custom"
+            AssetName = $assetName
+            Url = $NotepadLatestPortableUrl
+            HtmlUrl = $NotepadLatestPortableUrl
+        }
+    }
+
+    Write-Host "Resolving latest Notepad++ release"
+    $release = Invoke-RestMethod -Headers @{ "User-Agent" = "MarkdownTableEditor-Smoke" } -Uri $NotepadLatestApiUrl
+    $asset = @($release.assets | Where-Object {
+        $_.name -match "portable\.x64\.zip$" -and $_.name -notmatch "sha256"
+    } | Select-Object -First 1)
+    if ($asset.Count -eq 0) {
+        throw "Latest Notepad++ release does not expose a portable x64 ZIP asset: $($release.html_url)"
+    }
+
+    return [pscustomobject]@{
+        Tag = [string]$release.tag_name
+        Name = [string]$release.name
+        AssetName = [string]$asset[0].name
+        Url = [string]$asset[0].browser_download_url
+        HtmlUrl = [string]$release.html_url
+    }
+}
+
+function Install-X64Plugin([string]$ExePath, [string]$PluginPath) {
+    $pluginsDir = Join-Path (Split-Path $ExePath -Parent) "plugins\MarkdownTableEditor"
+    New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
+    Copy-Item -LiteralPath $PluginPath -Destination (Join-Path $pluginsDir "MarkdownTableEditor.dll") -Force
+}
+
+function Get-RawMenuText([IntPtr]$Menu, [int]$Position) {
     $buffer = [Text.StringBuilder]::new(512)
     [void][MarkdownTableEditorNppSmokeNative]::GetMenuString($Menu, $Position, $buffer, $buffer.Capacity, $MF_BYPOSITION)
-    return (($buffer.ToString() -replace "&", "") -replace "\t.*$", "").Trim()
+    return ($buffer.ToString() -replace "&", "").Trim()
+}
+
+function Get-MenuText([IntPtr]$Menu, [int]$Position) {
+    return ((Get-RawMenuText $Menu $Position) -replace "\t.*$", "").Trim()
 }
 
 function Find-MenuItemId([IntPtr]$Menu, [string]$Needle, [switch]$Exact) {
@@ -124,10 +172,11 @@ function Find-MenuItemId([IntPtr]$Menu, [string]$Needle, [switch]$Exact) {
 
     $count = [MarkdownTableEditorNppSmokeNative]::GetMenuItemCount($Menu)
     for ($i = 0; $i -lt $count; $i++) {
+        $rawText = Get-RawMenuText $Menu $i
         $text = Get-MenuText $Menu $i
         $id = [MarkdownTableEditorNppSmokeNative]::GetMenuItemID($Menu, $i)
-        $isMatch = if ($Exact) { $text -eq $Needle } else { $text -like "*$Needle*" }
-        if ($id -ne -1 -and $isMatch) {
+        $matches = if ($Exact) { $text -eq $Needle } else { $text -like "*$Needle*" -or $rawText -like "*$Needle*" }
+        if ($id -ne -1 -and $matches) {
             return $id
         }
 
@@ -297,19 +346,126 @@ function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath) {
     }
 }
 
+function Invoke-TableMenuCommandSmoke(
+    [string]$Name,
+    [string]$ExePath,
+    [string]$FileName,
+    [string]$InputText,
+    [string]$MenuNeedle,
+    [string]$ExpectedText
+) {
+    $testFile = Join-Path (Split-Path $ExePath -Parent) $FileName
+    Set-Content -LiteralPath $testFile -Value $InputText -Encoding UTF8 -NoNewline
+
+    $process = Start-Process -FilePath $ExePath -ArgumentList @("-multiInst", "-nosession", $testFile) -WindowStyle Normal -PassThru
+    try {
+        $mainWindow = [IntPtr]::Zero
+        for ($i = 0; $i -lt 80; $i++) {
+            Start-Sleep -Milliseconds 250
+            $process.Refresh()
+            if ($process.MainWindowHandle -ne 0) {
+                $mainWindow = [IntPtr]$process.MainWindowHandle
+                break
+            }
+        }
+        if ($mainWindow -eq [IntPtr]::Zero) {
+            throw "${Name}: Notepad++ main window was not found"
+        }
+
+        $commandId = $null
+        for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Milliseconds 250
+            $commandId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) $MenuNeedle
+            if ($null -ne $commandId) {
+                break
+            }
+        }
+        if ($null -eq $commandId) {
+            throw "${Name}: plugin menu item was not found: $MenuNeedle"
+        }
+
+        [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$commandId, [IntPtr]::Zero)
+        Start-Sleep -Seconds 1
+
+        $dialogs = @(Get-ProcessDialogs $process.Id)
+        foreach ($dialog in $dialogs) {
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage($dialog.Handle, $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero)
+        }
+        if ($dialogs.Count -gt 0) {
+            $titles = ($dialogs | ForEach-Object { $_.Title }) -join "; "
+            throw "${Name}: unexpected dialog after $MenuNeedle command: $titles"
+        }
+
+        $saveId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Save" -Exact
+        if ($null -eq $saveId) {
+            throw "${Name}: save menu item was not found"
+        }
+        [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$saveId, [IntPtr]::Zero)
+        Start-Sleep -Seconds 1
+
+        $actual = (Get-Content -LiteralPath $testFile -Raw -Encoding UTF8) -replace "`r`n", "`n"
+        $actual = $actual.TrimEnd("`r", "`n")
+        $expected = ($ExpectedText -replace "`r`n", "`n").TrimEnd("`r", "`n")
+        if ($actual -ne $expected) {
+            throw "${Name}: $MenuNeedle result mismatch.`nExpected:`n$expected`nActual:`n$actual"
+        }
+
+        Write-Host "${Name}: $MenuNeedle menu smoke passed"
+    }
+    finally {
+        if (-not $process.HasExited) {
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage([IntPtr]$process.MainWindowHandle, $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero)
+            if (-not $process.WaitForExit(3000)) {
+                $process.Kill()
+                $process.WaitForExit()
+            }
+        }
+    }
+}
+
 Reset-Directory $WorkDir
 
-$npp759 = Download-And-Extract "npp-7.5.9-x86" $Notepad759Url "npp.7.5.9.bin.zip"
-$npp831 = Download-And-Extract "npp-8.3.1-x64" $Notepad831Url "npp.8.3.1.portable.x64.zip"
+if (-not $LatestOnly) {
+    $npp759 = Download-And-Extract "npp-7.5.9-x86" $Notepad759Url "npp.7.5.9.bin.zip"
+    $npp831 = Download-And-Extract "npp-8.3.1-x64" $Notepad831Url "npp.8.3.1.portable.x64.zip"
 
-$plugins759 = Join-Path (Split-Path $npp759 -Parent) "plugins"
-$plugins831 = Join-Path (Split-Path $npp831 -Parent) "plugins\MarkdownTableEditor"
-New-Item -ItemType Directory -Path $plugins759 -Force | Out-Null
-New-Item -ItemType Directory -Path $plugins831 -Force | Out-Null
-Copy-Item -LiteralPath $Win32PluginPath -Destination (Join-Path $plugins759 "MarkdownTableEditor.dll") -Force
-Copy-Item -LiteralPath $X64PluginPath -Destination (Join-Path $plugins831 "MarkdownTableEditor.dll") -Force
+    $plugins759 = Join-Path (Split-Path $npp759 -Parent) "plugins"
+    New-Item -ItemType Directory -Path $plugins759 -Force | Out-Null
+    Copy-Item -LiteralPath $Win32PluginPath -Destination (Join-Path $plugins759 "MarkdownTableEditor.dll") -Force
+    Install-X64Plugin $npp831 $X64PluginPath
 
-Invoke-ConvertSmoke "Notepad++ 7.5.9 x86" $npp759
-Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759
-Invoke-ConvertSmoke "Notepad++ 8.3.1 x64" $npp831
-Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831
+    Invoke-ConvertSmoke "Notepad++ 7.5.9 x86" $npp759
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759
+    Invoke-ConvertSmoke "Notepad++ 8.3.1 x64" $npp831
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831
+}
+
+if ($IncludeLatest -or $LatestOnly) {
+    $latest = Resolve-LatestNotepadPortable
+    $safeLatestName = ($latest.Tag -replace "[^0-9A-Za-z_.-]", "-").Trim("-")
+    if (-not $safeLatestName) {
+        $safeLatestName = "latest"
+    }
+    $latestExe = Download-And-Extract "npp-$safeLatestName-x64" $latest.Url $latest.AssetName
+    Install-X64Plugin $latestExe $X64PluginPath
+
+    $latestLabel = "Notepad++ $($latest.Tag) x64"
+    Write-Host "$latestLabel release page: $($latest.HtmlUrl)"
+    Invoke-ConvertSmoke $latestLabel $latestExe
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe
+    Invoke-TableMenuCommandSmoke `
+        -Name $latestLabel `
+        -ExePath $latestExe `
+        -FileName "mte-sort-ascending.md" `
+        -InputText "| Name | Score |`r`n| ---- | ----- |`r`n| Bob | 2 |`r`n| Anna | 10 |`r`n" `
+        -MenuNeedle "Ctrl+Alt+Shift+=" `
+        -ExpectedText "| Name | Score |`n| ---- | ----- |`n| Anna | 10    |`n| Bob  | 2     |"
+    Invoke-TableMenuCommandSmoke `
+        -Name $latestLabel `
+        -ExePath $latestExe `
+        -FileName "mte-sort-descending.md" `
+        -InputText "| Name | Score |`r`n| ---- | ----- |`r`n| Anna | 10 |`r`n| Bob | 2 |`r`n" `
+        -MenuNeedle "Ctrl+Alt+Shift+-" `
+        -ExpectedText "| Name | Score |`n| ---- | ----- |`n| Bob  | 2     |`n| Anna | 10    |"
+    Write-Host "$latestLabel latest regression smoke passed"
+}

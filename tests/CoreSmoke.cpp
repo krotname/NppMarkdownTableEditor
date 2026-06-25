@@ -241,6 +241,24 @@ int main()
 			"|     | gamma           |"
 		});
 
+	const MarkdownTable::EditResult narrowedAlignedColumn = MarkdownTable::apply(
+		{
+			"| Key | Value            |",
+			"| --- | ---------------- |",
+			"| row | alpha beta gamma |"
+		},
+		2,
+		1,
+		MarkdownTable::Action::NarrowColumn);
+	expectTrue("narrow aligned column ok", narrowedAlignedColumn.ok);
+	expectLines("narrow aligned column wraps current column", narrowedAlignedColumn.lines,
+		{
+			"| Key | Value           |",
+			"| --- | --------------- |",
+			"| row | alpha beta      |",
+			"|     | gamma           |"
+		});
+
 	const MarkdownTable::EditResult widenedColumn = MarkdownTable::apply(narrowedColumn.lines, 2, 1, MarkdownTable::Action::WidenColumn);
 	expectTrue("widen column ok", widenedColumn.ok);
 	expectLines("widen column rejoins current column", widenedColumn.lines,

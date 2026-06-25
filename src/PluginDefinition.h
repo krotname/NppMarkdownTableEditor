@@ -150,11 +150,11 @@ bool shouldShowWordWrapAutoFitWarningForTests(bool autoFitEnabled, bool wordWrap
 bool shouldRunFitToWindowAfterResizeForTests(bool enabled, bool inProgress, bool activeEditor, std::size_t previousColumns, std::size_t currentColumns);
 bool shouldScheduleFitToWindowAfterResizeMessageForTests(bool enabled, UINT message, WPARAM wParam, UINT windowPosFlags);
 bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled);
-bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated);
+bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress, bool activeEditor, bool contentUpdated);
 bool scintillaModificationShouldRunAutoTableFormatForTests(int modificationType);
 bool shouldRunAutoFitAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor);
 bool shouldScheduleFitToWindowAfterZoomForTests(bool autoFitEnabled, bool fitInProgress, bool activeEditor);
-bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress);
+bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress);
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled);
 bool shouldRunInitialAutoTableFormatForBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool alreadyHandled);
 bool shouldQueueInitialAutoTableFormatForOpenedBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alreadyHandled);
@@ -179,6 +179,8 @@ bool ensureNarrowColumnToolbarIconsForTests();
 void destroyNarrowColumnToolbarIconsForTests();
 bool ensureWidenColumnToolbarIconsForTests();
 void destroyWidenColumnToolbarIconsForTests();
+bool ensureAllToolbarIconsForTests();
+void destroyAllToolbarIconsForTests();
 }
 #endif
 

@@ -184,6 +184,10 @@ bool g_autoFitTable = true;
 bool g_autoAlignTable = true;
 bool g_fitToWindowInProgress = false;
 bool g_autoAlignInProgress = false;
+int g_pluginEditDepth = 0;
+int g_pluginEditUpdateAutoFormatSkips = 0;
+int g_pluginEditGlobalAutoFormatSkips = 0;
+int g_pluginEditResizeAutoFitSkips = 0;
 bool g_wordWrapAutoFitWarningSuppressed = false;
 bool g_wordWrapAutoFitWarningSuppressionLoaded = false;
 bool g_wordWrapAutoFitWarningComboActive = false;
@@ -194,24 +198,42 @@ HWND g_pendingFitToWindowScintilla = NULL;
 WNDPROC g_originalMainScintillaProc = NULL;
 WNDPROC g_originalSecondScintillaProc = NULL;
 WNDPROC g_originalNppProc = NULL;
-HBITMAP g_alignToolbarBmp = NULL;
-HICON g_alignToolbarIcon = NULL;
-HICON g_alignToolbarIconDarkMode = NULL;
-HBITMAP g_wrapLongCellsToolbarBmp = NULL;
-HICON g_wrapLongCellsToolbarIcon = NULL;
-HICON g_wrapLongCellsToolbarIconDarkMode = NULL;
-HBITMAP g_autoFitTableToolbarBmp = NULL;
-HICON g_autoFitTableToolbarIcon = NULL;
-HICON g_autoFitTableToolbarIconDarkMode = NULL;
-HBITMAP g_autoAlignTableToolbarBmp = NULL;
-HICON g_autoAlignTableToolbarIcon = NULL;
-HICON g_autoAlignTableToolbarIconDarkMode = NULL;
-HBITMAP g_narrowColumnToolbarBmp = NULL;
-HICON g_narrowColumnToolbarIcon = NULL;
-HICON g_narrowColumnToolbarIconDarkMode = NULL;
-HBITMAP g_widenColumnToolbarBmp = NULL;
-HICON g_widenColumnToolbarIcon = NULL;
-HICON g_widenColumnToolbarIconDarkMode = NULL;
+HBITMAP g_toolbarBmps[nbFunc] = {};
+HICON g_toolbarIcons[nbFunc] = {};
+HICON g_toolbarIconDarkModes[nbFunc] = {};
+
+void cancelFitToWindowResizeTimers();
+
+struct PluginEditGuard
+{
+	PluginEditGuard()
+	{
+		++g_pluginEditDepth;
+		g_pluginEditUpdateAutoFormatSkips = (std::max)(g_pluginEditUpdateAutoFormatSkips, 2);
+		g_pluginEditGlobalAutoFormatSkips = (std::max)(g_pluginEditGlobalAutoFormatSkips, 2);
+		g_pluginEditResizeAutoFitSkips = (std::max)(g_pluginEditResizeAutoFitSkips, 1);
+		cancelFitToWindowResizeTimers();
+	}
+
+	~PluginEditGuard()
+	{
+		if (g_pluginEditDepth > 0)
+			--g_pluginEditDepth;
+		cancelFitToWindowResizeTimers();
+	}
+};
+
+bool consumePluginEditAutoFormatSkip(int &skips)
+{
+	if (g_pluginEditDepth > 0)
+		return true;
+	if (skips > 0)
+	{
+		--skips;
+		return true;
+	}
+	return false;
+}
 
 bool shouldPreserveEnterColumn(bool activeEditor, bool emptySelection, bool tableLine, UINT message, WPARAM key);
 bool captureEnterColumnToPreserve(HWND hwnd, UINT message, WPARAM key, std::size_t &column);
@@ -1617,8 +1639,22 @@ enum class ToolbarIconKind
 	TableAutoFitWidth,
 	TableAlign,
 	TableAutoAlign,
+	TableNextCell,
+	TablePreviousCell,
+	TableInsertRow,
+	TableDeleteRow,
+	TableInsertColumn,
+	TableDeleteColumn,
 	TableNarrowColumn,
-	TableWidenColumn
+	TableWidenColumn,
+	TableMoveRowUp,
+	TableMoveRowDown,
+	TableMoveColumnLeft,
+	TableMoveColumnRight,
+	TableSortAscending,
+	TableSortDescending,
+	TableConvertDelimited,
+	TableInsertTable
 };
 
 void clearIcon(std::uint32_t *pixels)
@@ -1704,12 +1740,99 @@ void drawColumnResizeArrows(std::uint32_t *pixels, std::uint32_t accent, bool wi
 	}
 }
 
+void drawIconPlus(std::uint32_t *pixels, int x, int y, std::uint32_t color)
+{
+	drawIconHorizontalLine(pixels, x - 2, x + 2, y, color);
+	drawIconVerticalLine(pixels, x, y - 2, y + 2, color);
+}
+
+void drawIconMinus(std::uint32_t *pixels, int x, int y, std::uint32_t color)
+{
+	drawIconHorizontalLine(pixels, x - 2, x + 2, y, color);
+}
+
+void drawArrowRight(std::uint32_t *pixels, int x1, int x2, int y, std::uint32_t color)
+{
+	drawIconHorizontalLine(pixels, x1, x2, y, color);
+	setIconPixel(pixels, x2 - 1, y - 1, color);
+	setIconPixel(pixels, x2 - 2, y - 2, color);
+	setIconPixel(pixels, x2 - 1, y + 1, color);
+	setIconPixel(pixels, x2 - 2, y + 2, color);
+}
+
+void drawArrowLeft(std::uint32_t *pixels, int x1, int x2, int y, std::uint32_t color)
+{
+	drawIconHorizontalLine(pixels, x1, x2, y, color);
+	setIconPixel(pixels, x1 + 1, y - 1, color);
+	setIconPixel(pixels, x1 + 2, y - 2, color);
+	setIconPixel(pixels, x1 + 1, y + 1, color);
+	setIconPixel(pixels, x1 + 2, y + 2, color);
+}
+
+void drawArrowDown(std::uint32_t *pixels, int x, int y1, int y2, std::uint32_t color)
+{
+	drawIconVerticalLine(pixels, x, y1, y2, color);
+	setIconPixel(pixels, x - 1, y2 - 1, color);
+	setIconPixel(pixels, x - 2, y2 - 2, color);
+	setIconPixel(pixels, x + 1, y2 - 1, color);
+	setIconPixel(pixels, x + 2, y2 - 2, color);
+}
+
+void drawArrowUp(std::uint32_t *pixels, int x, int y1, int y2, std::uint32_t color)
+{
+	drawIconVerticalLine(pixels, x, y1, y2, color);
+	setIconPixel(pixels, x - 1, y1 + 1, color);
+	setIconPixel(pixels, x - 2, y1 + 2, color);
+	setIconPixel(pixels, x + 1, y1 + 1, color);
+	setIconPixel(pixels, x + 2, y1 + 2, color);
+}
+
+void drawHighlightedRow(std::uint32_t *pixels, std::uint32_t color)
+{
+	drawIconHorizontalLine(pixels, 2, 13, 11, color);
+	drawIconHorizontalLine(pixels, 2, 13, 12, color);
+}
+
+void drawHighlightedColumn(std::uint32_t *pixels, std::uint32_t color)
+{
+	drawIconVerticalLine(pixels, 7, 9, 13, color);
+	drawIconVerticalLine(pixels, 8, 9, 13, color);
+}
+
+void drawSortBars(std::uint32_t *pixels, std::uint32_t color, bool descending)
+{
+	const int widths[3] = { 4, 6, 8 };
+	for (int row = 0; row < 3; ++row)
+	{
+		const int width = descending ? widths[2 - row] : widths[row];
+		const int y = 3 + row * 3;
+		drawIconHorizontalLine(pixels, 2, 2 + width, y, color);
+		drawIconHorizontalLine(pixels, 2, 2 + width, y + 1, color);
+	}
+	if (descending)
+		drawArrowDown(pixels, 13, 2, 11, color);
+	else
+		drawArrowUp(pixels, 13, 2, 11, color);
+}
+
+void drawDelimitedDots(std::uint32_t *pixels, std::uint32_t color)
+{
+	for (int y = 2; y <= 5; y += 3)
+	{
+		setIconPixel(pixels, 2, y, color);
+		setIconPixel(pixels, 5, y, color);
+		setIconPixel(pixels, 8, y, color);
+	}
+	drawArrowRight(pixels, 9, 13, 4, color);
+}
+
 void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKind kind)
 {
 	const std::uint32_t grid = darkMode ? argb(255, 248, 250, 252) : argb(255, 12, 18, 28);
 	const std::uint32_t muted = darkMode ? argb(255, 190, 202, 216) : argb(255, 74, 85, 104);
 	const std::uint32_t fitAccent = darkMode ? argb(255, 255, 82, 82) : argb(255, 232, 0, 32);
 	const std::uint32_t alignAccent = darkMode ? argb(255, 64, 176, 255) : argb(255, 0, 88, 255);
+	const std::uint32_t editAccent = darkMode ? argb(255, 74, 222, 128) : argb(255, 22, 163, 74);
 
 	clearIcon(pixels);
 	if (kind == ToolbarIconKind::TableFitWidth || kind == ToolbarIconKind::TableAutoFitWidth)
@@ -1728,11 +1851,75 @@ void drawMarkdownToolbarIcon(std::uint32_t *pixels, bool darkMode, ToolbarIconKi
 		if (kind == ToolbarIconKind::TableAutoAlign)
 			drawAutoCorner(pixels, fitAccent);
 	}
+	else if (kind == ToolbarIconKind::TableNextCell || kind == ToolbarIconKind::TablePreviousCell)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		if (kind == ToolbarIconKind::TableNextCell)
+			drawArrowRight(pixels, 3, 12, 4, editAccent);
+		else
+			drawArrowLeft(pixels, 3, 12, 4, editAccent);
+	}
+	else if (kind == ToolbarIconKind::TableInsertRow || kind == ToolbarIconKind::TableDeleteRow)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawHighlightedRow(pixels, editAccent);
+		if (kind == ToolbarIconKind::TableInsertRow)
+			drawIconPlus(pixels, 12, 4, editAccent);
+		else
+			drawIconMinus(pixels, 12, 4, fitAccent);
+	}
+	else if (kind == ToolbarIconKind::TableInsertColumn || kind == ToolbarIconKind::TableDeleteColumn)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawHighlightedColumn(pixels, editAccent);
+		if (kind == ToolbarIconKind::TableInsertColumn)
+			drawIconPlus(pixels, 12, 4, editAccent);
+		else
+			drawIconMinus(pixels, 12, 4, fitAccent);
+	}
 	else if (kind == ToolbarIconKind::TableNarrowColumn || kind == ToolbarIconKind::TableWidenColumn)
 	{
 		drawMdBadge(pixels, grid);
 		drawMiniTable(pixels, grid, muted);
 		drawColumnResizeArrows(pixels, fitAccent, kind == ToolbarIconKind::TableWidenColumn);
+	}
+	else if (kind == ToolbarIconKind::TableMoveRowUp || kind == ToolbarIconKind::TableMoveRowDown)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawHighlightedRow(pixels, muted);
+		if (kind == ToolbarIconKind::TableMoveRowUp)
+			drawArrowUp(pixels, 12, 2, 6, editAccent);
+		else
+			drawArrowDown(pixels, 12, 2, 6, editAccent);
+	}
+	else if (kind == ToolbarIconKind::TableMoveColumnLeft || kind == ToolbarIconKind::TableMoveColumnRight)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawHighlightedColumn(pixels, muted);
+		if (kind == ToolbarIconKind::TableMoveColumnLeft)
+			drawArrowLeft(pixels, 3, 12, 4, editAccent);
+		else
+			drawArrowRight(pixels, 3, 12, 4, editAccent);
+	}
+	else if (kind == ToolbarIconKind::TableSortAscending || kind == ToolbarIconKind::TableSortDescending)
+	{
+		drawSortBars(pixels, alignAccent, kind == ToolbarIconKind::TableSortDescending);
+	}
+	else if (kind == ToolbarIconKind::TableConvertDelimited)
+	{
+		drawDelimitedDots(pixels, alignAccent);
+		drawMiniTable(pixels, grid, muted);
+	}
+	else if (kind == ToolbarIconKind::TableInsertTable)
+	{
+		drawMdBadge(pixels, grid);
+		drawMiniTable(pixels, grid, muted);
+		drawIconPlus(pixels, 12, 4, editAccent);
 	}
 }
 
@@ -1812,92 +1999,153 @@ void destroyToolbarIconHandles(HBITMAP &bitmap, HICON &icon, HICON &darkModeIcon
 	}
 }
 
+ToolbarIconKind toolbarIconKindForCommand(std::size_t commandIndex)
+{
+	switch (commandIndex)
+	{
+	case alignCommandIndex: return ToolbarIconKind::TableAlign;
+	case autoAlignTableCommandIndex: return ToolbarIconKind::TableAutoAlign;
+	case wrapLongCellsCommandIndex: return ToolbarIconKind::TableFitWidth;
+	case autoFitTableCommandIndex: return ToolbarIconKind::TableAutoFitWidth;
+	case nextCellCommandIndex: return ToolbarIconKind::TableNextCell;
+	case previousCellCommandIndex: return ToolbarIconKind::TablePreviousCell;
+	case insertRowCommandIndex: return ToolbarIconKind::TableInsertRow;
+	case deleteRowCommandIndex: return ToolbarIconKind::TableDeleteRow;
+	case insertColumnCommandIndex: return ToolbarIconKind::TableInsertColumn;
+	case deleteColumnCommandIndex: return ToolbarIconKind::TableDeleteColumn;
+	case narrowColumnCommandIndex: return ToolbarIconKind::TableNarrowColumn;
+	case widenColumnCommandIndex: return ToolbarIconKind::TableWidenColumn;
+	case moveRowUpCommandIndex: return ToolbarIconKind::TableMoveRowUp;
+	case moveRowDownCommandIndex: return ToolbarIconKind::TableMoveRowDown;
+	case moveColumnLeftCommandIndex: return ToolbarIconKind::TableMoveColumnLeft;
+	case moveColumnRightCommandIndex: return ToolbarIconKind::TableMoveColumnRight;
+	case sortRowsAscendingCommandIndex: return ToolbarIconKind::TableSortAscending;
+	case sortRowsDescendingCommandIndex: return ToolbarIconKind::TableSortDescending;
+	case convertCsvTsvCommandIndex: return ToolbarIconKind::TableConvertDelimited;
+	case insertTableCommandIndex: return ToolbarIconKind::TableInsertTable;
+	default: return ToolbarIconKind::TableAlign;
+	}
+}
+
+bool commandHasExplicitToolbarIconKind(std::size_t commandIndex)
+{
+	switch (commandIndex)
+	{
+	case alignCommandIndex:
+	case autoAlignTableCommandIndex:
+	case wrapLongCellsCommandIndex:
+	case autoFitTableCommandIndex:
+	case nextCellCommandIndex:
+	case previousCellCommandIndex:
+	case insertRowCommandIndex:
+	case deleteRowCommandIndex:
+	case insertColumnCommandIndex:
+	case deleteColumnCommandIndex:
+	case narrowColumnCommandIndex:
+	case widenColumnCommandIndex:
+	case moveRowUpCommandIndex:
+	case moveRowDownCommandIndex:
+	case moveColumnLeftCommandIndex:
+	case moveColumnRightCommandIndex:
+	case sortRowsAscendingCommandIndex:
+	case sortRowsDescendingCommandIndex:
+	case convertCsvTsvCommandIndex:
+	case insertTableCommandIndex:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool ensureCommandToolbarIconHandles(std::size_t commandIndex)
+{
+	if (commandIndex >= static_cast<std::size_t>(nbFunc))
+		return false;
+	if (!commandHasExplicitToolbarIconKind(commandIndex))
+		return false;
+
+	return ensureToolbarIconHandles(
+		g_toolbarBmps[commandIndex],
+		g_toolbarIcons[commandIndex],
+		g_toolbarIconDarkModes[commandIndex],
+		toolbarIconKindForCommand(commandIndex));
+}
+
+void destroyCommandToolbarIconHandles(std::size_t commandIndex)
+{
+	if (commandIndex >= static_cast<std::size_t>(nbFunc))
+		return;
+
+	destroyToolbarIconHandles(
+		g_toolbarBmps[commandIndex],
+		g_toolbarIcons[commandIndex],
+		g_toolbarIconDarkModes[commandIndex]);
+}
+
+void destroyAllToolbarIconHandles()
+{
+	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
+		destroyCommandToolbarIconHandles(commandIndex);
+}
+
 bool ensureAlignToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode, ToolbarIconKind::TableAlign);
+	return ensureCommandToolbarIconHandles(alignCommandIndex);
 }
 
 bool ensureWrapLongCellsToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode, ToolbarIconKind::TableFitWidth);
+	return ensureCommandToolbarIconHandles(wrapLongCellsCommandIndex);
 }
 
 bool ensureAutoFitTableToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(
-		g_autoFitTableToolbarBmp,
-		g_autoFitTableToolbarIcon,
-		g_autoFitTableToolbarIconDarkMode,
-		ToolbarIconKind::TableAutoFitWidth);
+	return ensureCommandToolbarIconHandles(autoFitTableCommandIndex);
 }
 
 bool ensureAutoAlignTableToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(
-		g_autoAlignTableToolbarBmp,
-		g_autoAlignTableToolbarIcon,
-		g_autoAlignTableToolbarIconDarkMode,
-		ToolbarIconKind::TableAutoAlign);
+	return ensureCommandToolbarIconHandles(autoAlignTableCommandIndex);
 }
 
 bool ensureNarrowColumnToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(
-		g_narrowColumnToolbarBmp,
-		g_narrowColumnToolbarIcon,
-		g_narrowColumnToolbarIconDarkMode,
-		ToolbarIconKind::TableNarrowColumn);
+	return ensureCommandToolbarIconHandles(narrowColumnCommandIndex);
 }
 
 bool ensureWidenColumnToolbarIconHandles()
 {
-	return ensureToolbarIconHandles(
-		g_widenColumnToolbarBmp,
-		g_widenColumnToolbarIcon,
-		g_widenColumnToolbarIconDarkMode,
-		ToolbarIconKind::TableWidenColumn);
+	return ensureCommandToolbarIconHandles(widenColumnCommandIndex);
 }
 
 void destroyAlignToolbarIconHandles()
 {
-	destroyToolbarIconHandles(g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(alignCommandIndex);
 }
 
 void destroyWrapLongCellsToolbarIconHandles()
 {
-	destroyToolbarIconHandles(g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(wrapLongCellsCommandIndex);
 }
 
 void destroyAutoFitTableToolbarIconHandles()
 {
-	destroyToolbarIconHandles(
-		g_autoFitTableToolbarBmp,
-		g_autoFitTableToolbarIcon,
-		g_autoFitTableToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(autoFitTableCommandIndex);
 }
 
 void destroyAutoAlignTableToolbarIconHandles()
 {
-	destroyToolbarIconHandles(
-		g_autoAlignTableToolbarBmp,
-		g_autoAlignTableToolbarIcon,
-		g_autoAlignTableToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(autoAlignTableCommandIndex);
 }
 
 void destroyNarrowColumnToolbarIconHandles()
 {
-	destroyToolbarIconHandles(
-		g_narrowColumnToolbarBmp,
-		g_narrowColumnToolbarIcon,
-		g_narrowColumnToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(narrowColumnCommandIndex);
 }
 
 void destroyWidenColumnToolbarIconHandles()
 {
-	destroyToolbarIconHandles(
-		g_widenColumnToolbarBmp,
-		g_widenColumnToolbarIcon,
-		g_widenColumnToolbarIconDarkMode);
+	destroyCommandToolbarIconHandles(widenColumnCommandIndex);
 }
 
 BOOL CALLBACK findToolbarWindowCallback(HWND hwnd, LPARAM lParam)
@@ -2019,9 +2267,9 @@ bool shouldRunInitialFitWhenTogglingAutoFitTable(bool currentlyEnabled)
 	return !currentlyEnabled;
 }
 
-bool shouldRunAutoTableFormatAfterUpdate(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated)
+bool shouldRunAutoTableFormatAfterUpdate(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress, bool activeEditor, bool contentUpdated)
 {
-	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress && activeEditor && contentUpdated;
+	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress && !pluginEditInProgress && activeEditor && contentUpdated;
 }
 
 bool scintillaModificationShouldRunAutoTableFormat(int modificationType)
@@ -2042,9 +2290,9 @@ bool shouldScheduleFitToWindowAfterZoom(bool autoFitEnabled, bool fitInProgress,
 	return autoFitEnabled && !fitInProgress && activeEditor;
 }
 
-bool shouldRunAutoTableFormatAfterGlobalModified(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress)
+bool shouldRunAutoTableFormatAfterGlobalModified(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress)
 {
-	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress;
+	return (autoAlignEnabled || autoFitEnabled) && !alignInProgress && !fitInProgress && !pluginEditInProgress;
 }
 
 bool shouldRunInitialAlignWhenTogglingAutoAlignTable(bool currentlyEnabled)
@@ -2216,7 +2464,13 @@ bool autoAlignCurrentTable(bool quiet, CaretPlacement caretPlacement = CaretPlac
 
 bool autoFormatCurrentDocumentAfterGlobalEdit()
 {
-	if (!shouldRunAutoTableFormatAfterGlobalModified(g_autoAlignTable, g_autoFitTable, g_autoAlignInProgress, g_fitToWindowInProgress))
+	const bool pluginEditAutoFormatBlocked = consumePluginEditAutoFormatSkip(g_pluginEditGlobalAutoFormatSkips);
+	if (!shouldRunAutoTableFormatAfterGlobalModified(
+		g_autoAlignTable,
+		g_autoFitTable,
+		g_autoAlignInProgress,
+		g_fitToWindowInProgress,
+		pluginEditAutoFormatBlocked))
 		return false;
 
 	if (g_autoFitTable)
@@ -2241,6 +2495,8 @@ void fitToWindowAfterResize(HWND resizedScintilla)
 
 	HWND scintilla = currentScintilla();
 	if (!scintilla || scintilla != resizedScintilla)
+		return;
+	if (consumePluginEditAutoFormatSkip(g_pluginEditResizeAutoFitSkips))
 		return;
 
 	const std::size_t columns = availableDisplayColumns(scintilla);
@@ -2297,7 +2553,21 @@ void runAutoTableFormatAfterUpdate(HWND updatedScintilla, bool contentUpdated)
 {
 	HWND scintilla = currentScintilla();
 	const bool activeEditor = scintilla && scintilla == updatedScintilla;
-	if (!shouldRunAutoTableFormatAfterUpdate(g_autoAlignTable, g_autoFitTable, g_autoAlignInProgress, g_fitToWindowInProgress, activeEditor, contentUpdated))
+	const bool canAutoFormat =
+		(g_autoAlignTable || g_autoFitTable) &&
+		!g_autoAlignInProgress &&
+		!g_fitToWindowInProgress &&
+		activeEditor &&
+		contentUpdated;
+	const bool pluginEditAutoFormatBlocked = canAutoFormat && consumePluginEditAutoFormatSkip(g_pluginEditUpdateAutoFormatSkips);
+	if (!shouldRunAutoTableFormatAfterUpdate(
+		g_autoAlignTable,
+		g_autoFitTable,
+		g_autoAlignInProgress,
+		g_fitToWindowInProgress,
+		pluginEditAutoFormatBlocked,
+		activeEditor,
+		contentUpdated))
 		return;
 	if (!selectionEmpty(scintilla))
 		return;
@@ -2860,6 +3130,7 @@ bool runAutoTableFormatForDocument(MarkdownTable::Action action)
 
 	const LRESULT currentPosResult = ::SendMessage(scintilla, SCI_GETCURRENTPOS, 0, 0);
 	ScintillaUndoAction undo(scintilla);
+	PluginEditGuard pluginEdit;
 	for (std::size_t i = replacements.size(); i > 0; --i)
 	{
 		const DocumentTableReplacement &replacement = replacements[i - 1];
@@ -3578,6 +3849,7 @@ void replaceRangeWithEdit(HWND scintilla, Sci_Position start, Sci_Position end, 
 	const std::size_t targetOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
 	ScintillaUndoAction undo(scintilla);
+	PluginEditGuard pluginEdit;
 	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(start), static_cast<LPARAM>(end));
 	::SendMessage(scintilla, SCI_REPLACETARGET, static_cast<WPARAM>(replacement.size()), reinterpret_cast<LPARAM>(replacement.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(start + static_cast<Sci_Position>(targetOffset)), 0);
@@ -3598,6 +3870,7 @@ void replaceSelectionWithInsertedTable(HWND scintilla, const MarkdownTable::Edit
 	const std::size_t targetOffset = insertText.caretDelta + offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
 	ScintillaUndoAction undo(scintilla);
+	PluginEditGuard pluginEdit;
 	::SendMessage(scintilla, SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(insertText.text.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(selectionStart + static_cast<LRESULT>(targetOffset)), 0);
 }
@@ -3825,6 +4098,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	}
 
 	ScintillaUndoAction undo(scintilla);
+	PluginEditGuard pluginEdit;
 	::SendMessage(scintilla, SCI_SETTARGETRANGE, static_cast<WPARAM>(replaceStart), static_cast<LPARAM>(replaceEnd));
 	::SendMessage(scintilla, SCI_REPLACETARGET, static_cast<WPARAM>(replacement.size()), reinterpret_cast<LPARAM>(replacement.c_str()));
 	::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
@@ -4114,9 +4388,9 @@ bool shouldRunInitialFitWhenTogglingAutoFitTableForTests(bool currentlyEnabled)
 	return shouldRunInitialFitWhenTogglingAutoFitTable(currentlyEnabled);
 }
 
-bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool activeEditor, bool contentUpdated)
+bool shouldRunAutoTableFormatAfterUpdateForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress, bool activeEditor, bool contentUpdated)
 {
-	return shouldRunAutoTableFormatAfterUpdate(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress, activeEditor, contentUpdated);
+	return shouldRunAutoTableFormatAfterUpdate(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress, pluginEditInProgress, activeEditor, contentUpdated);
 }
 
 bool scintillaModificationShouldRunAutoTableFormatForTests(int modificationType)
@@ -4134,9 +4408,9 @@ bool shouldScheduleFitToWindowAfterZoomForTests(bool autoFitEnabled, bool fitInP
 	return shouldScheduleFitToWindowAfterZoom(autoFitEnabled, fitInProgress, activeEditor);
 }
 
-bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress)
+bool shouldRunAutoTableFormatAfterGlobalModifiedForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alignInProgress, bool fitInProgress, bool pluginEditInProgress)
 {
-	return shouldRunAutoTableFormatAfterGlobalModified(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress);
+	return shouldRunAutoTableFormatAfterGlobalModified(autoAlignEnabled, autoFitEnabled, alignInProgress, fitInProgress, pluginEditInProgress);
 }
 
 bool shouldRunInitialAlignWhenTogglingAutoAlignTableForTests(bool currentlyEnabled)
@@ -4304,6 +4578,21 @@ void destroyWidenColumnToolbarIconsForTests()
 {
 	destroyWidenColumnToolbarIconHandles();
 }
+
+bool ensureAllToolbarIconsForTests()
+{
+	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
+	{
+		if (!ensureCommandToolbarIconHandles(commandIndex))
+			return false;
+	}
+	return true;
+}
+
+void destroyAllToolbarIconsForTests()
+{
+	destroyAllToolbarIconHandles();
+}
 }
 #endif
 
@@ -4321,12 +4610,7 @@ void pluginInit(HANDLE hModule)
 void pluginCleanUp()
 {
 	removeFitToWindowResizeHooks();
-	destroyAlignToolbarIconHandles();
-	destroyWrapLongCellsToolbarIconHandles();
-	destroyAutoFitTableToolbarIconHandles();
-	destroyAutoAlignTableToolbarIconHandles();
-	destroyNarrowColumnToolbarIconHandles();
-	destroyWidenColumnToolbarIconHandles();
+	destroyAllToolbarIconHandles();
 }
 
 //
@@ -4442,31 +4726,17 @@ void registerToolbarIcons()
 		return;
 
 	refreshUiLanguageState();
-	if (funcItem[alignCommandIndex]._cmdID != 0 && ensureAlignToolbarIconHandles())
-		registerToolbarIcon(alignCommandIndex, g_alignToolbarBmp, g_alignToolbarIcon, g_alignToolbarIconDarkMode);
-
-	if (funcItem[autoAlignTableCommandIndex]._cmdID != 0 && ensureAutoAlignTableToolbarIconHandles())
-		registerToolbarIcon(
-			autoAlignTableCommandIndex,
-			g_autoAlignTableToolbarBmp,
-			g_autoAlignTableToolbarIcon,
-			g_autoAlignTableToolbarIconDarkMode);
-
-	if (funcItem[wrapLongCellsCommandIndex]._cmdID != 0 && ensureWrapLongCellsToolbarIconHandles())
-		registerToolbarIcon(wrapLongCellsCommandIndex, g_wrapLongCellsToolbarBmp, g_wrapLongCellsToolbarIcon, g_wrapLongCellsToolbarIconDarkMode);
-
-	if (funcItem[autoFitTableCommandIndex]._cmdID != 0 && ensureAutoFitTableToolbarIconHandles())
-		registerToolbarIcon(
-			autoFitTableCommandIndex,
-			g_autoFitTableToolbarBmp,
-			g_autoFitTableToolbarIcon,
-			g_autoFitTableToolbarIconDarkMode);
-
-	if (funcItem[narrowColumnCommandIndex]._cmdID != 0 && ensureNarrowColumnToolbarIconHandles())
-		registerToolbarIcon(narrowColumnCommandIndex, g_narrowColumnToolbarBmp, g_narrowColumnToolbarIcon, g_narrowColumnToolbarIconDarkMode);
-
-	if (funcItem[widenColumnCommandIndex]._cmdID != 0 && ensureWidenColumnToolbarIconHandles())
-		registerToolbarIcon(widenColumnCommandIndex, g_widenColumnToolbarBmp, g_widenColumnToolbarIcon, g_widenColumnToolbarIconDarkMode);
+	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
+	{
+		if (funcItem[commandIndex]._cmdID != 0 && ensureCommandToolbarIconHandles(commandIndex))
+		{
+			registerToolbarIcon(
+				commandIndex,
+				g_toolbarBmps[commandIndex],
+				g_toolbarIcons[commandIndex],
+				g_toolbarIconDarkModes[commandIndex]);
+		}
+	}
 
 	refreshAutoFitTableUi();
 	refreshAutoAlignTableUi();
