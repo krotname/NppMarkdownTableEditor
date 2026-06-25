@@ -39,6 +39,7 @@ The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` fil
 - Move to the next or previous cell.
 - Insert, delete, and move rows.
 - Insert, delete, and move columns.
+- Narrow or widen the current column by one display column.
 - Sort rows by the current column in ascending or descending order.
 - Wrap long cells into continuation rows fitted to the current Notepad++ editor width so wide registries are easier to edit in plain text; if space is extremely tight, long words are split inside the cell.
 - Convert selected CSV/TSV text or the current CSV/TSV block into a Markdown table.

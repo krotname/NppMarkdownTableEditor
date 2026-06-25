@@ -132,7 +132,25 @@ function Resolve-LatestNotepadPortable {
     }
 
     Write-Host "Resolving latest Notepad++ release"
-    $release = Invoke-RestMethod -Headers @{ "User-Agent" = "MarkdownTableEditor-Smoke" } -Uri $NotepadLatestApiUrl
+    $release = $null
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            $release = Invoke-RestMethod -Headers @{ "User-Agent" = "MarkdownTableEditor-Smoke" } -Uri $NotepadLatestApiUrl
+            break
+        } catch {
+            $lastError = $_
+            if ($attempt -eq 3) {
+                throw
+            }
+            Write-Host "Latest Notepad++ release lookup failed on attempt $attempt, retrying"
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+    if (-not $release) {
+        throw "Latest Notepad++ release lookup failed: $lastError"
+    }
+
     $asset = @($release.assets | Where-Object {
         $_.name -match "portable\.x64\.zip$" -and $_.name -notmatch "sha256"
     } | Select-Object -First 1)
