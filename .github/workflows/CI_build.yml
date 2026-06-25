@@ -89,4 +89,4 @@ jobs:
 
     - name: Notepad++ compatibility smoke
       shell: pwsh
-      run: msbuild Package.proj /t:NppCompatibilitySmoke
+      run: msbuild Package.proj "/t:NppCompatibilitySmoke;NppLatestSmoke"

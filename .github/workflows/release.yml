@@ -103,7 +103,7 @@ jobs:
 
       - name: Notepad++ compatibility smoke
         shell: pwsh
-        run: msbuild Package.proj /t:NppCompatibilitySmoke
+        run: msbuild Package.proj "/t:NppCompatibilitySmoke;NppLatestSmoke"
 
   release:
     needs:
@@ -183,16 +183,29 @@ jobs:
             exit 1
           fi
           cat > release-notes.md <<EOF
+          ## Builds / Downloads
+
+          - [MarkdownTableEditor-$VERSION-x86.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-x86.zip)
+          - [MarkdownTableEditor-$VERSION-x86-pluginadmin.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-x86-pluginadmin.zip)
+          - [MarkdownTableEditor-$VERSION-x64.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-x64.zip)
+          - [MarkdownTableEditor-$VERSION-x64-pluginadmin.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-x64-pluginadmin.zip)
+          - [MarkdownTableEditor-$VERSION-arm64.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-arm64.zip)
+          - [MarkdownTableEditor-$VERSION-arm64-pluginadmin.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-arm64-pluginadmin.zip)
+          - [MarkdownTableEditor-$VERSION-sbom.cdx.json](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-sbom.cdx.json)
+          - [SHA256SUMS.txt](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/SHA256SUMS.txt)
+
           ## What's Changed
 
-          - Hardened GitHub Actions permissions, dependency review, CodeQL, Scorecard, release packaging, and remote-update checks after repository audit.
-          - Refreshed compatibility smoke scripts and packaging targets for the current Notepad++ plugin release baseline.
+          - Fixed Power Auto Fit so typing in lower sparse or continuation rows keeps the caret in the edited row instead of jumping back to the second row.
+          - Prevented pending auto-format timers from overriding plugin edits and manual column-width actions.
+          - Kept Java/C++ core behavior in sync for continuation-row reflow, manual column resizing, caret placement, escaped pipes, and Unicode/CJK width handling.
+          - Added latest Notepad++ portable smoke coverage with retry handling for transient release API failures.
           - Rebuilt x86, x64, and arm64 plugin ZIPs plus Plugin Admin ZIPs with SHA-256 sums, SBOM, and GitHub attestations.
 
           ## Validation
 
           - GitHub Actions release build completed for Win32, x64, and ARM64 with coverage and performance checks.
-          - GitHub Actions compatibility smoke completed for Notepad++ 7.5.9 x86 and 8.3.1 x64.
+          - GitHub Actions compatibility smoke completed for Notepad++ 7.5.9 x86, 8.3.1 x64, and the latest portable x64 release.
           EOF
 
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
