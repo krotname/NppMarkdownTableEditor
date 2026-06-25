@@ -1240,11 +1240,48 @@ void appendContinuationCell(std::string &target, const std::string &continuation
 	target += value;
 }
 
+std::vector<bool> continuationRowsToPreserve(const Table &table, std::size_t originalTargetRow)
+{
+	std::vector<bool> preserve(table.rows.size(), false);
+	if (table.separatorRow == static_cast<std::size_t>(-1) || originalTargetRow >= table.rows.size())
+		return preserve;
+
+	std::vector<std::size_t> continuationBaseForRow(table.rows.size(), static_cast<std::size_t>(-1));
+	std::size_t baseRowIndex = static_cast<std::size_t>(-1);
+	Row baseRow;
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (row.separator || rowIndex <= table.separatorRow || baseRowIndex == static_cast<std::size_t>(-1) ||
+			!isLikelyContinuationRow(row, baseRow, table.columns))
+		{
+			if (!row.separator && rowIndex > table.separatorRow)
+			{
+				baseRowIndex = rowIndex;
+				baseRow = row;
+			}
+			continue;
+		}
+
+		continuationBaseForRow[rowIndex] = baseRowIndex;
+		for (std::size_t column = 0; column < table.columns; ++column)
+			appendContinuationCell(baseRow.cells[column], row.cells[column]);
+	}
+
+	const std::size_t targetBaseRow = continuationBaseForRow[originalTargetRow];
+	if (targetBaseRow == static_cast<std::size_t>(-1))
+		return preserve;
+	for (std::size_t rowIndex = 0; rowIndex < continuationBaseForRow.size(); ++rowIndex)
+		preserve[rowIndex] = continuationBaseForRow[rowIndex] == targetBaseRow;
+	return preserve;
+}
+
 std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow)
 {
 	if (table.separatorRow == static_cast<std::size_t>(-1))
 		return originalTargetRow;
 
+	const std::vector<bool> preserveContinuationRows = continuationRowsToPreserve(table, originalTargetRow);
 	std::vector<Row> unwrappedRows;
 	unwrappedRows.reserve(table.rows.size());
 	std::size_t targetRow = originalTargetRow;
@@ -1253,7 +1290,8 @@ std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow)
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
-		if (row.separator || rowIndex <= table.separatorRow || baseRowIndex == static_cast<std::size_t>(-1) ||
+		if (row.separator || rowIndex <= table.separatorRow || preserveContinuationRows[rowIndex] ||
+			baseRowIndex == static_cast<std::size_t>(-1) ||
 			!isLikelyContinuationRow(row, unwrappedRows[baseRowIndex], table.columns))
 		{
 			if (rowIndex == originalTargetRow)

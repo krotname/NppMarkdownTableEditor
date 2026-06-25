@@ -293,6 +293,29 @@ int main()
 	expectTrue("expanded auto wrap reduces continuation rows", expandedWrapped.lines.size() < autoWrapped.lines.size());
 	expectLineLengthAtMost("expanded auto wrap keeps physical lines inside wider width", expandedWrapped.lines, 150);
 
+	const MarkdownTable::EditResult sparseLowerRow = MarkdownTable::applyWrappedToWidth(
+		{
+			"| Step | Note |",
+			"| --- | --- |",
+			"| first | alpha |",
+			"|  | bravo |",
+			"|  | Xcharlie |"
+		},
+		4,
+		1,
+		64);
+	expectTrue("auto wrap sparse lower row ok", sparseLowerRow.ok);
+	expectSize("auto wrap sparse lower row target", sparseLowerRow.targetRow, 4);
+	expectSize("auto wrap sparse lower row caret offset", sparseLowerRow.targetColumnOffset, 10);
+	expectLines("auto wrap keeps sparse lower rows separate", sparseLowerRow.lines,
+		{
+			"| Step  | Note     |",
+			"| ----- | -------- |",
+			"| first | alpha    |",
+			"|       | bravo    |",
+			"|       | Xcharlie |"
+		});
+
 	const MarkdownTable::EditResult veryNarrowWrapped = MarkdownTable::applyWrappedToWidth(
 		{
 			"| A | B | C |",
