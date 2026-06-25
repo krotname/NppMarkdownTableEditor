@@ -8,7 +8,7 @@
 [![Release](https://img.shields.io/github/v/release/krotname/NppMarkdownTableEditor?label=release)](https://github.com/krotname/NppMarkdownTableEditor/releases/latest)
 [![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-00599C)](https://isocpp.org/)
-[![Plugin List PR](https://img.shields.io/badge/Plugin%20List-PR%20%231115-f97316)](https://github.com/notepad-plus-plus/nppPluginList/pull/1115)
+[![Plugin List PR](https://img.shields.io/badge/Plugin%20List-PR%20%231127-f97316)](https://github.com/notepad-plus-plus/nppPluginList/pull/1127)
 [![Website](https://img.shields.io/badge/website-markdowntableeditor.krot.name-0f766e)](https://markdowntableeditor.krot.name/)
 
 Markdown Table Editor превращает Notepad++ в удобный редактор Markdown-таблиц.
@@ -82,7 +82,7 @@ gh attestation verify MarkdownTableEditor-*-x64.zip --repo krotname/NppMarkdownT
 
 ## Публикация
 
-- PR в официальный Notepad++ Plugin List: https://github.com/notepad-plus-plus/nppPluginList/pull/1115
+- PR в официальный Notepad++ Plugin List: https://github.com/notepad-plus-plus/nppPluginList/pull/1127
 
 ## Совместимость
 
