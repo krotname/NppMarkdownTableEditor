@@ -170,7 +170,7 @@ jobs:
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         with:
           subject-path: release-files/*.zip
-          sbom-path: release-files/*-sbom.cdx.json
+          sbom-path: release-files/MarkdownTableEditor-${{ needs.version.outputs.version }}-sbom.cdx.json
 
       - name: Publish GitHub release
         shell: bash
