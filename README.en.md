@@ -7,12 +7,17 @@
 [![Release](https://img.shields.io/github/v/release/krotname/NppMarkdownTableEditor?label=release)](https://github.com/krotname/NppMarkdownTableEditor/releases/latest)
 [![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-00599C)](https://isocpp.org/)
-[![Plugin List PR](https://img.shields.io/badge/Plugin%20List-PR%20%231127-f97316)](https://github.com/notepad-plus-plus/nppPluginList/pull/1127)
+[![Plugin List](https://img.shields.io/badge/Plugin%20List-merged%20%231127-2ea44f)](https://github.com/notepad-plus-plus/nppPluginList/pull/1127)
 [![Website](https://img.shields.io/badge/website-markdowntableeditor.krot.name-0f766e)](https://markdowntableeditor.krot.name/)
 
 Markdown Table Editor turns Notepad++ into a convenient Markdown table editor.
 Paste a messy table from someone else or from an AI tool, run the align command, and the plugin aligns the columns, preserves Markdown formatting,
 and helps you quickly rearrange rows, columns, and data.
+
+**Quick start:** [download the latest release](https://github.com/krotname/NppMarkdownTableEditor/releases/latest) ·
+[official Plugin List PR](https://github.com/notepad-plus-plus/nppPluginList/pull/1127) ·
+[open the project website](https://markdowntableeditor.krot.name/) ·
+[README на русском](README.md)
 
 ## Related Projects
 
@@ -23,6 +28,11 @@ and helps you quickly rearrange rows, columns, and data.
 ![Markdown table alignment example in Notepad++](docs/demo.gif)
 
 The GIF is built from real Notepad++ screenshots on Windows: a regular `.md` file is open, and the `Align table (no width change)` command is triggered from the plugin menu.
+
+<p>
+  <img src="docs/real-demo-frames/before.png" alt="Markdown table before alignment in Notepad++" width="49%">
+  <img src="docs/real-demo-frames/after.png" alt="Markdown table after alignment in Notepad++" width="49%">
+</p>
 
 ## Why Use It
 
