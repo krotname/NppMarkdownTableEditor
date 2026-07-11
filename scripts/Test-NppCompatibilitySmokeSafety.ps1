@@ -4,8 +4,15 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $smokeScript = Join-Path $PSScriptRoot "Invoke-NppCompatibilitySmoke.ps1"
 
 function Assert-WorkDirRejected([string]$Path, [string]$Scenario, [string]$ExpectedMessage = "WorkDir must be a child directory under the project root") {
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -WorkDir $Path 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -WorkDir $Path 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorPreference
+    }
     $text = $output | Out-String
     if ($exitCode -eq 0) {
         throw "$Scenario unexpectedly accepted unsafe WorkDir '$Path'."
@@ -17,11 +24,18 @@ function Assert-WorkDirRejected([string]$Path, [string]$Scenario, [string]$Expec
 
 function Assert-SafeWorkDirReachesPluginValidation([string]$Path) {
     $missingPlugin = Join-Path $projectRoot "build\path-safety-tests\missing-plugin.dll"
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript `
-        -WorkDir $Path `
-        -Win32PluginPath $missingPlugin `
-        -X64PluginPath $missingPlugin 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript `
+            -WorkDir $Path `
+            -Win32PluginPath $missingPlugin `
+            -X64PluginPath $missingPlugin 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorPreference
+    }
     $text = $output | Out-String
     if ($exitCode -eq 0 -or $text -notmatch "Win32 plugin DLL not found") {
         throw "Safe child WorkDir did not reach plugin validation as expected:`n$text"
