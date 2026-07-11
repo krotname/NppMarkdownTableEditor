@@ -221,6 +221,31 @@ int main()
 			"|     | epsilon zeta eta theta |"
 		});
 
+	const std::vector<std::string> displayClusters =
+	{
+		"1\xEF\xB8\x8F\xE2\x83\xA3",
+		"\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8",
+		"\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x92\xBB"
+	};
+	for (std::size_t clusterIndex = 0; clusterIndex < displayClusters.size(); ++clusterIndex)
+	{
+		const std::string &cluster = displayClusters[clusterIndex];
+		const MarkdownTable::EditResult clusterWrapped = MarkdownTable::apply(
+			{
+				"| Value |",
+				"| --- |",
+				"| " + std::string(25, 'x') + cluster + "z |"
+			},
+			2,
+			0,
+			MarkdownTable::Action::WrapLongCells);
+		expectTrue("wrap display cluster ok", clusterWrapped.ok);
+		bool clusterKeptIntact = false;
+		for (std::size_t lineIndex = 0; lineIndex < clusterWrapped.lines.size(); ++lineIndex)
+			clusterKeptIntact = clusterKeptIntact || clusterWrapped.lines[lineIndex].find(cluster) != std::string::npos;
+		expectTrue("wrap keeps display cluster intact", clusterKeptIntact);
+	}
+
 	const MarkdownTable::EditResult narrowedColumn = MarkdownTable::apply(
 		{
 			"| Key | Value |",
@@ -310,6 +335,18 @@ int main()
 	expectTrue("expanded auto wrap ok", expandedWrapped.ok);
 	expectTrue("expanded auto wrap reduces continuation rows", expandedWrapped.lines.size() < autoWrapped.lines.size());
 	expectLineLengthAtMost("expanded auto wrap keeps physical lines inside wider width", expandedWrapped.lines, 150);
+
+	const MarkdownTable::EditResult equalSlackWrapped = MarkdownTable::applyWrappedToWidth(
+		{
+			"| A | B |",
+			"| --- | --- |",
+			"| abcde | vwxyz |"
+		},
+		2,
+		0,
+		16);
+	expectTrue("equal slack auto wrap ok", equalSlackWrapped.ok);
+	expectLineLengthAtMost("equal slack auto wrap honors width", equalSlackWrapped.lines, 16);
 
 	const MarkdownTable::EditResult sparseLowerRow = MarkdownTable::applyWrappedToWidth(
 		{
@@ -809,6 +846,12 @@ Anna	A\\|B)").lines,
 	expectTrue("unterminated quoted csv is rejected", !MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"unterminated").ok);
 	expectTrue("characters after a closing csv quote are rejected", !MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"quoted\"junk").ok);
 	expectTrue("whitespace after a closing csv quote is accepted", MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"quoted\"  ").ok);
+	expectLines("whitespace before a delimiter after a closing csv quote", MarkdownTable::convertDelimitedToTable("Name,Note,State\nAnna,\"quoted\"  ,done").lines,
+		{
+			"| Name | Note   | State |",
+			"| ---- | ------ | ----- |",
+			"| Anna | quoted | done  |"
+		});
 	expectLines("csv preserves an explicitly empty record", MarkdownTable::convertDelimitedToTable("A,B\n,\nC,D").lines,
 		{
 			"| A   | B   |",

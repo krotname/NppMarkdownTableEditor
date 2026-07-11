@@ -947,11 +947,7 @@ std::size_t widthSum(const std::vector<std::size_t> &widths)
 {
 	std::size_t sum = 0;
 	for (std::size_t i = 0; i < widths.size(); ++i)
-	{
-		if (widths[i] > (std::numeric_limits<std::size_t>::max)() - sum)
-			return (std::numeric_limits<std::size_t>::max)();
 		sum += widths[i];
-	}
 	return sum;
 }
 
@@ -998,12 +994,7 @@ std::size_t reductionToSlackCap(
 			continue;
 		const std::size_t slack = widths[column] > minimums[column] ? widths[column] - minimums[column] : 0;
 		if (slack > slackCap)
-		{
-			const std::size_t amount = slack - slackCap;
-			if (amount > (std::numeric_limits<std::size_t>::max)() - reduction)
-				return (std::numeric_limits<std::size_t>::max)();
-			reduction += amount;
-		}
+			reduction += slack - slackCap;
 	}
 	return reduction;
 }
@@ -1023,10 +1014,7 @@ void shrinkColumnsToBudget(std::vector<std::size_t> &widths, const std::vector<s
 			continue;
 		const std::size_t slack = widths[column] > minimums[column] ? widths[column] - minimums[column] : 0;
 		maxSlack = (std::max)(maxSlack, slack);
-		if (slack > (std::numeric_limits<std::size_t>::max)() - totalSlack)
-			totalSlack = (std::numeric_limits<std::size_t>::max)();
-		else
-			totalSlack += slack;
+		totalSlack += slack;
 	}
 
 	const std::size_t reduction = (std::min)(requestedReduction, totalSlack);
@@ -1080,10 +1068,7 @@ void growColumnsToBudget(
 		if (!allowed[column] || widths[column] >= naturalWidths[column])
 			continue;
 		deficits[column] = naturalWidths[column] - widths[column];
-		if (deficits[column] > (std::numeric_limits<std::size_t>::max)() - totalDeficit)
-			totalDeficit = (std::numeric_limits<std::size_t>::max)();
-		else
-			totalDeficit += deficits[column];
+		totalDeficit += deficits[column];
 	}
 	const std::size_t available = (std::min)(budget - currentWidth, totalDeficit);
 	shrinkColumnsToBudget(deficits, zeroes, allowed, totalDeficit - available);
