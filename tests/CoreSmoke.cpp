@@ -746,6 +746,24 @@ int main()
 			"| Anna | A\\|B |"
 		});
 
+	expectLines("tsv preserves an already escaped pipe", MarkdownTable::convertDelimitedToTable(
+		R"(Name	Note
+Anna	A\|B)").lines,
+		{
+			"| Name | Note |",
+			"| ---- | ---- |",
+			R"(| Anna | A\|B |)"
+		});
+
+	expectLines("tsv fixes even backslash parity before a pipe", MarkdownTable::convertDelimitedToTable(
+		R"(Name	Note
+Anna	A\\|B)").lines,
+		{
+			"| Name | Note   |",
+			"| ---- | ------ |",
+			R"(| Anna | A\\\|B |)"
+		});
+
 	expectLines("tsv to table pads uneven rows", MarkdownTable::convertDelimitedToTable("A\tB\tC\n1\t2\n3\t4\t5").lines,
 		{
 			"| A   | B   | C   |",
@@ -788,7 +806,47 @@ int main()
 	expectString("plain text csv message", MarkdownTable::convertDelimitedToTable("just a note").message, "No CSV or TSV data found");
 	expectTrue("plain multiline text is not csv", !MarkdownTable::convertDelimitedToTable("first line\nsecond line").ok);
 	expectTrue("single quoted comma cell is not csv", !MarkdownTable::convertDelimitedToTable("\"just, a note\"").ok);
+	expectTrue("unterminated quoted csv is rejected", !MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"unterminated").ok);
+	expectTrue("characters after a closing csv quote are rejected", !MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"quoted\"junk").ok);
+	expectTrue("whitespace after a closing csv quote is accepted", MarkdownTable::convertDelimitedToTable("Name,Note\nAnna,\"quoted\"  ").ok);
+	expectLines("csv preserves an explicitly empty record", MarkdownTable::convertDelimitedToTable("A,B\n,\nC,D").lines,
+		{
+			"| A   | B   |",
+			"| --- | --- |",
+			"|     |     |",
+			"| C   | D   |"
+		});
+	expectLines("csv trims surrounding cell spaces", MarkdownTable::convertDelimitedToTable("Name,Quoted,Unquoted\nAnna,\"  kept  \",  trim  ").lines,
+		{
+			"| Name | Quoted | Unquoted |",
+			"| ---- | ------ | -------- |",
+			"| Anna | kept   | trim     |"
+		});
 	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n\t").ok);
+	expectTrue("setext heading is not mistaken for a table", !MarkdownTable::apply(
+		{
+			"A | B",
+			"---"
+		},
+		0,
+		0,
+		MarkdownTable::Action::Align).ok);
+	expectTrue("one-column table with explicit pipes remains valid", MarkdownTable::apply(
+		{
+			"| A |",
+			"| --- |"
+		},
+		0,
+		0,
+		MarkdownTable::Action::Align).ok);
+	expectTrue("separator column count must match header", !MarkdownTable::apply(
+		{
+			"A | B | C",
+			"--- | ---"
+		},
+		0,
+		0,
+		MarkdownTable::Action::Align).ok);
 
 	expectLines("keep markdown header row", MarkdownTable::apply(
 		{

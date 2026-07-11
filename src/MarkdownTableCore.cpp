@@ -623,6 +623,42 @@ std::size_t nextUtf8Offset(const std::string &text, std::size_t offset)
 	return offset;
 }
 
+std::size_t nextDisplayClusterOffset(const std::string &text, std::size_t offset)
+{
+	const unsigned int baseCodePoint = readUtf8CodePoint(text, offset);
+
+	if (isKeycapBase(baseCodePoint))
+	{
+		const std::size_t keycapEnd = skipKeycapCluster(text, offset);
+		if (keycapEnd != static_cast<std::size_t>(-1))
+			return keycapEnd;
+	}
+
+	if (isRegionalIndicator(baseCodePoint) && offset < text.size())
+	{
+		std::size_t nextOffset = offset;
+		const unsigned int nextCodePoint = readUtf8CodePoint(text, nextOffset);
+		if (isRegionalIndicator(nextCodePoint))
+			return nextOffset;
+	}
+
+	std::size_t ignoredWidth = codePointDisplayWidth(baseCodePoint);
+	offset = skipClusterModifiers(text, offset, baseCodePoint, ignoredWidth);
+	while (offset < text.size())
+	{
+		std::size_t joinerOffset = offset;
+		if (readUtf8CodePoint(text, joinerOffset) != 0x200D)
+			break;
+
+		offset = joinerOffset;
+		if (offset >= text.size())
+			break;
+		const unsigned int joinedCodePoint = readUtf8CodePoint(text, offset);
+		offset = skipClusterModifiers(text, offset, joinedCodePoint, ignoredWidth);
+	}
+	return offset;
+}
+
 bool startsMarkdownLinkAt(const std::string &text, std::size_t offset)
 {
 	if (offset >= text.size() || text[offset] != '[')
@@ -704,16 +740,16 @@ std::size_t longTokenChunkEnd(const std::string &token, std::size_t offset, std:
 	while (end < token.size())
 	{
 		const std::size_t before = end;
-		const std::size_t after = nextUtf8Offset(token, before);
-		const std::size_t codePointWidth = displayWidth(token.substr(before, after - before));
-		if (before > offset && chunkWidth + codePointWidth > targetWidth)
+		const std::size_t after = nextDisplayClusterOffset(token, before);
+		const std::size_t clusterWidth = displayWidth(token.substr(before, after - before));
+		if (before > offset && chunkWidth + clusterWidth > targetWidth)
 			return before;
-		chunkWidth += codePointWidth;
+		chunkWidth += clusterWidth;
 		end = after;
 		if (chunkWidth >= targetWidth)
 			return end;
 	}
-	return end > offset ? end : nextUtf8Offset(token, offset);
+	return end > offset ? end : nextDisplayClusterOffset(token, offset);
 }
 
 void appendWrappedToken(std::vector<std::string> &segments, std::string &current, const std::string &token, std::size_t width)
@@ -911,7 +947,11 @@ std::size_t widthSum(const std::vector<std::size_t> &widths)
 {
 	std::size_t sum = 0;
 	for (std::size_t i = 0; i < widths.size(); ++i)
+	{
+		if (widths[i] > (std::numeric_limits<std::size_t>::max)() - sum)
+			return (std::numeric_limits<std::size_t>::max)();
 		sum += widths[i];
+	}
 	return sum;
 }
 
@@ -945,53 +985,113 @@ std::vector<bool> wrappableColumns(const Table &table, const std::vector<std::si
 	return result;
 }
 
-std::size_t largestShrinkableColumn(const std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed)
+std::size_t reductionToSlackCap(
+	const std::vector<std::size_t> &widths,
+	const std::vector<std::size_t> &minimums,
+	const std::vector<bool> &allowed,
+	std::size_t slackCap)
 {
-	std::size_t best = static_cast<std::size_t>(-1);
-	std::size_t bestSlack = 0;
+	std::size_t reduction = 0;
 	for (std::size_t column = 0; column < widths.size(); ++column)
 	{
-		if (!allowed[column] || widths[column] <= minimums[column])
+		if (!allowed[column])
 			continue;
-
-		const std::size_t slack = widths[column] - minimums[column];
-		if (best == static_cast<std::size_t>(-1) || slack > bestSlack)
+		const std::size_t slack = widths[column] > minimums[column] ? widths[column] - minimums[column] : 0;
+		if (slack > slackCap)
 		{
-			best = column;
-			bestSlack = slack;
+			const std::size_t amount = slack - slackCap;
+			if (amount > (std::numeric_limits<std::size_t>::max)() - reduction)
+				return (std::numeric_limits<std::size_t>::max)();
+			reduction += amount;
 		}
 	}
-	return best;
+	return reduction;
 }
 
 void shrinkColumnsToBudget(std::vector<std::size_t> &widths, const std::vector<std::size_t> &minimums, const std::vector<bool> &allowed, std::size_t budget)
 {
-	while (widthSum(widths) > budget)
+	const std::size_t currentWidth = widthSum(widths);
+	if (currentWidth <= budget)
+		return;
+
+	const std::size_t requestedReduction = currentWidth - budget;
+	std::size_t totalSlack = 0;
+	std::size_t maxSlack = 0;
+	for (std::size_t column = 0; column < widths.size(); ++column)
 	{
-		const std::size_t column = largestShrinkableColumn(widths, minimums, allowed);
-		if (column == static_cast<std::size_t>(-1))
-			return;
-		--widths[column];
+		if (!allowed[column])
+			continue;
+		const std::size_t slack = widths[column] > minimums[column] ? widths[column] - minimums[column] : 0;
+		maxSlack = (std::max)(maxSlack, slack);
+		if (slack > (std::numeric_limits<std::size_t>::max)() - totalSlack)
+			totalSlack = (std::numeric_limits<std::size_t>::max)();
+		else
+			totalSlack += slack;
+	}
+
+	const std::size_t reduction = (std::min)(requestedReduction, totalSlack);
+	if (reduction == 0)
+		return;
+
+	std::size_t low = 0;
+	std::size_t high = maxSlack;
+	while (low < high)
+	{
+		const std::size_t cap = low + (high - low) / 2;
+		if (reductionToSlackCap(widths, minimums, allowed, cap) <= reduction)
+			high = cap;
+		else
+			low = cap + 1;
+	}
+
+	const std::size_t slackCap = low;
+	std::size_t remaining = reduction - reductionToSlackCap(widths, minimums, allowed, slackCap);
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (!allowed[column])
+			continue;
+		const std::size_t minimum = minimums[column];
+		const std::size_t slack = widths[column] > minimum ? widths[column] - minimum : 0;
+		std::size_t targetSlack = (std::min)(slack, slackCap);
+		if (remaining > 0 && targetSlack == slackCap && targetSlack > 0)
+		{
+			--targetSlack;
+			--remaining;
+		}
+		widths[column] = minimum + targetSlack;
 	}
 }
 
-std::size_t bestGrowableColumn(const std::vector<std::size_t> &widths, const std::vector<std::size_t> &naturalWidths, const std::vector<bool> &allowed)
+void growColumnsToBudget(
+	std::vector<std::size_t> &widths,
+	const std::vector<std::size_t> &naturalWidths,
+	const std::vector<bool> &allowed,
+	std::size_t budget)
 {
-	std::size_t best = static_cast<std::size_t>(-1);
-	std::size_t bestSlack = 0;
+	const std::size_t currentWidth = widthSum(widths);
+	if (currentWidth >= budget)
+		return;
+
+	std::vector<std::size_t> deficits(widths.size(), 0);
+	std::vector<std::size_t> zeroes(widths.size(), 0);
+	std::size_t totalDeficit = 0;
 	for (std::size_t column = 0; column < widths.size(); ++column)
 	{
 		if (!allowed[column] || widths[column] >= naturalWidths[column])
 			continue;
-
-		const std::size_t slack = naturalWidths[column] - widths[column];
-		if (best == static_cast<std::size_t>(-1) || slack > bestSlack)
-		{
-			best = column;
-			bestSlack = slack;
-		}
+		deficits[column] = naturalWidths[column] - widths[column];
+		if (deficits[column] > (std::numeric_limits<std::size_t>::max)() - totalDeficit)
+			totalDeficit = (std::numeric_limits<std::size_t>::max)();
+		else
+			totalDeficit += deficits[column];
 	}
-	return best;
+	const std::size_t available = (std::min)(budget - currentWidth, totalDeficit);
+	shrinkColumnsToBudget(deficits, zeroes, allowed, totalDeficit - available);
+	for (std::size_t column = 0; column < widths.size(); ++column)
+	{
+		if (allowed[column])
+			widths[column] = naturalWidths[column] - deficits[column];
+	}
 }
 
 std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std::size_t maxTableWidth)
@@ -1040,13 +1140,7 @@ std::vector<std::size_t> targetColumnWidthsForTableWidth(const Table &table, std
 		shrinkColumnsToBudget(widths, hardMinimums, allColumns, budget);
 	}
 
-	while (widthSum(widths) < budget)
-	{
-		const std::size_t column = bestGrowableColumn(widths, naturalWidths, canWrap);
-		if (column == static_cast<std::size_t>(-1))
-			break;
-		++widths[column];
-	}
+	growColumnsToBudget(widths, naturalWidths, canWrap, budget);
 
 	return widths;
 }
@@ -1886,7 +1980,6 @@ void setResultFromFormat(EditResult &result, FormatResult &formatted)
 char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
-	std::size_t commas = 0;
 	bool inQuotes = false;
 	bool cellBlank = true;
 
@@ -1911,7 +2004,6 @@ char detectDelimiter(const std::string &text)
 		}
 		else if (ch == ',')
 		{
-			++commas;
 			cellBlank = true;
 		}
 		else if (ch == '\r' || ch == '\n')
@@ -1924,7 +2016,7 @@ char detectDelimiter(const std::string &text)
 		}
 	}
 
-	return tabs > commas ? '\t' : ',';
+	return tabs > 0 ? '\t' : ',';
 }
 
 bool hasDelimitedStructure(const std::string &text)
@@ -1934,6 +2026,7 @@ bool hasDelimitedStructure(const std::string &text)
 		return false;
 	bool inQuotes = false;
 	bool cellBlank = true;
+	bool foundDelimiter = false;
 	for (std::size_t i = 0; i < value.size(); ++i)
 	{
 		const char ch = value[i];
@@ -1950,7 +2043,8 @@ bool hasDelimitedStructure(const std::string &text)
 		}
 		else if (ch == ',' || ch == '\t')
 		{
-			return true;
+			foundDelimiter = true;
+			cellBlank = true;
 		}
 		else if (ch == '\r' || ch == '\n')
 		{
@@ -1961,7 +2055,7 @@ bool hasDelimitedStructure(const std::string &text)
 			cellBlank = false;
 		}
 	}
-	return false;
+	return foundDelimiter && !inQuotes;
 }
 
 bool hasCellContent(const std::vector<std::string> &row)
@@ -1980,6 +2074,8 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 	std::vector<std::string> row;
 	std::string cell;
 	bool inQuotes = false;
+	bool closedQuotedField = false;
+	bool recordHasDelimitedSyntax = false;
 
 	for (std::size_t i = 0; i < text.size(); ++i)
 	{
@@ -1996,6 +2092,7 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 				else
 				{
 					inQuotes = false;
+					closedQuotedField = true;
 				}
 			}
 			else if (ch == '\r' || ch == '\n')
@@ -2011,10 +2108,43 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 			continue;
 		}
 
+		if (closedQuotedField)
+		{
+			if (ch == delimiter)
+			{
+				row.push_back(trim(cell));
+				cell.clear();
+				closedQuotedField = false;
+				recordHasDelimitedSyntax = true;
+			}
+			else if (ch == '\r' || ch == '\n')
+			{
+				row.push_back(trim(cell));
+				cell.clear();
+				if (hasCellContent(row) || recordHasDelimitedSyntax)
+					rows.push_back(row);
+				row.clear();
+				closedQuotedField = false;
+				recordHasDelimitedSyntax = false;
+				if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+					++i;
+			}
+			else if (isSpace(static_cast<unsigned char>(ch)))
+			{
+				cell += ch;
+			}
+			else
+			{
+				return std::vector<std::vector<std::string> >();
+			}
+			continue;
+		}
+
 		if (ch == '"' && trim(cell).empty())
 		{
 			cell.clear();
 			inQuotes = true;
+			recordHasDelimitedSyntax = true;
 			continue;
 		}
 
@@ -2022,6 +2152,7 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 		{
 			row.push_back(trim(cell));
 			cell.clear();
+			recordHasDelimitedSyntax = true;
 			continue;
 		}
 
@@ -2029,9 +2160,10 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 		{
 			row.push_back(trim(cell));
 			cell.clear();
-			if (hasCellContent(row))
+			if (hasCellContent(row) || recordHasDelimitedSyntax)
 				rows.push_back(row);
 			row.clear();
+			recordHasDelimitedSyntax = false;
 			if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
 				++i;
 			continue;
@@ -2040,8 +2172,11 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 		cell += ch;
 	}
 
+	if (inQuotes)
+		return std::vector<std::vector<std::string> >();
+
 	row.push_back(trim(cell));
-	if (hasCellContent(row))
+	if (hasCellContent(row) || recordHasDelimitedSyntax)
 		rows.push_back(row);
 	return rows;
 }
@@ -2052,7 +2187,7 @@ std::string escapeMarkdownCell(const std::string &cell)
 	for (std::size_t i = 0; i < cell.size(); ++i)
 	{
 		const char ch = cell[i];
-		if (ch == '|')
+		if (ch == '|' && !isEscaped(cell, i))
 			escaped += "\\|";
 		else if (ch == '\r' || ch == '\n')
 			escaped += ' ';
@@ -2169,10 +2304,14 @@ TableRange findTableRange(const std::vector<std::string> &lines, int row)
 		const std::size_t firstRow = separatorRow - 1;
 		if (!isPotentialTableLine(lines[firstRow]))
 			continue;
+		if (!isPotentialTableLine(lines[separatorRow]))
+			continue;
 
 		Row separator;
 		separator.cells = splitCells(lines[separatorRow]);
 		if (!isSeparatorRow(separator) && !isShortSeparatorLine(lines[separatorRow]))
+			continue;
+		if (splitCells(lines[firstRow]).size() != separator.cells.size())
 			continue;
 
 		const std::size_t lastRow = tableRangeEnd(lines, firstRow, separatorRow);

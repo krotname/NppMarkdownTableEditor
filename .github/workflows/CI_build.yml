@@ -5,12 +5,18 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build and tests (${{ matrix.build_configuration }}, ${{ matrix.build_platform }})
 
     runs-on: windows-2022
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       max-parallel: 6
       matrix:
         build_configuration: [Release, Debug]
@@ -42,6 +48,11 @@ jobs:
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
       run: msbuild Package.proj /m /t:CorePerformance /p:Configuration=Release /p:Platform=x64
 
+    - name: Compatibility script safety tests
+      if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
+      shell: pwsh
+      run: msbuild Package.proj /m /t:RunCompatibilityScriptSafetyTests
+
     - name: Upload coverage to Codecov
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
@@ -58,6 +69,8 @@ jobs:
       with:
           name: plugin_dll_x64
           path: bin64\MarkdownTableEditor.dll
+          if-no-files-found: error
+          retention-days: 14
 
     - name: Archive artifacts for Win32
       if: matrix.build_platform == 'Win32' && matrix.build_configuration == 'Release'
@@ -65,6 +78,8 @@ jobs:
       with:
           name: plugin_dll_x86
           path: bin\MarkdownTableEditor.dll
+          if-no-files-found: error
+          retention-days: 14
 
     - name: Archive artifacts for ARM64
       if: matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
@@ -72,6 +87,8 @@ jobs:
       with:
           name: plugin_dll_arm64
           path: arm64\MarkdownTableEditor.dll
+          if-no-files-found: error
+          retention-days: 14
 
   npp-ui-smoke:
     name: Tests / Notepad++ compatibility smoke

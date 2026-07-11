@@ -194,7 +194,7 @@
         Func<double, string> formatDecimal = value => value.ToString("0.###############", CultureInfo.InvariantCulture);
         Action<XElement, int, int> setLineRate = (node, covered, valid) =>
         {
-            var rate = valid == 0 ? 1.0 : (double)covered / valid;
+            var rate = valid == 0 ? 0.0 : (double)covered / valid;
             node.SetAttributeValue("line-rate", formatDecimal(rate));
         };
         Func<string, string> relativePath = path =>
@@ -282,6 +282,11 @@
         var allClasses = document.Descendants("class").ToList();
         var linesValid = allClasses.Sum(node => node.Element("lines").Elements("line").Count());
         var linesCovered = allClasses.Sum(node => node.Element("lines").Elements("line").Count(line => ((int?)line.Attribute("hits") ?? 0) > 0));
+        if (linesValid == 0)
+        {
+            Log.LogError("Coverage report contains no source lines under {0}: {1}", sourceRoot, InputPath);
+            return false;
+        }
         var coverage = document.Root;
         setLineRate(coverage, linesCovered, linesValid);
         coverage.SetAttributeValue("lines-covered", linesCovered.ToString(CultureInfo.InvariantCulture));
@@ -317,9 +322,20 @@
         var coverage = document.Root;
         double actual;
         double minimum;
+        int linesValid;
         if (coverage == null || !Double.TryParse((string)coverage.Attribute("line-rate"), NumberStyles.Float, CultureInfo.InvariantCulture, out actual))
         {
             Log.LogError("Coverage report does not contain a valid root line-rate: {0}", InputPath);
+            return false;
+        }
+        if (!Int32.TryParse((string)coverage.Attribute("lines-valid"), NumberStyles.Integer, CultureInfo.InvariantCulture, out linesValid) || linesValid <= 0)
+        {
+            Log.LogError("Coverage report contains no valid source lines: {0}", InputPath);
+            return false;
+        }
+        if (Double.IsNaN(actual) || Double.IsInfinity(actual) || actual < 0.0 || actual > 1.0)
+        {
+            Log.LogError("Coverage report contains an invalid line-rate {0}: {1}", actual, InputPath);
             return false;
         }
         if (!Double.TryParse(MinimumLineRate, NumberStyles.Float, CultureInfo.InvariantCulture, out minimum))
@@ -355,6 +371,7 @@
     <CoverageReportsDir>$(BuildDir)\reports\coverage</CoverageReportsDir>
     <RawCoverageReport>$(CoverageWorkDir)\coverage.raw.cobertura.xml</RawCoverageReport>
     <CoverageReport>$(CoverageReportsDir)\coverage.cobertura.xml</CoverageReport>
+    <CoverageSettings>$(ProjectRoot)tests\CodeCoverage.config</CoverageSettings>
     <MinimumCoreLineCoverage Condition="'$(MinimumCoreLineCoverage)'==''">0.70</MinimumCoreLineCoverage>
     <PackageRoot>$(BuildDir)\dist</PackageRoot>
     <PackageDir>$(PackageRoot)\MarkdownTableEditor</PackageDir>
@@ -482,6 +499,10 @@
     <Exec Command="&quot;$(PluginShortcutTestExe)&quot;" />
   </Target>
 
+  <Target Name="RunCompatibilityScriptSafetyTests">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)scripts\Test-NppCompatibilitySmokeSafety.ps1&quot;" />
+  </Target>
+
   <Target Name="CleanCoverage">
     <RemoveDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" Condition="Exists('$(CoverageWorkDir)') Or Exists('$(CoverageReportsDir)')" />
     <MakeDir Directories="$(CoverageWorkDir);$(CoverageReportsDir)" />
@@ -494,7 +515,8 @@
   </Target>
 
   <Target Name="Coverage" DependsOnTargets="CleanCoverage;BuildCoreSmokeTests;ResolveCoverageInputs">
-    <Exec Command="&quot;$(CoverageConsole)&quot; collect --nologo --output &quot;$(RawCoverageReport)&quot; --output-format cobertura --include-files &quot;$(ProjectRoot)src\MarkdownTableCore.cpp&quot; &quot;$(TestExe)&quot;" />
+    <Exec WorkingDirectory="$(ProjectRoot)tests"
+          Command="&quot;$(CoverageConsole)&quot; collect --nologo --settings &quot;$(CoverageSettings)&quot; --output &quot;$(RawCoverageReport)&quot; --output-format cobertura &quot;$(TestExe)&quot;" />
     <NormalizeCoberturaCoverage InputPath="$(RawCoverageReport)"
                                 OutputPath="$(CoverageReport)"
                                 ProjectRoot="$(ProjectRoot)"

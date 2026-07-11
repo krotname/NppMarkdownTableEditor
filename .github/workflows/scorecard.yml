@@ -14,7 +14,7 @@ permissions: read-all
 jobs:
   scorecard:
     name: OSSF Scorecards
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: read
@@ -45,3 +45,4 @@ jobs:
           name: openssf-scorecard
           path: scorecard-results.sarif
           if-no-files-found: error
+          retention-days: 14
