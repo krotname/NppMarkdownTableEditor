@@ -31,7 +31,7 @@ function Assert-NoReparsePointsBelowRoot([string]$Path, [string]$Root) {
                 throw "Refusing to use a WorkDir path that crosses a reparse point: $($item.FullName)"
             }
         }
-        $parent = Split-Path -LiteralPath $current -Parent
+        $parent = [IO.Path]::GetDirectoryName($current)
         if (-not $parent -or $parent.Equals($current, [StringComparison]::OrdinalIgnoreCase)) {
             throw "Could not validate WorkDir ancestry: $Path"
         }
