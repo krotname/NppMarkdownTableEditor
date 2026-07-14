@@ -12,17 +12,48 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Test-PathWithin([string]$Path, [string]$Root, [switch]$AllowRoot) {
+    $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    if ($fullPath.Equals($fullRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        return [bool]$AllowRoot
+    }
+    return $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-NoReparsePointsBelowRoot([string]$Path, [string]$Root) {
+    $current = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    while (-not $current.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase)) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Refusing to use a WorkDir path that crosses a reparse point: $($item.FullName)"
+            }
+        }
+        $parent = [IO.Path]::GetDirectoryName($current)
+        if (-not $parent -or $parent.Equals($current, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Could not validate WorkDir ancestry: $Path"
+        }
+        $current = $parent.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    }
+}
+
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 if (-not $WorkDir) {
     $WorkDir = Join-Path $projectRoot ($(if ($LatestOnly) { "build\npp-latest" } else { "build\npp-compat" }))
 } elseif (-not [IO.Path]::IsPathRooted($WorkDir)) {
     $WorkDir = Join-Path $projectRoot $WorkDir
 }
-$WorkDir = [IO.Path]::GetFullPath($WorkDir)
+$WorkDir = [IO.Path]::GetFullPath($WorkDir).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 
-if (-not $WorkDir.StartsWith($projectRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "WorkDir must stay under the project root. Got: $WorkDir"
+if (-not (Test-PathWithin -Path $WorkDir -Root $projectRoot)) {
+    throw "WorkDir must be a child directory under the project root. Got: $WorkDir"
 }
+if ((Test-Path -LiteralPath $WorkDir) -and -not (Test-Path -LiteralPath $WorkDir -PathType Container)) {
+    throw "WorkDir must be a directory, not a file. Got: $WorkDir"
+}
+Assert-NoReparsePointsBelowRoot -Path $WorkDir -Root $projectRoot
 
 if (-not $Win32PluginPath) {
     $Win32PluginPath = Join-Path $projectRoot "bin\MarkdownTableEditor.dll"
@@ -88,10 +119,11 @@ $WM_COMMAND = 0x0111
 $WM_CLOSE = 0x0010
 
 function Reset-Directory([string]$Path) {
-    $resolved = [IO.Path]::GetFullPath($Path)
-    if (-not $resolved.StartsWith($WorkDir, [StringComparison]::OrdinalIgnoreCase) -and $resolved -ne $WorkDir) {
+    $resolved = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    if (-not (Test-PathWithin -Path $resolved -Root $WorkDir -AllowRoot)) {
         throw "Refusing to remove path outside WorkDir: $resolved"
     }
+    Assert-NoReparsePointsBelowRoot -Path $resolved -Root $projectRoot
     if (Test-Path -LiteralPath $resolved) {
         $removeArgs = @{ Recurse = $true; Force = $true }
         Remove-Item -LiteralPath $resolved @removeArgs

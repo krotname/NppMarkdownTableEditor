@@ -88,6 +88,13 @@ std::size_t asSize(const JsonValue &value)
 	return value.get<std::size_t>();
 }
 
+bool asBool(const JsonValue &value)
+{
+	if (!value.is_boolean())
+		throw std::runtime_error("Expected JSON boolean");
+	return value.get<bool>();
+}
+
 std::vector<std::string> asStringVector(const JsonValue &value)
 {
 	if (!value.is_array())
@@ -167,8 +174,10 @@ void runConversionScenarios(const JsonValue &scenarios)
 		const JsonValue &scenario = *item;
 		const std::string name = asString(member(scenario, "name"));
 		const MarkdownTable::EditResult result = MarkdownTable::convertDelimitedToTable(asString(member(scenario, "input")));
-		expectTrue(name, result.ok, std::string("should convert: ") + result.message);
-		expectLines(name, result.lines, asStringVector(member(scenario, "lines")));
+		const bool expectedOk = !hasMember(scenario, "ok") || asBool(member(scenario, "ok"));
+		expectTrue(name, result.ok == expectedOk, std::string("unexpected conversion status: ") + result.message);
+		if (expectedOk)
+			expectLines(name, result.lines, asStringVector(member(scenario, "lines")));
 	}
 }
 
@@ -186,7 +195,10 @@ void runEditScenarios(const JsonValue &scenarios)
 			static_cast<int>(asSize(member(scenario, "row"))),
 			static_cast<int>(asSize(member(scenario, "column"))),
 			actionFromString(asString(member(scenario, "action"))));
-		expectTrue(name, result.ok, std::string("should apply: ") + result.message);
+		const bool expectedOk = !hasMember(scenario, "ok") || asBool(member(scenario, "ok"));
+		expectTrue(name, result.ok == expectedOk, std::string("unexpected edit status: ") + result.message);
+		if (!expectedOk)
+			continue;
 		expectLines(name, result.lines, asStringVector(member(scenario, "lines")));
 
 		if (hasMember(scenario, "targetRow"))

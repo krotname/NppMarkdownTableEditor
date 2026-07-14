@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: notepad-interface-sync
+  cancel-in-progress: false
+
 jobs:
   update:
     # Keep the upstream sync limited to the canonical project repository.
@@ -20,10 +24,13 @@ jobs:
       contents: write
 
     runs-on: windows-2022
+    timeout-minutes: 30
 
     steps:
     - name: Checkout Markdown Table Editor repo
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
 
     - name: Checkout N++ repo
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -38,10 +45,6 @@ jobs:
       shell: bash
       run: |
         any_difference=false
-
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          any_difference=true
-        fi
 
         pairs=(
           "src/Scintilla.h|npp_repo/scintilla/include/Scintilla.h"
@@ -66,37 +69,44 @@ jobs:
           fi
         done
 
-        if [ "$any_difference" = true ]; then
-          echo "ANY_DIFFERENCE=True" >> "$GITHUB_OUTPUT"
-        fi
+        git diff --check
+        echo "ANY_DIFFERENCE=$any_difference" >> "$GITHUB_OUTPUT"
 
         date_now="$(date +%Y_%B_%d)"
         echo "CHANGE DATE will be $date_now"
         echo "CHANGE_DATE=$date_now" >> "$GITHUB_OUTPUT"
-        echo "HEAD_REF=$(git --git-dir=npp_repo/.git describe --always '@')" >> "$GITHUB_OUTPUT"
+        echo "HEAD_REF=$(git -C npp_repo rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
         rm -rf npp_repo
         git status
 
-    - name: Commit any updates to the repo
+    - name: If ANY_DIFFERENCE then add MSBuild to PATH
+      if: steps.diff_step.outputs.ANY_DIFFERENCE == 'true'
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+
+    - name: If ANY_DIFFERENCE then ensure ARM64 C++ build tools
+      if: steps.diff_step.outputs.ANY_DIFFERENCE == 'true'
+      shell: pwsh
+      run: .\scripts\Ensure-VsArm64Tools.ps1
+
+    - name: If ANY_DIFFERENCE then validate the synchronized interfaces
+      if: steps.diff_step.outputs.ANY_DIFFERENCE == 'true'
+      shell: pwsh
+      run: msbuild Package.proj /m "/t:BuildReleaseAllPlatforms;RunCoreSmokeTests;RunPluginShortcutSmokeTests;RunCompatibilityScriptSafetyTests"
+
+    - name: Commit validated updates to the repo
+      if: steps.diff_step.outputs.ANY_DIFFERENCE == 'true'
+      id: auto_commit
       uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
       with:
         # GitHub will auto-link the upstream ref to the corresponding commit
         commit_message: Sync Notepad++ interface files with notepad-plus-plus/notepad-plus-plus@${{ steps.diff_step.outputs.HEAD_REF }}
 
-    - name: If ANY_DIFFERENCE then add MSBuild to PATH
-      if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
-      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
-
-    - name: If ANY_DIFFERENCE then run MSBuild of plugin dll
-      if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
-      run: msbuild Package.proj /m /t:BuildReleaseAllPlatforms
-
     - name: Release
-      if: ${{steps.diff_step.outputs.ANY_DIFFERENCE}}
+      if: steps.auto_commit.outputs.changes_detected == 'true'
       uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
       with:
-        name: Markdown Table Editor Notepad++ interface sync v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
-        tag_name: v${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
-        target_commitish: ${{ github.ref_name }}
+        name: Markdown Table Editor Notepad++ interface sync ${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
+        tag_name: npp-interface-sync-${{ steps.diff_step.outputs.CHANGE_DATE }}.${{github.run_number}}.${{github.run_attempt}}
+        target_commitish: ${{ steps.auto_commit.outputs.commit_hash }}
         token: ${{ secrets.GITHUB_TOKEN }}

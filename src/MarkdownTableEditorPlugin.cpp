@@ -23,27 +23,11 @@ extern NppData nppData;
 
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD  reasonForCall, LPVOID /*lpReserved*/)
 {
-	try {
-
-		switch (reasonForCall)
-		{
-			case DLL_PROCESS_ATTACH:
-				pluginInit(hModule);
-				break;
-
-			case DLL_PROCESS_DETACH:
-				pluginCleanUp();
-				break;
-
-			case DLL_THREAD_ATTACH:
-				break;
-
-			case DLL_THREAD_DETACH:
-				break;
-		}
+	if (reasonForCall == DLL_PROCESS_ATTACH)
+	{
+		pluginInit(hModule);
+		::DisableThreadLibraryCalls(reinterpret_cast<HMODULE>(hModule));
 	}
-	catch (...) { return FALSE; }
-
     return TRUE;
 }
 
@@ -61,13 +45,16 @@ extern "C" __declspec(dllexport) const TCHAR * getName()
 
 extern "C" __declspec(dllexport) FuncItem * getFuncsArray(int *nbF)
 {
-	*nbF = nbFunc;
+	if (nbF)
+		*nbF = nbFunc;
 	return funcItem;
 }
 
 
 extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 {
+	if (!notifyCode)
+		return;
 	switch (notifyCode->nmhdr.code) 
 	{
 		case NPPN_READY:
@@ -141,7 +128,7 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 
 		case NPPN_SHUTDOWN:
 		{
-			removeFitToWindowResizeHooks();
+			pluginCleanUp();
 			commandMenuCleanUp();
 		}
 		break;

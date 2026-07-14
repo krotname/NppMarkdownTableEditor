@@ -13,9 +13,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   version:
     runs-on: windows-2022
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -47,6 +52,7 @@ jobs:
   build:
     needs: version
     runs-on: windows-2022
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +93,7 @@ jobs:
             build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}.zip
             build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}-pluginadmin.zip
           if-no-files-found: error
+          retention-days: 7
 
   compatibility-smoke:
     needs: version
@@ -111,6 +118,7 @@ jobs:
       - build
       - compatibility-smoke
     runs-on: windows-2022
+    timeout-minutes: 15
     permissions:
       contents: write
       id-token: write

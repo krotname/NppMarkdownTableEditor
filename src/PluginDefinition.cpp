@@ -31,6 +31,8 @@
 #include <string>
 #include <vector>
 
+#pragma comment(lib, "comctl32.lib")
+
 //
 // The plugin data that Notepad++ needs
 //
@@ -195,9 +197,9 @@ std::size_t g_lastFitToWindowColumns = 0;
 std::vector<uptr_t> g_initialAutoFormatBuffers;
 std::vector<uptr_t> g_pendingInitialAutoFormatBuffers;
 HWND g_pendingFitToWindowScintilla = NULL;
-WNDPROC g_originalMainScintillaProc = NULL;
-WNDPROC g_originalSecondScintillaProc = NULL;
-WNDPROC g_originalNppProc = NULL;
+bool g_mainScintillaSubclassInstalled = false;
+bool g_secondScintillaSubclassInstalled = false;
+bool g_nppSubclassInstalled = false;
 HBITMAP g_toolbarBmps[nbFunc] = {};
 HICON g_toolbarIcons[nbFunc] = {};
 HICON g_toolbarIconDarkModes[nbFunc] = {};
@@ -2742,21 +2744,17 @@ void cancelFitToWindowResizeTimers()
 	cancelFitToWindowResizeTimer(nppData._scintillaSecondHandle);
 }
 
-WNDPROC originalScintillaProc(HWND hwnd)
-{
-	if (hwnd == nppData._scintillaMainHandle)
-		return g_originalMainScintillaProc;
-	if (hwnd == nppData._scintillaSecondHandle)
-		return g_originalSecondScintillaProc;
-	return NULL;
-}
+const UINT_PTR fitToWindowScintillaSubclassId = 0x4D544553;
+const UINT_PTR fitToWindowNppSubclassId = 0x4D54454E;
 
-LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK fitToWindowScintillaProc(
+	HWND hwnd,
+	UINT message,
+	WPARAM wParam,
+	LPARAM lParam,
+	UINT_PTR /*subclassId*/,
+	DWORD_PTR /*referenceData*/)
 {
-	WNDPROC original = originalScintillaProc(hwnd);
-	if (!original)
-		return ::DefWindowProc(hwnd, message, wParam, lParam);
-
 	if (message == WM_TIMER && wParam == fitToWindowResizeTimerId)
 	{
 		cancelFitToWindowResizeTimer(hwnd);
@@ -2766,7 +2764,7 @@ LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam
 
 	std::size_t preservedEnterColumn = 0;
 	const bool preserveEnterColumn = captureEnterColumnToPreserve(hwnd, message, wParam, preservedEnterColumn);
-	const LRESULT result = ::CallWindowProc(original, hwnd, message, wParam, lParam);
+	const LRESULT result = ::DefSubclassProc(hwnd, message, wParam, lParam);
 	if (preserveEnterColumn)
 		restoreEnterColumn(hwnd, preservedEnterColumn);
 	if (shouldScheduleFitToWindowAfterResizeMessage(message, wParam, lParam))
@@ -2774,68 +2772,46 @@ LRESULT CALLBACK fitToWindowScintillaProc(HWND hwnd, UINT message, WPARAM wParam
 	return result;
 }
 
-LRESULT CALLBACK fitToWindowNppProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK fitToWindowNppProc(
+	HWND hwnd,
+	UINT message,
+	WPARAM wParam,
+	LPARAM lParam,
+	UINT_PTR /*subclassId*/,
+	DWORD_PTR /*referenceData*/)
 {
-	WNDPROC original = g_originalNppProc;
-	if (!original)
-		return ::DefWindowProc(hwnd, message, wParam, lParam);
-
-	const LRESULT result = ::CallWindowProc(original, hwnd, message, wParam, lParam);
+	const LRESULT result = ::DefSubclassProc(hwnd, message, wParam, lParam);
 	if (shouldScheduleFitToWindowAfterResizeMessage(message, wParam, lParam))
 		scheduleFitToWindowAfterResize(currentScintilla());
 	return result;
 }
 
-void subclassScintillaWindow(HWND hwnd, WNDPROC &original)
+void subclassScintillaWindow(HWND hwnd, bool &installed)
 {
-	if (!hwnd || original)
+	if (!hwnd || installed)
 		return;
-
-	original = reinterpret_cast<WNDPROC>(::SetWindowLongPtr(
-		hwnd,
-		GWLP_WNDPROC,
-		reinterpret_cast<LONG_PTR>(fitToWindowScintillaProc)));
+	installed = ::SetWindowSubclass(hwnd, fitToWindowScintillaProc, fitToWindowScintillaSubclassId, 0) != FALSE;
 }
 
 void subclassNppWindow()
 {
-	if (!nppData._nppHandle || g_originalNppProc)
+	if (!nppData._nppHandle || g_nppSubclassInstalled)
 		return;
-
-	g_originalNppProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtr(
-		nppData._nppHandle,
-		GWLP_WNDPROC,
-		reinterpret_cast<LONG_PTR>(fitToWindowNppProc)));
+	g_nppSubclassInstalled = ::SetWindowSubclass(nppData._nppHandle, fitToWindowNppProc, fitToWindowNppSubclassId, 0) != FALSE;
 }
 
-void removeScintillaSubclass(HWND hwnd, WNDPROC &original)
+void removeScintillaSubclass(HWND hwnd, bool &installed)
 {
-	if (!hwnd || !original)
-	{
-		original = NULL;
-		return;
-	}
-
-	if (reinterpret_cast<WNDPROC>(::GetWindowLongPtr(hwnd, GWLP_WNDPROC)) == fitToWindowScintillaProc)
-	{
-		::SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(original));
-	}
-	original = NULL;
+	if (hwnd && installed)
+		::RemoveWindowSubclass(hwnd, fitToWindowScintillaProc, fitToWindowScintillaSubclassId);
+	installed = false;
 }
 
 void removeNppSubclass()
 {
-	if (!nppData._nppHandle || !g_originalNppProc)
-	{
-		g_originalNppProc = NULL;
-		return;
-	}
-
-	if (reinterpret_cast<WNDPROC>(::GetWindowLongPtr(nppData._nppHandle, GWLP_WNDPROC)) == fitToWindowNppProc)
-	{
-		::SetWindowLongPtr(nppData._nppHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_originalNppProc));
-	}
-	g_originalNppProc = NULL;
+	if (nppData._nppHandle && g_nppSubclassInstalled)
+		::RemoveWindowSubclass(nppData._nppHandle, fitToWindowNppProc, fitToWindowNppSubclassId);
+	g_nppSubclassInstalled = false;
 }
 
 std::string getRangeText(HWND scintilla, Sci_Position start, Sci_Position end)
@@ -4908,15 +4884,15 @@ void toggleAutoAlignTable()
 void installFitToWindowResizeHooks()
 {
 	subclassNppWindow();
-	subclassScintillaWindow(nppData._scintillaMainHandle, g_originalMainScintillaProc);
-	subclassScintillaWindow(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
+	subclassScintillaWindow(nppData._scintillaMainHandle, g_mainScintillaSubclassInstalled);
+	subclassScintillaWindow(nppData._scintillaSecondHandle, g_secondScintillaSubclassInstalled);
 	rememberCurrentFitToWindowWidth();
 }
 
 void removeFitToWindowResizeHooks()
 {
 	cancelFitToWindowResizeTimers();
-	removeScintillaSubclass(nppData._scintillaMainHandle, g_originalMainScintillaProc);
-	removeScintillaSubclass(nppData._scintillaSecondHandle, g_originalSecondScintillaProc);
+	removeScintillaSubclass(nppData._scintillaMainHandle, g_mainScintillaSubclassInstalled);
+	removeScintillaSubclass(nppData._scintillaSecondHandle, g_secondScintillaSubclassInstalled);
 	removeNppSubclass();
 }

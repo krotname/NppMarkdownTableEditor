@@ -367,6 +367,12 @@ int main()
 		const std::string tsv = delimited(5000, 8, '\t');
 		const std::vector<std::string> sortable = sortableTable(5000, 8);
 		const std::vector<std::string> operationTable = table(1500, 16, true);
+		const std::vector<std::string> hugeHeaderTable =
+		{
+			"| " + std::string(1000000, 'x') + " |",
+			"| --- |",
+			"| value |"
+		};
 
 		const std::vector<BenchmarkCase> benchmarks =
 		{
@@ -398,6 +404,11 @@ int main()
 					consume(MarkdownTable::apply(sortable, 2500, 0, MarkdownTable::Action::SortRowsAscending));
 					consume(MarkdownTable::apply(sortable, 2500, 1, MarkdownTable::Action::SortRowsDescending));
 				}
+			},
+			{
+				"fit 1000000-char header",
+				1500.0,
+				[&hugeHeaderTable]() { consume(MarkdownTable::applyWrappedToWidth(hugeHeaderTable, 2, 0, 80)); }
 			},
 			{
 				"row and column operations",

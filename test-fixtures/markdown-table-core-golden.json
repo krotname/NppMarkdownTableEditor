@@ -20,6 +20,55 @@
       ]
     },
     {
+      "name": "csv preserves escaped pipes and fixes even slash parity",
+      "input": "Name,Note\nAnna,a\\|b\nBob,a\\\\|b",
+      "lines": [
+        "| Name | Note   |",
+        "| ---- | ------ |",
+        "| Anna | a\\|b   |",
+        "| Bob  | a\\\\\\|b |"
+      ]
+    },
+    {
+      "name": "tsv delimiter wins when cell commas are more frequent",
+      "input": "Name\tNote\nAnna\tone,two,three,four\nBob\tplain",
+      "lines": [
+        "| Name | Note               |",
+        "| ---- | ------------------ |",
+        "| Anna | one,two,three,four |",
+        "| Bob  | plain              |"
+      ]
+    },
+    {
+      "name": "unterminated quoted csv field is rejected",
+      "input": "Name,Note\nAnna,\"unfinished",
+      "ok": false
+    },
+    {
+      "name": "characters after closing csv quote are rejected",
+      "input": "Name,Note\nAnna,\"quoted\"junk",
+      "ok": false
+    },
+    {
+      "name": "csv preserves an explicitly empty record",
+      "input": "A,B\n,\nC,D",
+      "lines": [
+        "| A   | B   |",
+        "| --- | --- |",
+        "|     |     |",
+        "| C   | D   |"
+      ]
+    },
+    {
+      "name": "csv trims surrounding cell spaces",
+      "input": "Name,Quoted,Unquoted\nAnna,\"  kept  \",  trim  ",
+      "lines": [
+        "| Name | Quoted | Unquoted |",
+        "| ---- | ------ | -------- |",
+        "| Anna | kept   | trim     |"
+      ]
+    },
+    {
       "name": "csv crlf and multiline quoted cell",
       "input": "Name,Note\r\nAnna,\"line 1\r\nline 2\"\r\nBob,done\r\n",
       "lines": [
@@ -64,6 +113,28 @@
     }
   ],
   "edits": [
+    {
+      "name": "setext heading is not a markdown table",
+      "action": "ALIGN",
+      "row": 0,
+      "column": 0,
+      "input": [
+        "Title A | Title B",
+        "---"
+      ],
+      "ok": false
+    },
+    {
+      "name": "separator column count must match header",
+      "action": "ALIGN",
+      "row": 0,
+      "column": 0,
+      "input": [
+        "A | B | C",
+        "--- | ---"
+      ],
+      "ok": false
+    },
     {
       "name": "unicode width align",
       "action": "ALIGN",
@@ -287,6 +358,25 @@
         "| --- | --- |",
         "| e\u0301   | 1   |",
         "| 表  | 2   |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
+      "name": "wrap long cells keeps combining grapheme cluster intact",
+      "action": "WRAP_LONG_CELLS",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| C |",
+        "| --- |",
+        "| 1234567890123456789012345a\u0301z |"
+      ],
+      "lines": [
+        "| C                          |",
+        "| -------------------------- |",
+        "| 1234567890123456789012345a\u0301 |",
+        "| z                          |"
       ],
       "targetRow": 2,
       "targetColumn": 0
