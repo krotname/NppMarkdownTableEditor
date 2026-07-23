@@ -2909,7 +2909,7 @@ void restoreEnterColumn(HWND hwnd, std::size_t column)
 std::string getSelectedText(HWND scintilla)
 {
 	const LRESULT lengthResult = ::SendMessage(scintilla, SCI_GETSELTEXT, 0, 0);
-	if (lengthResult <= 1)
+	if (lengthResult <= 0)
 		return std::string();
 
 	const std::size_t length = static_cast<std::size_t>(lengthResult);
