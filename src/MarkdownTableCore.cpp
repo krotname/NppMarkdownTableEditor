@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <clocale>
 #include <cstdlib>
 #include <utility>
 
@@ -1631,17 +1632,75 @@ std::size_t rowById(const Table &table, std::size_t id, std::size_t fallback)
 	return closestEditableRow(table, fallback);
 }
 
+bool isAsciiDigit(char ch)
+{
+	return ch >= '0' && ch <= '9';
+}
+
+// Both plugin cores accept the same strict grammar: [+-]? digits [. digits?] | [+-]? . digits,
+// with an optional [eE][+-]digits exponent. Hex floats, "inf"/"nan" spellings, and Java-only
+// suffixes like "1.5f" stay textual so both plugins sort them identically.
+bool isStrictDecimalNumber(const std::string &value)
+{
+	const std::size_t length = value.size();
+	std::size_t pos = 0;
+	if (pos < length && (value[pos] == '+' || value[pos] == '-'))
+		++pos;
+	std::size_t mantissaDigits = 0;
+	while (pos < length && isAsciiDigit(value[pos]))
+	{
+		++pos;
+		++mantissaDigits;
+	}
+	if (pos < length && value[pos] == '.')
+	{
+		++pos;
+		while (pos < length && isAsciiDigit(value[pos]))
+		{
+			++pos;
+			++mantissaDigits;
+		}
+	}
+	if (mantissaDigits == 0)
+		return false;
+	if (pos < length && (value[pos] == 'e' || value[pos] == 'E'))
+	{
+		++pos;
+		if (pos < length && (value[pos] == '+' || value[pos] == '-'))
+			++pos;
+		std::size_t exponentDigits = 0;
+		while (pos < length && isAsciiDigit(value[pos]))
+		{
+			++pos;
+			++exponentDigits;
+		}
+		if (exponentDigits == 0)
+			return false;
+	}
+	return pos == length;
+}
+
+double parseStrictDecimal(const std::string &value)
+{
+#ifdef _MSC_VER
+	// The host process may run under a comma-decimal locale; pin LC_NUMERIC to "C" so the
+	// validated '.'-decimal grammar always parses the same way as Double.parseDouble in the
+	// IntelliJ plugin core.
+	static const _locale_t cLocale = _create_locale(LC_NUMERIC, "C");
+	return _strtod_l(value.c_str(), NULL, cLocale);
+#else
+	return std::strtod(value.c_str(), NULL);
+#endif
+}
+
 bool tryParseNumber(const std::string &value, double &number)
 {
 	const std::string trimmed = trim(value);
-	if (trimmed.empty())
+	if (!isStrictDecimalNumber(trimmed))
 		return false;
 
-	char *end = NULL;
-	number = std::strtod(trimmed.c_str(), &end);
-	while (end && *end != '\0' && isSpace(static_cast<unsigned char>(*end)))
-		++end;
-	return end && *end == '\0';
+	number = parseStrictDecimal(trimmed);
+	return true;
 }
 
 bool isUtf8Continuation(unsigned char ch)
@@ -1855,7 +1914,9 @@ SortKey makeSortKey(const std::string &value)
 
 int compareSortKeys(const SortKey &left, const SortKey &right)
 {
-	if (left.numeric && right.numeric)
+	if (left.numeric != right.numeric)
+		return left.numeric ? -1 : 1;
+	if (left.numeric)
 	{
 		if (left.number < right.number)
 			return -1;

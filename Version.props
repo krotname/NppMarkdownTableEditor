@@ -2,7 +2,7 @@
   <PropertyGroup>
     <MarkdownTableEditorVersionMajor Condition="'$(MarkdownTableEditorVersionMajor)'==''">11</MarkdownTableEditorVersionMajor>
     <MarkdownTableEditorVersionMinor Condition="'$(MarkdownTableEditorVersionMinor)'==''">0</MarkdownTableEditorVersionMinor>
-    <MarkdownTableEditorVersionPatch Condition="'$(MarkdownTableEditorVersionPatch)'==''">2</MarkdownTableEditorVersionPatch>
+    <MarkdownTableEditorVersionPatch Condition="'$(MarkdownTableEditorVersionPatch)'==''">3</MarkdownTableEditorVersionPatch>
     <MarkdownTableEditorVersionBuild Condition="'$(MarkdownTableEditorVersionBuild)'==''">0</MarkdownTableEditorVersionBuild>
     <MarkdownTableEditorVersion Condition="'$(MarkdownTableEditorVersion)'==''">$(MarkdownTableEditorVersionMajor).$(MarkdownTableEditorVersionMinor).$(MarkdownTableEditorVersionPatch)</MarkdownTableEditorVersion>
   </PropertyGroup>

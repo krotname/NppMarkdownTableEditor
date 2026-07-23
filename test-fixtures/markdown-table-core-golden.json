@@ -450,6 +450,72 @@
       ]
     },
     {
+      "name": "sort groups strict decimal numbers before text",
+      "action": "SORT_ASCENDING",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Value |",
+        "| --- |",
+        "| 10 |",
+        "| 1z |",
+        "| 9 |",
+        "| .5 |",
+        "| 0x10 |",
+        "| inf |",
+        "| 1.5f |",
+        "| 2e3 |",
+        "| 5e-1 |",
+        "| 1e+2 |",
+        "| 7e |",
+        "| 3E2 |",
+        "| - |",
+        "| a­b |",
+        "| 󰀁w |"
+      ],
+      "lines": [
+        "| Value |",
+        "| ----- |",
+        "| .5    |",
+        "| 5e-1  |",
+        "| 9     |",
+        "| 10    |",
+        "| 1e+2  |",
+        "| 3E2   |",
+        "| 2e3   |",
+        "| -     |",
+        "| 0x10  |",
+        "| 1.5f  |",
+        "| 1z    |",
+        "| 7e    |",
+        "| a­b    |",
+        "| inf   |",
+        "| 󰀁w    |"
+      ],
+      "targetRow": 5,
+      "targetColumn": 0
+    },
+    {
+      "name": "sort treats plus and minus zero as equal",
+      "action": "SORT_ASCENDING",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| V |",
+        "| --- |",
+        "| -0 |",
+        "| +0 |"
+      ],
+      "lines": [
+        "| V   |",
+        "| --- |",
+        "| +0  |",
+        "| -0  |"
+      ],
+      "targetRow": 3,
+      "targetColumn": 0
+    },
+    {
       "name": "next cell appends row",
       "action": "NEXT_CELL",
       "row": 3,
