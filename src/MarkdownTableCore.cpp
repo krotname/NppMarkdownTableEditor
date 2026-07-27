@@ -274,7 +274,10 @@ Table parseTable(const std::vector<std::string> &lines, std::size_t firstRow, st
 		table.trailingPipe = trailingPipeRows * 2 >= rowCount;
 	}
 
-	for (std::size_t i = 0; i < table.rows.size(); ++i)
+	// The scan starts at the second row: a table range always pairs a header with the separator
+	// directly below it, so a header made of dashes such as "| --- | --- |" must stay a header
+	// instead of being mistaken for the separator and rejecting the whole table.
+	for (std::size_t i = 1; i < table.rows.size(); ++i)
 	{
 		if (isSeparatorRow(table.rows[i]) || (i == 1 && isShortSeparatorLine(lines[firstRow + i])))
 		{
@@ -929,16 +932,62 @@ std::vector<std::size_t> headerColumnWidths(const Table &table)
 	return widths;
 }
 
+// Whether a cell holds anything but whitespace, without copying the cell.
+bool cellHasText(const std::string &cell)
+{
+	for (std::size_t i = 0; i < cell.size(); ++i)
+	{
+		if (!isSpace(static_cast<unsigned char>(cell[i])))
+			return true;
+	}
+	return false;
+}
+
+bool hasEmptyCellInColumn(const Table &table, std::size_t column)
+{
+	if (column >= table.columns)
+		return false;
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (!row.separator && column < row.cells.size() && !cellHasText(row.cells[column]))
+			return true;
+	}
+	return false;
+}
+
+// A row whose first cell is empty would otherwise start with padding followed by the pipe that
+// separates the first two columns. Re-parsing such a row strips that pipe as a leading pipe and
+// silently drops the first column, so the pipe is forced back on.
+bool rendersLeadingPipe(const Table &table)
+{
+	return table.leadingPipe || hasEmptyCellInColumn(table, 0);
+}
+
+// Mirrors rendersLeadingPipe for the trailing edge. A single column table without a leading pipe
+// also needs one, because it has no separating pipe of its own and would be rendered as plain text
+// that is no longer a table.
+bool rendersTrailingPipe(const Table &table)
+{
+	if (table.trailingPipe || table.columns == 0)
+		return table.trailingPipe;
+	if (hasEmptyCellInColumn(table, table.columns - 1))
+		return true;
+	return table.columns < 2 && !rendersLeadingPipe(table);
+}
+
 std::size_t formattedTableOverhead(const Table &table)
 {
-	std::size_t overhead = table.leadingPipe ? 1 : 0;
+	const bool leadingPipe = rendersLeadingPipe(table);
+	const bool trailingPipe = rendersTrailingPipe(table);
+	std::size_t overhead = leadingPipe ? 1 : 0;
 	for (std::size_t column = 0; column < table.columns; ++column)
 	{
 		if (column > 0)
 			overhead += 2;
-		if (table.leadingPipe || column > 0)
+		if (leadingPipe || column > 0)
 			++overhead;
-		if (table.trailingPipe && column + 1 == table.columns)
+		if (trailingPipe && column + 1 == table.columns)
 			overhead += 2;
 	}
 	return overhead;
@@ -1215,11 +1264,6 @@ std::size_t resizeColumnWidth(Table &table, std::size_t originalTargetRow, std::
 	return wrapCellsToColumnWidths(table, originalTargetRow, columnWidths);
 }
 
-bool cellHasText(const std::string &cell)
-{
-	return !trim(cell).empty();
-}
-
 std::size_t nonEmptyCellCount(const Row &row)
 {
 	std::size_t count = 0;
@@ -1488,16 +1532,18 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 	result.targetRow = targetRow < table.rows.size() ? targetRow : 0;
 	result.targetColumn = targetColumn < table.columns ? targetColumn : 0;
 
+	const bool leadingPipe = rendersLeadingPipe(table);
+	const bool trailingPipe = rendersTrailingPipe(table);
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
-		std::string line = table.leadingPipe ? "|" : "";
-		std::size_t lineCapacity = table.leadingPipe ? 1 : 0;
+		std::string line = leadingPipe ? "|" : "";
+		std::size_t lineCapacity = leadingPipe ? 1 : 0;
 		for (std::size_t column = 0; column < table.columns; ++column)
 		{
 			if (column > 0)
 				lineCapacity += 2;
-			if (table.leadingPipe || column > 0)
+			if (leadingPipe || column > 0)
 				++lineCapacity;
 			if (row.separator)
 			{
@@ -1508,7 +1554,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 				const std::size_t currentWidth = cellWidths[rowIndex * table.columns + column];
 				lineCapacity += row.cells[column].size() + (widths[column] > currentWidth ? widths[column] - currentWidth : 0);
 			}
-			if (table.trailingPipe && column + 1 == table.columns)
+			if (trailingPipe && column + 1 == table.columns)
 				lineCapacity += 2;
 		}
 		line.reserve(lineCapacity);
@@ -1517,7 +1563,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 		{
 			if (column > 0)
 				line += " |";
-			if (table.leadingPipe || column > 0)
+			if (leadingPipe || column > 0)
 				line.push_back(' ');
 
 			if (row.separator)
@@ -1536,7 +1582,7 @@ FormatResult formatTable(const Table &table, std::size_t targetRow, std::size_t 
 					result.targetColumnOffset = cellStart + contentOffset;
 			}
 
-			if (table.trailingPipe && column + 1 == table.columns)
+			if (trailingPipe && column + 1 == table.columns)
 				line += " |";
 		}
 
@@ -2023,6 +2069,23 @@ void setResultFromFormat(EditResult &result, FormatResult &formatted)
 	result.targetColumnOffset = formatted.targetColumnOffset;
 }
 
+// Whether the formatted table differs from the document rows it was built from, so that a
+// successful no-op such as aligning an already aligned table reports changed == false.
+bool differsFromSourceRows(const std::vector<std::string> &produced,
+	const std::vector<std::string> &lines,
+	std::size_t firstRow,
+	std::size_t lastRow)
+{
+	if (produced.size() != lastRow - firstRow + 1)
+		return true;
+	for (std::size_t i = 0; i < produced.size(); ++i)
+	{
+		if (produced[i] != lines[firstRow + i])
+			return true;
+	}
+	return false;
+}
+
 char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
@@ -2361,13 +2424,23 @@ TableRange findTableRange(const std::vector<std::string> &lines, int row)
 			continue;
 
 		const std::size_t lastRow = tableRangeEnd(lines, firstRow, separatorRow);
-		if (targetRow >= firstRow && targetRow <= lastRow)
+		if (targetRow < firstRow)
+		{
+			// Tables are discovered in document order, so no later one can contain the row.
+			return result;
+		}
+		if (targetRow <= lastRow)
 		{
 			result.found = true;
 			result.firstRow = firstRow;
 			result.lastRow = lastRow;
 			return result;
 		}
+
+		// Resume after the table so the next header candidate starts at lastRow + 1 and tables can
+		// never overlap, not even when this one ended on a row that still carries pipes. The loop
+		// increment turns this into lastRow + 2.
+		separatorRow = lastRow + 1;
 	}
 
 	return result;
@@ -2527,7 +2600,7 @@ EditResult apply(const std::vector<std::string> &lines, int row, int column, Act
 		: formatTable(table, targetRow, targetColumn, &minimumWidths);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
-	result.changed = true;
+	result.changed = differsFromSourceRows(result.lines, lines, tableRange.firstRow, tableRange.lastRow);
 	return result;
 }
 
@@ -2571,7 +2644,7 @@ EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, i
 	FormatResult formatted = formatTable(table, targetRow, tableColumn, &columnWidths);
 	setResultFromFormat(result, formatted);
 	result.ok = true;
-	result.changed = true;
+	result.changed = differsFromSourceRows(result.lines, lines, tableRange.firstRow, tableRange.lastRow);
 	return result;
 }
 

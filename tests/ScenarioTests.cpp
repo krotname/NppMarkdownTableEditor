@@ -507,6 +507,89 @@ void runLargeDataScenarios()
 	expectContains("huge generated csv escapes pipe", hugeCsvText, "pipe \\|");
 	expectContains("huge generated csv keeps quotes", hugeCsvText, "quote \"ok\"");
 }
+
+// Regressions shared with the IDEA core release 0.2.0. Each one used to lose data or reject a
+// valid table, and both cores must agree on the fixed behaviour.
+void runRoundTripRegressionScenarios()
+{
+	// A pipe-bearing separator right after a table used to start a second, overlapping table that
+	// reused the previous table's last row as its header.
+	const std::vector<std::string> trailingSeparator =
+	{
+		"| a | b |",
+		"| --- | --- |",
+		"| 1 | 2 |",
+		"--- | ---",
+		"x | y"
+	};
+	const MarkdownTable::TableRange firstTable = MarkdownTable::findTableRange(trailingSeparator, 2);
+	expectTrue("trailing separator keeps the first table", firstTable.found);
+	expectSize("trailing separator first row", firstTable.firstRow, 0);
+	expectSize("trailing separator last row", firstTable.lastRow, 2);
+	expectTrue("row after the table is not a table",
+		!MarkdownTable::findTableRange(trailingSeparator, 3).found);
+	expectTrue("last row after the table is not a table",
+		!MarkdownTable::findTableRange(trailingSeparator, 4).found);
+
+	// Without the outer pipe the new trailing empty cell re-parses as a trailing pipe, so header
+	// and separator disagree on the column count and the table stops being recognised.
+	const std::vector<std::string> pipeless = { "a | b", "--- | ---", "1 | 2" };
+	const MarkdownTable::EditResult inserted =
+		MarkdownTable::apply(pipeless, 2, 1, MarkdownTable::Action::InsertColumnRight);
+	expectTrue("pipeless insert column ok", inserted.ok);
+	expectLines("pipeless insert column keeps the outer pipe", inserted.lines,
+		std::vector<std::string>({ "a   | b   |     |", "--- | --- | --- |", "1   | 2   |     |" }));
+	expectTrue("pipeless insert column stays a table",
+		MarkdownTable::findTableRange(inserted.lines, 0).found);
+
+	// Deleting down to one column used to leave rows without any pipe at all.
+	const MarkdownTable::EditResult deleted =
+		MarkdownTable::apply(pipeless, 2, 1, MarkdownTable::Action::DeleteColumn);
+	expectTrue("pipeless delete column ok", deleted.ok);
+	expectLines("pipeless delete column keeps a pipe", deleted.lines,
+		std::vector<std::string>({ "a   |", "--- |", "1   |" }));
+	expectTrue("pipeless delete column stays a table",
+		MarkdownTable::findTableRange(deleted.lines, 0).found);
+
+	// Moving an empty column to the front needs the leading pipe for the same reason.
+	const std::vector<std::string> emptyMiddle = { "a | b | c", "--- | --- | ---", "x |  | z" };
+	const MarkdownTable::EditResult moved =
+		MarkdownTable::apply(emptyMiddle, 2, 1, MarkdownTable::Action::MoveColumnLeft);
+	expectTrue("moved empty column ok", moved.ok);
+	expectLines("moved empty column adds the leading pipe", moved.lines,
+		std::vector<std::string>({ "| b   | a   | c  ", "| --- | --- | ---", "|     | x   | z  " }));
+
+	// A dashes-only header used to be mistaken for the separator, rejecting the whole table.
+	const std::vector<std::string> dashHeader = { "| --- | --- |", "| --- | --- |", "| a | b |" };
+	expectTrue("dashes only header is found", MarkdownTable::findTableRange(dashHeader, 0).found);
+	const MarkdownTable::EditResult aligned =
+		MarkdownTable::apply(dashHeader, 2, 0, MarkdownTable::Action::Align);
+	expectTrue("dashes only header aligns", aligned.ok);
+	expectLines("dashes only header stays a header", aligned.lines,
+		std::vector<std::string>({ "| --- | --- |", "| --- | --- |", "| a   | b   |" }));
+
+	// changed must report real change instead of always being true.
+	const std::vector<std::string> stable = { "| a   | b   |", "| --- | --- |", "| 1   | 2   |" };
+	expectTrue("aligning an aligned table reports no change",
+		!MarkdownTable::apply(stable, 0, 0, MarkdownTable::Action::Align).changed);
+	expectTrue("blocked row move reports no change",
+		!MarkdownTable::apply(stable, 2, 0, MarkdownTable::Action::MoveRowUp).changed);
+	expectTrue("inserting a row reports a change",
+		MarkdownTable::apply(stable, 2, 0, MarkdownTable::Action::InsertRowBelow).changed);
+	expectTrue("conversion reports a change",
+		MarkdownTable::convertDelimitedToTable("a,b\n1,2").changed);
+	expectTrue("table creation reports a change", MarkdownTable::createTable(2, 1).changed);
+	expectTrue("re-wrapping a wrapped table reports no change", []() {
+		const std::vector<std::string> wide =
+		{
+			"| h | text |",
+			"| --- | --- |",
+			"| 1 | the quick brown fox jumps over the lazy dog again and again |"
+		};
+		const MarkdownTable::EditResult first = MarkdownTable::applyWrappedToWidth(wide, 2, 1, 40);
+		return first.ok && !MarkdownTable::applyWrappedToWidth(first.lines, 2, 1, 40).changed;
+	}());
+}
 }
 
 int runScenarioUnitTests()
@@ -519,6 +602,7 @@ int runScenarioUnitTests()
 	runShortColumnScenarios();
 	runDelimitedScenarios();
 	runLargeDataScenarios();
+	runRoundTripRegressionScenarios();
 
 	if (g_failures == 0)
 		std::cout << "Scenario unit tests passed (" << g_checks << " checks)\n";

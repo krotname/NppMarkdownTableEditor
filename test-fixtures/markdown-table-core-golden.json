@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "conversion": [
     {
       "name": "quoted csv to markdown table",
@@ -555,6 +556,78 @@
       ],
       "targetRow": 0,
       "targetColumn": 1
+    },
+    {
+      "name": "pipeless table gains an outer pipe when a column becomes empty",
+      "action": "INSERT_COLUMN_RIGHT",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "a | b",
+        "--- | ---",
+        "1 | 2"
+      ],
+      "lines": [
+        "a   | b   |     |",
+        "--- | --- | --- |",
+        "1   | 2   |     |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 2
+    },
+    {
+      "name": "pipeless table keeps a pipe after deleting a column",
+      "action": "DELETE_COLUMN",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "a | b",
+        "--- | ---",
+        "1 | 2"
+      ],
+      "lines": [
+        "a   |",
+        "--- |",
+        "1   |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
+      "name": "dashes only header stays a header",
+      "action": "ALIGN",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| --- | --- |",
+        "| --- | --- |",
+        "| a | b |"
+      ],
+      "lines": [
+        "| --- | --- |",
+        "| --- | --- |",
+        "| a   | b   |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
+      "name": "moving an empty column to the front adds the leading pipe",
+      "action": "MOVE_COLUMN_LEFT",
+      "row": 2,
+      "column": 1,
+      "input": [
+        "a | b | c",
+        "--- | --- | ---",
+        "x |  | z"
+      ],
+      "lines": [
+        "| b   | a   | c  ",
+        "| --- | --- | ---",
+        "|     | x   | z  "
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
     }
   ]
 }

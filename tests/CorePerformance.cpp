@@ -167,6 +167,20 @@ std::string separator(std::size_t columns)
 	return line;
 }
 
+// Prose that carries pipes without ever forming a table, ended by a real one, so the scan has to
+// walk the whole document before it can answer.
+std::vector<std::string> pipeHeavyLines(std::size_t nonTableLines)
+{
+	std::vector<std::string> lines;
+	lines.reserve(nonTableLines + 3);
+	for (std::size_t row = 0; row < nonTableLines; ++row)
+		lines.push_back("prose " + std::to_string(row) + " | still not a table");
+	lines.push_back("| Name | Value |");
+	lines.push_back("| --- | --- |");
+	lines.push_back("| tail | 1 |");
+	return lines;
+}
+
 std::vector<std::string> table(std::size_t dataRows, std::size_t columns, bool unicode)
 {
 	std::vector<std::string> lines;
@@ -373,6 +387,7 @@ int main()
 			"| --- |",
 			"| value |"
 		};
+		const std::vector<std::string> pipeHeavyDocument = pipeHeavyLines(50000);
 
 		const std::vector<BenchmarkCase> benchmarks =
 		{
@@ -423,6 +438,19 @@ int main()
 					consume(MarkdownTable::apply(operationTable, 700, 6, MarkdownTable::Action::MoveRowDown));
 					consume(MarkdownTable::apply(operationTable, 700, 6, MarkdownTable::Action::MoveColumnLeft));
 					consume(MarkdownTable::apply(operationTable, 700, 6, MarkdownTable::Action::MoveColumnRight));
+				}
+			},
+			{
+				"scan 50000 non-table pipe lines",
+				500.0,
+				[&pipeHeavyDocument]()
+				{
+					const MarkdownTable::TableRange range = MarkdownTable::findTableRange(
+						pipeHeavyDocument,
+						static_cast<int>(pipeHeavyDocument.size() - 1));
+					if (!range.found)
+						throw std::runtime_error("table range scan must find the trailing table");
+					g_sink = g_sink + range.firstRow + range.lastRow;
 				}
 			}
 		};

@@ -200,10 +200,12 @@ jobs:
 
           ## What's Changed
 
-          - Fixed Power Auto Fit so typing in lower sparse or continuation rows keeps the caret in the edited row instead of jumping back to the second row.
-          - Prevented pending auto-format timers from overriding plugin edits and manual column-width actions.
-          - Kept Java/C++ core behavior in sync for continuation-row reflow, manual column resizing, caret placement, escaped pipes, and Unicode/CJK width handling.
-          - Added latest Notepad++ portable smoke coverage with retry handling for transient release API failures.
+          - Fixed table detection so a separator line right after a table no longer starts a second, overlapping table that reused the previous table's last row as its header.
+          - Fixed formatting of tables without outer pipes: rows now keep the outer pipe whenever the first or last column holds an empty cell, so inserting a column no longer drops one on the next parse.
+          - Fixed deleting down to a single column in a table without outer pipes, which used to leave rows with no pipe at all and turn the table into plain text.
+          - Fixed a header made only of dashes being mistaken for the separator row, which rejected every edit on that table.
+          - EditResult.changed now reports whether the result really differs from the input instead of always being true.
+          - Kept Java/C++ core behavior in sync: both cores were verified to produce identical output across 28763 generated scenarios covering every action, wrapping width, conversion, range lookup, and cursor mapping.
           - Rebuilt x86, x64, and arm64 plugin ZIPs plus Plugin Admin ZIPs with SHA-256 sums, SBOM, and GitHub attestations.
 
           ## Validation
