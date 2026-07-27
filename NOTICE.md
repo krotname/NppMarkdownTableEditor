@@ -3,6 +3,11 @@
 Markdown Table Editor для Notepad++ распространяется как GPL-3.0-or-later.
 Корневой `license.txt` содержит текст GNU General Public License v3.
 
+Та же лицензия действует для всего комплекта Markdown Table Editor: для плагина
+[IDE JetBrains](https://github.com/krotname/IdeaMarkdownTableEditor) и для Java-библиотеки ядра
+`name.krot:markdown-table-core` начиная с версии 0.3.0. Версии ядра до 0.2.0 включительно
+опубликованы на Maven Central под MIT и сохраняют исходные условия.
+
 ## Собственный код проекта
 
 C++-ядро Markdown-таблиц и интеграционный код плагина являются частью этого проекта.

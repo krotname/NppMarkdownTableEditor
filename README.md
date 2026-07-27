@@ -205,3 +205,13 @@ Performance benchmarks ядра:
 ```cmd
 msbuild Package.proj /t:CorePerformance /p:Configuration=Release /p:Platform=x64
 ```
+
+## Лицензия
+
+Проект распространяется по лицензии [GNU General Public License v3.0 или более поздней версии](LICENSE)
+(`GPL-3.0-or-later`). Та же лицензия действует для плагина
+[Markdown Table Editor для IDE JetBrains](https://github.com/krotname/IdeaMarkdownTableEditor) и для библиотеки
+ядра `name.krot:markdown-table-core`, поэтому весь комплект Markdown Table Editor распространяется на единых
+условиях. Сторонние файлы шаблона Notepad++, Scintilla и тестовой библиотеки перечислены в [NOTICE.md](NOTICE.md).
+
+Copyright (C) 2026 krotname

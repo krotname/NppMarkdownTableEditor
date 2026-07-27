@@ -27,3 +27,4 @@ vs.proj/.vs/
 *.obj
 *.pdb
 docs/social-preview.png
+.claude/
