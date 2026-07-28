@@ -1,0 +1,5 @@
+# Custom labels of the self-hosted release runner, so actionlint accepts runs-on entries
+# that target it. See .github/workflows/release.yml.
+self-hosted-runner:
+  labels:
+    - adler
