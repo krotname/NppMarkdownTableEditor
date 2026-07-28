@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   selftest:
+    # Same trusted-ref rule as the release build: a dispatch picks the ref, and only the default
+    # branch may execute code on the persistent runner.
+    if: github.ref == 'refs/heads/master'
     runs-on: [self-hosted, windows, adler]
     timeout-minutes: 90
     strategy:
@@ -43,7 +46,9 @@ jobs:
           msbuild -version
 
       - name: Build package
-        run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
+        # CleanPackage first: on a persistent runner an incremental build could pass without the
+        # machine actually recompiling the plugin.
+        run: msbuild Package.proj /m "/t:CleanPackage;Package" /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
 
       - name: Report produced artifacts
         shell: pwsh
