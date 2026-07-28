@@ -51,8 +51,12 @@ jobs:
 
   build:
     needs: version
-    runs-on: windows-2022
-    timeout-minutes: 30
+    # Release binaries are compiled on the self-hosted runner in Russia, which is what the
+    # Russian software registry filing declares as the compilation host. Pull request and CI
+    # checks stay on GitHub-hosted runners; this workflow only starts on tag pushes and manual
+    # dispatch, so no fork code can reach the machine.
+    runs-on: [self-hosted, windows, adler]
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:

@@ -1,0 +1,50 @@
+name: Runner self-test
+
+# Manual check that the self-hosted release runner can still build the plugin for every
+# platform. It never publishes anything: no release, no artifacts, no attestation.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: [self-hosted, windows, adler]
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [Win32, x64, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+
+      - name: Ensure ARM64 C++ build tools
+        if: matrix.platform == 'ARM64'
+        shell: pwsh
+        run: .\scripts\Ensure-VsArm64Tools.ps1
+
+      - name: Report runner environment
+        shell: pwsh
+        run: |
+          "runner: $env:RUNNER_NAME"
+          "host: $env:COMPUTERNAME"
+          "os: " + (Get-CimInstance Win32_OperatingSystem).Caption
+          "cpu: " + (Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name)
+          "ram_gb: " + [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+          "free_disk_gb: " + [math]::Round((Get-PSDrive C).Free / 1GB)
+          msbuild -version
+
+      - name: Build package
+        run: msbuild Package.proj /m /t:Package /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
+
+      - name: Report produced artifacts
+        shell: pwsh
+        run: Get-ChildItem build -File -Filter *.zip | ForEach-Object { "{0} {1} bytes" -f $_.Name, $_.Length }
