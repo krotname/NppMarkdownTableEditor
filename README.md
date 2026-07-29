@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/krotname/NppMarkdownTableEditor)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-00599C)](https://isocpp.org/)
 [![Plugin List](https://img.shields.io/badge/Plugin%20List-merged%20%231127-2ea44f)](https://github.com/notepad-plus-plus/nppPluginList/pull/1127)
-[![Website](https://img.shields.io/badge/website-markdowntableeditor.krot.name-0f766e)](https://markdowntableeditor.krot.name/)
+[![Website](https://img.shields.io/badge/website-markdowntableeditor.ru-0f766e)](https://markdowntableeditor.ru/)
 
 Markdown Table Editor превращает Notepad++ в удобный редактор Markdown-таблиц.
 Берёте чужую косую таблицу или сгенерированную ИИ, запускаете команду выравнивания, а плагин выровняет колонки, сохранит Markdown-разметку
@@ -17,7 +17,7 @@ Markdown Table Editor превращает Notepad++ в удобный реда�
 
 **Быстрый старт:** [скачать последний релиз](https://github.com/krotname/NppMarkdownTableEditor/releases/latest) ·
 [официальный Plugin List PR](https://github.com/notepad-plus-plus/nppPluginList/pull/1127) ·
-[открыть сайт проекта](https://markdowntableeditor.krot.name/) ·
+[открыть сайт проекта](https://markdowntableeditor.ru/) ·
 [English README](README.en.md)
 
 ## Другие версии
