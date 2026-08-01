@@ -97,7 +97,7 @@ jobs:
     - name: Commit validated updates to the repo
       if: steps.diff_step.outputs.ANY_DIFFERENCE == 'true'
       id: auto_commit
-      uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
+      uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7
       with:
         # GitHub will auto-link the upstream ref to the corresponding commit
         commit_message: Sync Notepad++ interface files with notepad-plus-plus/notepad-plus-plus@${{ steps.diff_step.outputs.HEAD_REF }}
