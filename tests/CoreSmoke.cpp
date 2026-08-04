@@ -439,27 +439,35 @@ int main()
 	expectTrue("fit keeps a segment under an empty cell ok", segmentUnderEmptyCell.ok);
 	expectTrue("fit keeps a segment under an empty cell", segmentUnderEmptyCell.lines.size() == 4);
 
-	// The first token of a continuation segment is measured whole, so a code span or a link that
-	// could not have fitted after the previous segment still marks the row as wrapping output.
-	const MarkdownTable::EditResult codeSpanContinuation = MarkdownTable::applyWrappedToWidth(
-		{ "| A | B |", "| --- | --- |", "| alpha | keep |", "| `co de` more | |" },
+	// The header is wider than the wrap target, so the rendered column is wider than the width the
+	// body segments were actually split at.
+	const MarkdownTable::EditResult narrowUnderHeader = MarkdownTable::applyWrappedToWidth(
+		{ "| Identifier | Description |", "| --- | --- |", "| x | alpha beta gamma delta epsilon |" },
+		2,
 		0,
-		0,
-		120);
-	expectTrue("fit rejoins a code span continuation ok", codeSpanContinuation.ok);
-	expectTrue(
-		"fit rejoins a code span continuation",
-		codeSpanContinuation.lines[2].find("alpha `co de` more") != std::string::npos);
+		15);
+	expectTrue("fit below the header width ok", narrowUnderHeader.ok);
+	expectTrue("fit below the header width wraps", narrowUnderHeader.lines.size() > 3);
+	const MarkdownTable::EditResult widenedUnderHeader =
+		MarkdownTable::applyWrappedToWidth(narrowUnderHeader.lines, 0, 0, 200);
+	expectTrue("fit rejoins a body wrapped below the header width ok", widenedUnderHeader.ok);
+	expectTrue("fit rejoins a body wrapped below the header width", widenedUnderHeader.lines.size() == 3);
 
-	const MarkdownTable::EditResult linkContinuation = MarkdownTable::applyWrappedToWidth(
-		{ "| A | B |", "| --- | --- |", "| alpha | keep |", "| [l](http://x/y) more | |" },
+	// Wrapping cuts an over-wide link mid-token, so a fragment no longer parses as a link.
+	const MarkdownTable::EditResult hardSplitLinks = MarkdownTable::applyWrappedToWidth(
+		{ "| A | B |", "| --- | --- |", "| [x y](url) [x y](url) | a |" },
+		2,
 		0,
-		0,
-		120);
-	expectTrue("fit rejoins a link continuation ok", linkContinuation.ok);
+		18);
+	expectTrue("hard split link fit ok", hardSplitLinks.ok);
+	expectTrue("hard split link fit wraps", hardSplitLinks.lines.size() > 3);
+	const MarkdownTable::EditResult rejoinedLinks =
+		MarkdownTable::applyWrappedToWidth(hardSplitLinks.lines, 0, 0, 200);
+	expectTrue("fit rejoins hard split constructs ok", rejoinedLinks.ok);
+	expectTrue("fit rejoins hard split constructs", rejoinedLinks.lines.size() == 3);
 	expectTrue(
-		"fit rejoins a link continuation",
-		linkContinuation.lines[2].find("alpha [l](http://x/y) more") != std::string::npos);
+		"fit restores the original links",
+		rejoinedLinks.lines[2].find("[x y](url) [x y](url)") != std::string::npos);
 
 	const MarkdownTable::EditResult rejoinedWrap = MarkdownTable::applyWrappedToWidth(
 		{

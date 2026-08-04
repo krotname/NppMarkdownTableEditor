@@ -1275,44 +1275,18 @@ std::size_t nonEmptyCellCount(const Row &row)
 	return count;
 }
 
-// The first token of a cell exactly as wrapCellSegments would split it, so Markdown links and
-// code spans stay whole.
-std::string firstWrapToken(const std::string &cell)
-{
-	const std::string value = trim(cell);
-	if (value.empty())
-		return "";
-
-	std::size_t end = 0;
-	if (value[0] == '`')
-	{
-		end = markdownCodeSpanEnd(value, 0);
-	}
-	else if (startsMarkdownLinkAt(value, 0))
-	{
-		end = markdownLinkEnd(value, 0);
-	}
-	else
-	{
-		while (end < value.size() && !isSpace(static_cast<unsigned char>(value[end])))
-			end = nextUtf8Offset(value, end);
-	}
-	return value.substr(0, (std::min)(end, value.size()));
-}
-
-// Column widths a wrap would have used, measured only over rows that cannot themselves be
-// continuations.
+// Column widths a wrap would have used, measured only over body rows that fill every column.
 //
-// A continuation row must leave at least one column empty, so rows that fill every column carry
-// the real width. Measuring the continuation candidates too would let a hand-split row widen the
-// very column it is tested against.
+// Header rows are never wrapped, so a header wider than the wrap target would report a width the
+// body was never split at. A continuation row must leave at least one column empty, so measuring
+// the candidates too would let a hand-split row widen the very column it is tested against.
 std::vector<std::size_t> wrappingReferenceWidths(const Table &table)
 {
 	std::vector<std::size_t> widths(table.columns, 1);
-	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	for (std::size_t rowIndex = table.separatorRow + 1; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
-		if (!row.separator && rowIndex > table.separatorRow && nonEmptyCellCount(row) != table.columns)
+		if (row.separator || nonEmptyCellCount(row) != table.columns)
 			continue;
 		for (std::size_t column = 0; column < table.columns && column < row.cells.size(); ++column)
 			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
@@ -1323,9 +1297,14 @@ std::vector<std::size_t> wrappingReferenceWidths(const Table &table)
 // Whether row could have been produced by wrapping the cells of previousSegment at widths.
 //
 // Wrapping leaves a checkable trace. It fills a cell's segments from the top, so a segment never
-// sits under an empty one, and it is greedy, so it never leaves room for the next token. A row that
-// breaks either rule is ordinary sparse data that merely looks like wrapping output, and merging it
-// would destroy a record.
+// sits under an empty one, and it never splits a cell that fits, so a cell that would still have
+// fitted after the previous segment was never wrapped away from it. A row that breaks either rule
+// is ordinary sparse data that merely looks like wrapping output, and merging it would destroy a
+// record.
+//
+// The second test deliberately measures the whole cell rather than its first token. A segment can
+// be a fragment of a construct that was hard-split mid-token, and re-tokenising such a fragment
+// would under-measure it and reject a genuine continuation.
 bool couldFollowWrappedSegment(
 	const Row &previousSegment,
 	const Row &row,
@@ -1346,7 +1325,7 @@ bool couldFollowWrappedSegment(
 			return false;
 
 		const std::size_t width = column < widths.size() ? widths[column] : 0;
-		if (displayWidth(previousCell) + 1 + displayWidth(firstWrapToken(cell)) <= width)
+		if (displayWidth(previousCell) + 1 + displayWidth(trim(cell)) <= width)
 			return false;
 	}
 	return true;
