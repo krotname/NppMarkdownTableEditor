@@ -121,6 +121,10 @@ MarkdownTable::Action actionFromString(const std::string &value)
 		return MarkdownTable::Action::InsertColumnRight;
 	if (value == "DELETE_COLUMN")
 		return MarkdownTable::Action::DeleteColumn;
+	if (value == "NARROW_COLUMN")
+		return MarkdownTable::Action::NarrowColumn;
+	if (value == "WIDEN_COLUMN")
+		return MarkdownTable::Action::WidenColumn;
 	if (value == "MOVE_ROW_UP")
 		return MarkdownTable::Action::MoveRowUp;
 	if (value == "MOVE_ROW_DOWN")

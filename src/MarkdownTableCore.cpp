@@ -1275,7 +1275,89 @@ std::size_t nonEmptyCellCount(const Row &row)
 	return count;
 }
 
-bool isLikelyContinuationRow(const Row &row, const Row &baseRow, std::size_t columns)
+// The first token of a cell exactly as wrapCellSegments would split it, so Markdown links and
+// code spans stay whole.
+std::string firstWrapToken(const std::string &cell)
+{
+	const std::string value = trim(cell);
+	if (value.empty())
+		return "";
+
+	std::size_t end = 0;
+	if (value[0] == '`')
+	{
+		end = markdownCodeSpanEnd(value, 0);
+	}
+	else if (startsMarkdownLinkAt(value, 0))
+	{
+		end = markdownLinkEnd(value, 0);
+	}
+	else
+	{
+		while (end < value.size() && !isSpace(static_cast<unsigned char>(value[end])))
+			end = nextUtf8Offset(value, end);
+	}
+	return value.substr(0, (std::min)(end, value.size()));
+}
+
+// Column widths a wrap would have used, measured only over rows that cannot themselves be
+// continuations.
+//
+// A continuation row must leave at least one column empty, so rows that fill every column carry
+// the real width. Measuring the continuation candidates too would let a hand-split row widen the
+// very column it is tested against.
+std::vector<std::size_t> wrappingReferenceWidths(const Table &table)
+{
+	std::vector<std::size_t> widths(table.columns, 1);
+	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
+	{
+		const Row &row = table.rows[rowIndex];
+		if (!row.separator && rowIndex > table.separatorRow && nonEmptyCellCount(row) != table.columns)
+			continue;
+		for (std::size_t column = 0; column < table.columns && column < row.cells.size(); ++column)
+			widths[column] = (std::max)(widths[column], displayWidth(row.cells[column]));
+	}
+	return widths;
+}
+
+// Whether row could have been produced by wrapping the cells of previousSegment at widths.
+//
+// Wrapping leaves a checkable trace. It fills a cell's segments from the top, so a segment never
+// sits under an empty one, and it is greedy, so it never leaves room for the next token. A row that
+// breaks either rule is ordinary sparse data that merely looks like wrapping output, and merging it
+// would destroy a record.
+bool couldFollowWrappedSegment(
+	const Row &previousSegment,
+	const Row &row,
+	std::size_t columns,
+	const std::vector<std::size_t> &widths)
+{
+	if (previousSegment.cells.size() < columns)
+		return false;
+
+	for (std::size_t column = 0; column < columns; ++column)
+	{
+		const std::string &cell = row.cells[column];
+		if (!cellHasText(cell))
+			continue;
+
+		const std::string &previousCell = previousSegment.cells[column];
+		if (!cellHasText(previousCell))
+			return false;
+
+		const std::size_t width = column < widths.size() ? widths[column] : 0;
+		if (displayWidth(previousCell) + 1 + displayWidth(firstWrapToken(cell)) <= width)
+			return false;
+	}
+	return true;
+}
+
+bool isLikelyContinuationRow(
+	const Row &row,
+	const Row &baseRow,
+	const Row &previousSegment,
+	std::size_t columns,
+	const std::vector<std::size_t> &widths)
 {
 	if (columns < 2 || row.cells.size() < columns || baseRow.cells.size() < columns)
 		return false;
@@ -1292,7 +1374,10 @@ bool isLikelyContinuationRow(const Row &row, const Row &baseRow, std::size_t col
 	}
 
 	const std::size_t requiredAnchors = (std::max)(static_cast<std::size_t>(1), columns / 3);
-	return emptyWhereBaseHasText >= requiredAnchors;
+	if (emptyWhereBaseHasText < requiredAnchors)
+		return false;
+
+	return couldFollowWrappedSegment(previousSegment, row, columns, widths);
 }
 
 bool isAsciiAlphaNumeric(unsigned char ch)
@@ -1371,18 +1456,21 @@ std::vector<bool> continuationRowsToPreserve(const Table &table, std::size_t ori
 		return preserve;
 
 	std::vector<std::size_t> continuationBaseForRow(table.rows.size(), static_cast<std::size_t>(-1));
+	const std::vector<std::size_t> widths = wrappingReferenceWidths(table);
 	std::size_t baseRowIndex = static_cast<std::size_t>(-1);
 	Row baseRow;
+	Row previousSegment;
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
 		if (row.separator || rowIndex <= table.separatorRow || baseRowIndex == static_cast<std::size_t>(-1) ||
-			!isLikelyContinuationRow(row, baseRow, table.columns))
+			!isLikelyContinuationRow(row, baseRow, previousSegment, table.columns, widths))
 		{
 			if (!row.separator && rowIndex > table.separatorRow)
 			{
 				baseRowIndex = rowIndex;
 				baseRow = row;
+				previousSegment = row;
 			}
 			continue;
 		}
@@ -1390,6 +1478,7 @@ std::vector<bool> continuationRowsToPreserve(const Table &table, std::size_t ori
 		continuationBaseForRow[rowIndex] = baseRowIndex;
 		for (std::size_t column = 0; column < table.columns; ++column)
 			appendContinuationCell(baseRow.cells[column], row.cells[column]);
+		previousSegment = row;
 	}
 
 	const std::size_t targetBaseRow = continuationBaseForRow[originalTargetRow];
@@ -1406,22 +1495,27 @@ std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow)
 		return originalTargetRow;
 
 	const std::vector<bool> preserveContinuationRows = continuationRowsToPreserve(table, originalTargetRow);
+	const std::vector<std::size_t> widths = wrappingReferenceWidths(table);
 	std::vector<Row> unwrappedRows;
 	unwrappedRows.reserve(table.rows.size());
 	std::size_t targetRow = originalTargetRow;
 	std::size_t baseRowIndex = static_cast<std::size_t>(-1);
+	Row previousSegment;
 
 	for (std::size_t rowIndex = 0; rowIndex < table.rows.size(); ++rowIndex)
 	{
 		const Row &row = table.rows[rowIndex];
 		if (row.separator || rowIndex <= table.separatorRow || preserveContinuationRows[rowIndex] ||
 			baseRowIndex == static_cast<std::size_t>(-1) ||
-			!isLikelyContinuationRow(row, unwrappedRows[baseRowIndex], table.columns))
+			!isLikelyContinuationRow(row, unwrappedRows[baseRowIndex], previousSegment, table.columns, widths))
 		{
 			if (rowIndex == originalTargetRow)
 				targetRow = unwrappedRows.size();
 			if (!row.separator && rowIndex > table.separatorRow)
+			{
 				baseRowIndex = unwrappedRows.size();
+				previousSegment = row;
+			}
 			unwrappedRows.push_back(row);
 			continue;
 		}
@@ -1432,6 +1526,7 @@ std::size_t unwrapContinuationRows(Table &table, std::size_t originalTargetRow)
 		Row &baseRow = unwrappedRows[baseRowIndex];
 		for (std::size_t column = 0; column < table.columns; ++column)
 			appendContinuationCell(baseRow.cells[column], row.cells[column]);
+		previousSegment = row;
 	}
 
 	table.rows = std::move(unwrappedRows);

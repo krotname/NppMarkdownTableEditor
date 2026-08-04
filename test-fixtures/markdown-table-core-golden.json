@@ -628,6 +628,68 @@
       ],
       "targetRow": 2,
       "targetColumn": 0
+    },
+    {
+      "name": "manual resize keeps sparse rows that wrapping could not have produced",
+      "action": "WIDEN_COLUMN",
+      "row": 4,
+      "column": 0,
+      "input": [
+        "| Name | Note |",
+        "| --- | --- |",
+        "| Alice | short |",
+        "|  | second |",
+        "| Bob | a much longer value here |"
+      ],
+      "lines": [
+        "| Name   | Note                     |",
+        "| ------ | ------------------------ |",
+        "| Alice  | short                    |",
+        "|        | second                   |",
+        "| Bob    | a much longer value here |"
+      ],
+      "targetRow": 4,
+      "targetColumn": 0
+    },
+    {
+      "name": "manual resize still rejoins rows that wrapping produced",
+      "action": "WIDEN_COLUMN",
+      "row": 2,
+      "column": 0,
+      "input": [
+        "| Key | Description        |",
+        "| --- | ------------------ |",
+        "| x   | alpha beta gamma   |",
+        "|     | delta epsilon zeta |"
+      ],
+      "lines": [
+        "| Key  | Description        |",
+        "| ---- | ------------------ |",
+        "| x    | alpha beta gamma   |",
+        "|      | delta epsilon zeta |"
+      ],
+      "targetRow": 2,
+      "targetColumn": 0
+    },
+    {
+      "name": "a segment under an empty cell is never treated as wrapping output",
+      "action": "WIDEN_COLUMN",
+      "row": 3,
+      "column": 0,
+      "input": [
+        "| A | B |",
+        "| --- | --- |",
+        "| a |  |",
+        "|  | b |"
+      ],
+      "lines": [
+        "| A    | B   |",
+        "| ---- | --- |",
+        "| a    |     |",
+        "|      | b   |"
+      ],
+      "targetRow": 3,
+      "targetColumn": 0
     }
   ]
 }
