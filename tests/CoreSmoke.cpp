@@ -439,6 +439,28 @@ int main()
 	expectTrue("fit keeps a segment under an empty cell ok", segmentUnderEmptyCell.ok);
 	expectTrue("fit keeps a segment under an empty cell", segmentUnderEmptyCell.lines.size() == 4);
 
+	// The first token of a continuation segment is measured whole, so a code span or a link that
+	// could not have fitted after the previous segment still marks the row as wrapping output.
+	const MarkdownTable::EditResult codeSpanContinuation = MarkdownTable::applyWrappedToWidth(
+		{ "| A | B |", "| --- | --- |", "| alpha | keep |", "| `co de` more | |" },
+		0,
+		0,
+		120);
+	expectTrue("fit rejoins a code span continuation ok", codeSpanContinuation.ok);
+	expectTrue(
+		"fit rejoins a code span continuation",
+		codeSpanContinuation.lines[2].find("alpha `co de` more") != std::string::npos);
+
+	const MarkdownTable::EditResult linkContinuation = MarkdownTable::applyWrappedToWidth(
+		{ "| A | B |", "| --- | --- |", "| alpha | keep |", "| [l](http://x/y) more | |" },
+		0,
+		0,
+		120);
+	expectTrue("fit rejoins a link continuation ok", linkContinuation.ok);
+	expectTrue(
+		"fit rejoins a link continuation",
+		linkContinuation.lines[2].find("alpha [l](http://x/y) more") != std::string::npos);
+
 	const MarkdownTable::EditResult rejoinedWrap = MarkdownTable::applyWrappedToWidth(
 		{
 			"| Key | Description        |",
