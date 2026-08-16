@@ -181,6 +181,8 @@ bool ensureWidenColumnToolbarIconsForTests();
 void destroyWidenColumnToolbarIconsForTests();
 bool ensureAllToolbarIconsForTests();
 void destroyAllToolbarIconsForTests();
+bool commandHasToolbarButtonForTests(std::size_t commandIndex);
+std::size_t toolbarButtonCountForTests();
 }
 #endif
 

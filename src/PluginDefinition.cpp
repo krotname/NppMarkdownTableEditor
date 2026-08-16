@@ -2059,6 +2059,23 @@ bool commandHasExplicitToolbarIconKind(std::size_t commandIndex)
 	}
 }
 
+// Кнопку на панели инструментов получают только четыре основные команды. Остальные
+// шестнадцать остаются в меню плагина и на своих горячих клавишах: панель Notepad++ общая
+// для всех плагинов, и двадцать кнопок вытесняли с неё всё прочее (issue #11).
+bool commandHasToolbarButton(std::size_t commandIndex)
+{
+	switch (commandIndex)
+	{
+	case alignCommandIndex:
+	case autoAlignTableCommandIndex:
+	case wrapLongCellsCommandIndex:
+	case autoFitTableCommandIndex:
+		return true;
+	default:
+		return false;
+	}
+}
+
 bool ensureCommandToolbarIconHandles(std::size_t commandIndex)
 {
 	if (commandIndex >= static_cast<std::size_t>(nbFunc))
@@ -4555,6 +4572,22 @@ void destroyWidenColumnToolbarIconsForTests()
 	destroyWidenColumnToolbarIconHandles();
 }
 
+bool commandHasToolbarButtonForTests(std::size_t commandIndex)
+{
+	return commandHasToolbarButton(commandIndex);
+}
+
+std::size_t toolbarButtonCountForTests()
+{
+	std::size_t count = 0;
+	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
+	{
+		if (commandHasToolbarButton(commandIndex))
+			++count;
+	}
+	return count;
+}
+
 bool ensureAllToolbarIconsForTests()
 {
 	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
@@ -4704,6 +4737,8 @@ void registerToolbarIcons()
 	refreshUiLanguageState();
 	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
 	{
+		if (!commandHasToolbarButton(commandIndex))
+			continue;
 		if (funcItem[commandIndex]._cmdID != 0 && ensureCommandToolbarIconHandles(commandIndex))
 		{
 			registerToolbarIcon(

@@ -493,6 +493,17 @@ int runPluginShortcutTests()
 	expectTrue(failures, "narrow column toolbar icons are created", MarkdownTablePluginTesting::ensureNarrowColumnToolbarIconsForTests());
 	expectTrue(failures, "widen column toolbar icons are created", MarkdownTablePluginTesting::ensureWidenColumnToolbarIconsForTests());
 	expectTrue(failures, "all command toolbar icons are created", MarkdownTablePluginTesting::ensureAllToolbarIconsForTests());
+	// issue #11: на панели Notepad++ остаются только четыре основные кнопки, остальные
+	// команды доступны из меню плагина и по горячим клавишам.
+	expectSize(failures, "toolbar keeps only the four main buttons",
+		MarkdownTablePluginTesting::toolbarButtonCountForTests(), 4);
+	// Индексы — те же, что в таблице expected выше: 0 align, 1 auto align, 2 fit width, 3 auto fit.
+	for (std::size_t commandIndex = 0; commandIndex < static_cast<std::size_t>(nbFunc); ++commandIndex)
+	{
+		const bool expectedButton = commandIndex < 4;
+		expectTrue(failures, "toolbar button presence for command " + std::to_string(commandIndex),
+			MarkdownTablePluginTesting::commandHasToolbarButtonForTests(commandIndex) == expectedButton);
+	}
 	MarkdownTablePluginTesting::destroyAlignToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyWrapLongCellsToolbarIconsForTests();
 	MarkdownTablePluginTesting::destroyAutoFitTableToolbarIconsForTests();
