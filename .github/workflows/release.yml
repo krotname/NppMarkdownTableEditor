@@ -133,6 +133,14 @@ jobs:
       attestations: write
       artifact-metadata: write
     steps:
+      # Only for docs/release-notes.md, which carries this version's release prose.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: docs/release-notes.md
+          sparse-checkout-cone-mode: false
+
       - name: Download package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -205,22 +213,18 @@ jobs:
           - [MarkdownTableEditor-$VERSION-arm64-pluginadmin.zip](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-arm64-pluginadmin.zip)
           - [MarkdownTableEditor-$VERSION-sbom.cdx.json](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/MarkdownTableEditor-$VERSION-sbom.cdx.json)
           - [SHA256SUMS.txt](https://github.com/krotname/NppMarkdownTableEditor/releases/download/v$VERSION/SHA256SUMS.txt)
-
-          ## What's Changed
-
-          - Fixed table detection so a separator line right after a table no longer starts a second, overlapping table that reused the previous table's last row as its header.
-          - Fixed formatting of tables without outer pipes: rows now keep the outer pipe whenever the first or last column holds an empty cell, so inserting a column no longer drops one on the next parse.
-          - Fixed deleting down to a single column in a table without outer pipes, which used to leave rows with no pipe at all and turn the table into plain text.
-          - Fixed a header made only of dashes being mistaken for the separator row, which rejected every edit on that table.
-          - EditResult.changed now reports whether the result really differs from the input instead of always being true.
-          - Kept Java/C++ core behavior in sync: both cores were verified to produce identical output across 28763 generated scenarios covering every action, wrapping width, conversion, range lookup, and cursor mapping.
-          - Rebuilt x86, x64, and arm64 plugin ZIPs plus Plugin Admin ZIPs with SHA-256 sums, SBOM, and GitHub attestations.
-
-          ## Validation
-
-          - GitHub Actions release build completed for Win32, x64, and ARM64 with coverage and performance checks.
-          - GitHub Actions compatibility smoke completed for Notepad++ 7.5.9 x86, 8.3.1 x64, and the latest portable x64 release.
           EOF
+
+          # The per-version prose lives in the repository, so a release can never ship the previous
+          # version's notes: docs/release-notes.md is rewritten in the same commit that bumps
+          # Version.props.
+          if [ ! -s docs/release-notes.md ]; then
+            echo "docs/release-notes.md is missing or empty; write this release's notes first." >&2
+            exit 1
+          fi
+          printf '\n' >> release-notes.md
+          # Drop the file's own title and instructions: keep from the first "## " heading on.
+          sed '/^## /,$!d' docs/release-notes.md >> release-notes.md
 
           if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release upload "$TAG_NAME" "${files[@]}" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
