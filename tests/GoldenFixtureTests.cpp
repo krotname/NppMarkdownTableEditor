@@ -211,6 +211,50 @@ void runEditScenarios(const JsonValue &scenarios)
 			expectSize(name, result.targetColumn, asSize(member(scenario, "targetColumn")), "targetColumn");
 	}
 }
+
+void runSeparatorLineScenarios(const JsonValue &scenarios)
+{
+	if (!scenarios.is_array())
+		throw std::runtime_error("separatorLines must be an array");
+
+	for (JsonValue::const_iterator item = scenarios.begin(); item != scenarios.end(); ++item)
+	{
+		const JsonValue &scenario = *item;
+		const std::string name = asString(member(scenario, "name"));
+		const bool expected = asBool(member(scenario, "separator"));
+		const bool actual = MarkdownTable::isPotentialSeparatorLine(asString(member(scenario, "input")));
+		expectTrue(name, actual == expected, expected
+			? "expected a separator line"
+			: "expected a line that is not a separator");
+	}
+}
+
+void runRangeScenarios(const JsonValue &scenarios)
+{
+	if (!scenarios.is_array())
+		throw std::runtime_error("ranges must be an array");
+
+	for (JsonValue::const_iterator item = scenarios.begin(); item != scenarios.end(); ++item)
+	{
+		const JsonValue &scenario = *item;
+		const std::string name = asString(member(scenario, "name"));
+		const JsonValue &expected = member(scenario, "ranges");
+		if (!expected.is_array())
+			throw std::runtime_error("ranges entry must be an array");
+
+		const std::vector<MarkdownTable::TableRange> actual =
+			MarkdownTable::findTableRanges(asStringVector(member(scenario, "input")));
+		expectSize(name, actual.size(), expected.size(), "range count");
+		if (actual.size() != expected.size())
+			continue;
+
+		for (std::size_t i = 0; i < actual.size(); ++i)
+		{
+			expectSize(name, actual[i].firstRow, asSize(member(expected[i], "firstRow")), "firstRow");
+			expectSize(name, actual[i].lastRow, asSize(member(expected[i], "lastRow")), "lastRow");
+		}
+	}
+}
 }
 
 int runGoldenFixtureTests()
@@ -222,6 +266,8 @@ int runGoldenFixtureTests()
 		const JsonValue root = JsonValue::parse(text);
 		runConversionScenarios(member(root, "conversion"));
 		runEditScenarios(member(root, "edits"));
+		runSeparatorLineScenarios(member(root, "separatorLines"));
+		runRangeScenarios(member(root, "ranges"));
 	}
 	catch (const std::exception &error)
 	{
