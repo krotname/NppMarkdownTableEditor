@@ -2472,6 +2472,51 @@ std::size_t columnFromCursor(const std::string &line, std::size_t byteColumn)
 	return column;
 }
 
+bool isPotentialSeparatorLine(const std::string &line)
+{
+	if (!isPotentialTableLine(line))
+		return false;
+
+	Row separator;
+	separator.cells = splitCells(line);
+	return isSeparatorRow(separator) || isShortSeparatorLine(line);
+}
+
+namespace
+{
+bool isSeparatorForHeader(const std::string &headerLine, const std::string &separatorLine)
+{
+	if (!isPotentialSeparatorLine(separatorLine))
+		return false;
+	return splitCells(headerLine).size() == splitCells(separatorLine).size();
+}
+
+// Returns the table whose header sits directly above separatorRow, or a not-found range when those
+// two lines do not form a header/separator pair.
+TableRange tableRangeWithSeparatorAt(const std::vector<std::string> &lines, std::size_t separatorRow)
+{
+	TableRange range;
+	const std::size_t firstRow = separatorRow - 1;
+	if (!isPotentialTableLine(lines[firstRow]))
+		return range;
+	if (!isSeparatorForHeader(lines[firstRow], lines[separatorRow]))
+		return range;
+
+	range.found = true;
+	range.firstRow = firstRow;
+	range.lastRow = tableRangeEnd(lines, firstRow, separatorRow);
+	return range;
+}
+
+// Returns the loop value that resumes scanning after range. The caller's for increment turns it
+// into lastRow + 2, so the next header candidate is the first row past the table and discovered
+// ranges can never overlap - not even when the table ended on a row that still carries pipes.
+std::size_t nextSeparatorCandidate(const TableRange &range)
+{
+	return range.lastRow + 1;
+}
+}
+
 TableRange findTableRange(const std::vector<std::string> &lines, int row)
 {
 	TableRange result;
@@ -2484,40 +2529,35 @@ TableRange findTableRange(const std::vector<std::string> &lines, int row)
 
 	for (std::size_t separatorRow = 1; separatorRow < lines.size(); ++separatorRow)
 	{
-		const std::size_t firstRow = separatorRow - 1;
-		if (!isPotentialTableLine(lines[firstRow]))
+		const TableRange range = tableRangeWithSeparatorAt(lines, separatorRow);
+		if (!range.found)
 			continue;
-		if (!isPotentialTableLine(lines[separatorRow]))
-			continue;
-
-		Row separator;
-		separator.cells = splitCells(lines[separatorRow]);
-		if (!isSeparatorRow(separator) && !isShortSeparatorLine(lines[separatorRow]))
-			continue;
-		if (splitCells(lines[firstRow]).size() != separator.cells.size())
-			continue;
-
-		const std::size_t lastRow = tableRangeEnd(lines, firstRow, separatorRow);
-		if (targetRow < firstRow)
+		if (targetRow < range.firstRow)
 		{
 			// Tables are discovered in document order, so no later one can contain the row.
 			return result;
 		}
-		if (targetRow <= lastRow)
-		{
-			result.found = true;
-			result.firstRow = firstRow;
-			result.lastRow = lastRow;
-			return result;
-		}
+		if (targetRow <= range.lastRow)
+			return range;
 
-		// Resume after the table so the next header candidate starts at lastRow + 1 and tables can
-		// never overlap, not even when this one ended on a row that still carries pipes. The loop
-		// increment turns this into lastRow + 2.
-		separatorRow = lastRow + 1;
+		separatorRow = nextSeparatorCandidate(range);
 	}
 
 	return result;
+}
+
+std::vector<TableRange> findTableRanges(const std::vector<std::string> &lines)
+{
+	std::vector<TableRange> ranges;
+	for (std::size_t separatorRow = 1; separatorRow < lines.size(); ++separatorRow)
+	{
+		const TableRange range = tableRangeWithSeparatorAt(lines, separatorRow);
+		if (!range.found)
+			continue;
+		ranges.push_back(range);
+		separatorRow = nextSeparatorCandidate(range);
+	}
+	return ranges;
 }
 
 EditResult apply(const std::vector<std::string> &lines, int row, int column, Action action)

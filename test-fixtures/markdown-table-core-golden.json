@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "conversion": [
     {
       "name": "quoted csv to markdown table",
@@ -690,6 +690,203 @@
       ],
       "targetRow": 3,
       "targetColumn": 0
+    }
+  ],
+  "separatorLines": [
+    {
+      "name": "dashes between outer pipes",
+      "input": "| --- | --- |",
+      "separator": true
+    },
+    {
+      "name": "dashes without outer pipes",
+      "input": "--- | ---",
+      "separator": true
+    },
+    {
+      "name": "a dash split by spaces still rules a column",
+      "input": "| -- - | --- |",
+      "separator": true
+    },
+    {
+      "name": "an equals rule is a short separator line",
+      "input": "|===|",
+      "separator": true
+    },
+    {
+      "name": "colons without a rule are not a separator",
+      "input": "| :: |",
+      "separator": false
+    },
+    {
+      "name": "alignment colons on every column",
+      "input": "| :-- | --: | :-: |",
+      "separator": true
+    },
+    {
+      "name": "a data row is not a separator",
+      "input": "| x | y |",
+      "separator": false
+    },
+    {
+      "name": "a line without a pipe is never a separator",
+      "input": "---",
+      "separator": false
+    },
+    {
+      "name": "escaped pipes do not make a table line",
+      "input": "\\| --- \\|",
+      "separator": false
+    },
+    {
+      "name": "an empty line is not a separator",
+      "input": "",
+      "separator": false
+    },
+    {
+      "name": "a lone pipe has no rule",
+      "input": "|",
+      "separator": false
+    },
+    {
+      "name": "a single dashed cell",
+      "input": "| - |",
+      "separator": true
+    },
+    {
+      "name": "dashes mixed with equals",
+      "input": "| -=- |",
+      "separator": true
+    },
+    {
+      "name": "a rule next to text is not a separator",
+      "input": "| --- | x |",
+      "separator": false
+    },
+    {
+      "name": "leading whitespace is ignored",
+      "input": "   | --- | --- |",
+      "separator": true
+    }
+  ],
+  "ranges": [
+    {
+      "name": "one table in the middle of prose",
+      "input": [
+        "before",
+        "| A | B |",
+        "| --- | --- |",
+        "| x | y |",
+        "after"
+      ],
+      "ranges": [
+        { "firstRow": 1, "lastRow": 3 }
+      ]
+    },
+    {
+      "name": "two tables separated by a blank line",
+      "input": [
+        "| A | B |",
+        "| --- | --- |",
+        "| x | y |",
+        "",
+        "| C | D |",
+        "| --- | --- |",
+        "| z | w |"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 },
+        { "firstRow": 4, "lastRow": 6 }
+      ]
+    },
+    {
+      "name": "a separator without a leading pipe never reopens the table",
+      "input": [
+        "| A | B |",
+        "| --- | --- |",
+        "| x | y |",
+        "--- | ---"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 }
+      ]
+    },
+    {
+      "name": "prose that merely contains a pipe stops the table",
+      "input": [
+        "| A | B |",
+        "| --- | --- |",
+        "| x | y |",
+        "tail | prose"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 }
+      ]
+    },
+    {
+      "name": "a document without tables",
+      "input": [
+        "no pipes here",
+        "nor here"
+      ],
+      "ranges": []
+    },
+    {
+      "name": "a header made only of dashes stays a header",
+      "input": [
+        "| --- | --- |",
+        "| --- | --- |",
+        "| x | y |"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 }
+      ]
+    },
+    {
+      "name": "a short separator line opens a table",
+      "input": [
+        "| A |",
+        "|===|",
+        "| x |"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 }
+      ]
+    },
+    {
+      "name": "adjacent tables without a blank line are one range",
+      "input": [
+        "| A | B |",
+        "| --- | --- |",
+        "| x | y |",
+        "| C | D |",
+        "| --- | --- |",
+        "| z | w |"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 5 }
+      ]
+    },
+    {
+      "name": "three tables in one document",
+      "input": [
+        "| A |",
+        "| --- |",
+        "| 1 |",
+        "",
+        "| B |",
+        "| --- |",
+        "| 2 |",
+        "",
+        "| C |",
+        "| --- |",
+        "| 3 |"
+      ],
+      "ranges": [
+        { "firstRow": 0, "lastRow": 2 },
+        { "firstRow": 4, "lastRow": 6 },
+        { "firstRow": 8, "lastRow": 10 }
+      ]
     }
   ]
 }
