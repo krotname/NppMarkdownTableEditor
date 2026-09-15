@@ -1,0 +1,39 @@
+name: Release build dry run
+
+# Manual check that the release build still compiles the plugin for every platform on a clean
+# GitHub-hosted runner. It never publishes anything: no release, no artifacts, no attestation.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [Win32, x64, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+
+      - name: Ensure ARM64 C++ build tools
+        if: matrix.platform == 'ARM64'
+        shell: pwsh
+        run: .\scripts\Ensure-VsArm64Tools.ps1
+
+      - name: Build package
+        run: msbuild Package.proj /m "/t:CleanPackage;Package" /p:Configuration=Release /p:Platform="${{ matrix.platform }}"
+
+      - name: Report produced artifacts
+        shell: pwsh
+        run: Get-ChildItem build -File -Filter *.zip | ForEach-Object { "{0} {1} bytes" -f $_.Name, $_.Length }

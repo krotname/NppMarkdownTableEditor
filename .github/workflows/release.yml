@@ -51,15 +51,11 @@ jobs:
 
   build:
     needs: version
-    # Release binaries are compiled on the self-hosted runner in Russia, which is what the
-    # Russian software registry filing declares as the compilation host. Pull request and CI
-    # checks stay on GitHub-hosted runners.
-    #
     # A manual dispatch runs the workflow file and the build scripts of whatever ref was picked,
-    # so the runner is bound to trusted refs only: the default branch and release tags. Any other
-    # ref skips this job, and the release job that depends on it is skipped with it.
+    # so release binaries are built from trusted refs only: the default branch and release tags.
+    # Any other ref skips this job, and the release job that depends on it is skipped with it.
     if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: [self-hosted, windows, adler]
+    runs-on: windows-2022
     timeout-minutes: 90
     strategy:
       fail-fast: false
