@@ -164,11 +164,16 @@ function Resolve-LatestNotepadPortable {
     }
 
     Write-Host "Resolving latest Notepad++ release"
+    $headers = @{ "User-Agent" = "MarkdownTableEditor-Smoke" }
+    $apiUri = [Uri]$NotepadLatestApiUrl
+    if ($apiUri.Scheme -eq "https" -and $apiUri.Host -eq "api.github.com" -and $env:GH_TOKEN) {
+        $headers["Authorization"] = "Bearer $($env:GH_TOKEN)"
+    }
     $release = $null
     $lastError = $null
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         try {
-            $release = Invoke-RestMethod -Headers @{ "User-Agent" = "MarkdownTableEditor-Smoke" } -Uri $NotepadLatestApiUrl
+            $release = Invoke-RestMethod -Headers $headers -Uri $NotepadLatestApiUrl -TimeoutSec 30
             break
         } catch {
             $lastError = $_

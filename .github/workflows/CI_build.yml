@@ -106,4 +106,6 @@ jobs:
 
     - name: Notepad++ compatibility smoke
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: msbuild Package.proj "/t:NppCompatibilitySmoke;NppLatestSmoke"

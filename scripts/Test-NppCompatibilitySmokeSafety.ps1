@@ -65,4 +65,57 @@ finally {
     Remove-Item -LiteralPath $resolvedProbeDir -Recurse -Force
 }
 
-Write-Host "Notepad++ compatibility smoke path-safety tests passed"
+$tokens = $null
+$parseErrors = $null
+$smokeAst = [System.Management.Automation.Language.Parser]::ParseFile($smokeScript, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) {
+    throw "Compatibility smoke script contains parse errors."
+}
+$resolver = $smokeAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq "Resolve-LatestNotepadPortable"
+}, $true)
+Invoke-Expression $resolver.Extent.Text
+
+function Invoke-RestMethod([hashtable]$Headers, [string]$Uri, [int]$TimeoutSec) {
+    if ($TimeoutSec -ne 30) { throw "Latest release lookup has no bounded timeout." }
+    $script:lastReleaseHeaders = $Headers
+    return [pscustomobject]@{
+        tag_name = "test"
+        name = "test"
+        html_url = $Uri
+        assets = @([pscustomobject]@{ name = "npp.test.portable.x64.zip"; browser_download_url = "https://example.invalid/npp.zip" })
+    }
+}
+
+$previousToken = $env:GH_TOKEN
+try {
+    $env:GH_TOKEN = "smoke-test-token"
+    $NotepadLatestPortableUrl = ""
+    foreach ($NotepadLatestApiUrl in @(
+        "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest",
+        "http://api.github.com/releases/latest",
+        "https://api.github.com.example.invalid/releases/latest",
+        "https://example.invalid/releases/latest"
+    )) {
+        $null = Resolve-LatestNotepadPortable
+        $expectedAuth = $NotepadLatestApiUrl.StartsWith("https://api.github.com/")
+        if ($script:lastReleaseHeaders.ContainsKey("Authorization") -ne $expectedAuth) {
+            throw "Latest release lookup authenticated an unexpected API target."
+        }
+        if ($expectedAuth -and $script:lastReleaseHeaders["Authorization"] -ne "Bearer smoke-test-token") {
+            throw "Latest release lookup did not use the supplied token."
+        }
+    }
+    $env:GH_TOKEN = ""
+    $NotepadLatestApiUrl = "https://api.github.com/repos/notepad-plus-plus/notepad-plus-plus/releases/latest"
+    $null = Resolve-LatestNotepadPortable
+    if ($script:lastReleaseHeaders.ContainsKey("Authorization")) {
+        throw "Latest release lookup added authentication without a token."
+    }
+}
+finally {
+    $env:GH_TOKEN = $previousToken
+}
+
+Write-Host "Notepad++ compatibility smoke path and API-authentication safety tests passed"
