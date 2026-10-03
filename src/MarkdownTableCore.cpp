@@ -2160,11 +2160,12 @@ bool differsFromSourceRows(const std::vector<std::string> &produced,
 	return false;
 }
 
+std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &text, char delimiter);
+
 char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
 	std::size_t commas = 0;
-	bool firstDelimitedRecord = true;
 	bool inQuotes = false;
 	bool cellBlank = true;
 
@@ -2194,14 +2195,8 @@ char detectDelimiter(const std::string &text)
 		}
 		else if (ch == '\r' || ch == '\n')
 		{
-			if (firstDelimitedRecord && tabs > 0)
-				return '\t';
-			if (firstDelimitedRecord && commas > 0)
-			{
-				// A comma-only header can be a single TSV cell. Check the body.
-				firstDelimitedRecord = false;
-				commas = 0;
-			}
+			if (tabs > 0 || commas > 0)
+				break;
 			cellBlank = true;
 		}
 		else if (!isSpace(static_cast<unsigned char>(ch)))
@@ -2210,7 +2205,33 @@ char detectDelimiter(const std::string &text)
 		}
 	}
 
-	return tabs > 0 && (firstDelimitedRecord || commas == 0) ? '\t' : ',';
+	if (tabs > 0)
+		return '\t';
+	if (text.find('\t') == std::string::npos)
+		return ',';
+
+	// Compare logical body records using each delimiter's quote grammar.
+	// A populated tab-separated field is stronger evidence than tab padding;
+	// punctuation commas in occasional TSV cells need not imply CSV.
+	const auto csv = parseDelimitedRows(text, ',');
+	const auto tsv = parseDelimitedRows(text, '\t');
+	std::size_t csvRecords = 0;
+	std::size_t tsvRecords = 0;
+	for (std::size_t row = 1; row < csv.size(); ++row)
+		if (csv[row].size() > 1)
+			++csvRecords;
+	for (std::size_t row = 1; row < tsv.size(); ++row)
+	{
+		for (std::size_t column = 1; column < tsv[row].size(); ++column)
+		{
+			if (!trim(tsv[row][column]).empty())
+			{
+				++tsvRecords;
+				break;
+			}
+		}
+	}
+	return tsvRecords > csvRecords ? '\t' : ',';
 }
 
 bool hasDelimitedStructure(const std::string &text, char delimiter)

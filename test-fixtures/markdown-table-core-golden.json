@@ -2,6 +2,21 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "ragged tsv body commas stay inside tab separated cells",
+      "input": "Title, notes\nA\tone,two\nB\tplain",
+      "lines": ["| Title, notes |         |", "| ------------ | ------- |", "| A            | one,two |", "| B            | plain   |"]
+    },
+    {
+      "name": "ragged csv keeps a comma header before trailing tab padding",
+      "input": "Name,Note\nAnna\t",
+      "lines": ["| Name | Note |", "| ---- | ---- |", "| Anna |      |"]
+    },
+    {
+      "name": "ragged csv keeps a comma header before multiple padded records",
+      "input": "Name,Note\r\nAnna\t  \r\nBob\t",
+      "lines": ["| Name | Note |", "| ---- | ---- |", "| Anna |      |", "| Bob  |      |"]
+    },
+    {
       "name": "ragged tsv header comma is punctuation",
       "input": "Title, notes\nA\tB\nC\tD",
       "lines": ["| Title, notes |     |", "| ------------ | --- |", "| A            | B   |", "| C            | D   |"]
