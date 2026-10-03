@@ -2,6 +2,37 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "quoted tabs in later records preserve established tsv",
+      "input": "Title, notes\nA\tfoo\nB\tbar\n\t\"x\ty\"",
+      "lines": [
+        "| Title, notes |     |",
+        "| ------------ | --- |",
+        "| A            | foo |",
+        "| B            | bar |",
+        "|              | x\ty |"
+      ]
+    },
+    {
+      "name": "multiline quoted tab values preserve established tsv crlf",
+      "input": "Title, notes\r\nA\tfoo\r\nB\tbar\r\n\t\"x\ty\r\nz\"",
+      "lines": [
+        "| Title, notes |       |",
+        "| ------------ | ----- |",
+        "| A            | foo   |",
+        "| B            | bar   |",
+        "|              | x\ty z |"
+      ]
+    },
+    {
+      "name": "csv quoted continuation tabs preserve logical record boundaries crlf",
+      "input": "A,B\r\nx,\"foo\r\np\tq\r\nr\ts\"",
+      "lines": [
+        "| A   | B           |",
+        "| --- | ----------- |",
+        "| x   | foo p\tq r\ts |"
+      ]
+    },
+    {
       "name": "ragged tsv body tabs precede punctuation commas in every row",
       "input": "Title, notes\nA\tone,two\nB\tthree,four",
       "lines": ["| Title, notes |            |", "| ------------ | ---------- |", "| A            | one,two    |", "| B            | three,four |"]

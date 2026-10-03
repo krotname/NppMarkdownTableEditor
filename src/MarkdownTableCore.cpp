@@ -2160,14 +2160,14 @@ bool differsFromSourceRows(const std::vector<std::string> &produced,
 	return false;
 }
 
-std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &text, char delimiter);
+std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &text, char delimiter,
+	std::vector<std::size_t> *recordStarts = nullptr);
 
 char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
 	std::size_t commas = 0;
 	bool firstDelimitedRecord = true;
-	bool quotedTabs = false;
 	bool inQuotes = false;
 	bool cellBlank = true;
 
@@ -2176,8 +2176,6 @@ char detectDelimiter(const std::string &text)
 		const char ch = text[i];
 		if (inQuotes)
 		{
-			if (ch == '\t')
-				quotedTabs = true;
 			if (ch == '"' && i + 1 < text.size() && text[i + 1] == '"')
 				++i;
 			else if (ch == '"')
@@ -2219,11 +2217,10 @@ char detectDelimiter(const std::string &text)
 	// Compare logical body records using each delimiter's quote grammar.
 	// A populated tab-separated field is stronger evidence than tab padding;
 	// punctuation commas in occasional TSV cells need not imply CSV.
-	const auto csv = parseDelimitedRows(text, ',');
-	const auto tsv = parseDelimitedRows(text, '\t');
-	// Continuations of a valid quoted CSV field are not TSV records.
-	if (!csv.empty() && quotedTabs)
-		return ',';
+	std::vector<std::size_t> csvStarts;
+	std::vector<std::size_t> tsvStarts;
+	const auto csv = parseDelimitedRows(text, ',', &csvStarts);
+	const auto tsv = parseDelimitedRows(text, '\t', &tsvStarts);
 	std::size_t csvRecords = 0;
 	std::size_t leadingTabs = 0;
 	std::size_t tsvRecords = 0;
@@ -2236,8 +2233,15 @@ char detectDelimiter(const std::string &text)
 				++leadingTabs;
 		}
 	}
+	std::size_t csvStartIndex = 0;
 	for (std::size_t row = 1; row < tsv.size(); ++row)
 	{
+		// Physical continuations inside CSV fields are not new TSV records.
+		// The opening record still supplies evidence for an empty first field.
+		while (csvStartIndex < csvStarts.size() && csvStarts[csvStartIndex] < tsvStarts[row])
+			++csvStartIndex;
+		if (!csv.empty() && (csvStartIndex == csvStarts.size() || csvStarts[csvStartIndex] != tsvStarts[row]))
+			continue;
 		for (std::size_t column = 1; column < tsv[row].size(); ++column)
 		{
 			if (!trim(tsv[row][column]).empty())
@@ -2299,7 +2303,20 @@ bool hasCellContent(const std::vector<std::string> &row)
 	return false;
 }
 
-std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &text, char delimiter)
+void addDelimitedRow(std::vector<std::vector<std::string> > &rows,
+	const std::vector<std::string> &row, bool hasDelimitedSyntax,
+	std::vector<std::size_t> *recordStarts, std::size_t recordStart)
+{
+	if (hasCellContent(row) || hasDelimitedSyntax)
+	{
+		rows.push_back(row);
+		if (recordStarts)
+			recordStarts->push_back(recordStart);
+	}
+}
+
+std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &text, char delimiter,
+	std::vector<std::size_t> *recordStarts)
 {
 	std::vector<std::vector<std::string> > rows;
 	std::vector<std::string> row;
@@ -2307,6 +2324,7 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 	bool inQuotes = false;
 	bool closedQuotedField = false;
 	bool recordHasDelimitedSyntax = false;
+	std::size_t recordStart = 0;
 
 	for (std::size_t i = 0; i < text.size(); ++i)
 	{
@@ -2352,13 +2370,13 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 			{
 				row.push_back(trim(cell));
 				cell.clear();
-				if (hasCellContent(row) || recordHasDelimitedSyntax)
-					rows.push_back(row);
+				addDelimitedRow(rows, row, recordHasDelimitedSyntax, recordStarts, recordStart);
 				row.clear();
 				closedQuotedField = false;
 				recordHasDelimitedSyntax = false;
 				if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
 					++i;
+				recordStart = i + 1;
 			}
 			else if (isSpace(static_cast<unsigned char>(ch)))
 			{
@@ -2391,12 +2409,12 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 		{
 			row.push_back(trim(cell));
 			cell.clear();
-			if (hasCellContent(row) || recordHasDelimitedSyntax)
-				rows.push_back(row);
+			addDelimitedRow(rows, row, recordHasDelimitedSyntax, recordStarts, recordStart);
 			row.clear();
 			recordHasDelimitedSyntax = false;
 			if (ch == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
 				++i;
+			recordStart = i + 1;
 			continue;
 		}
 
@@ -2407,8 +2425,7 @@ std::vector<std::vector<std::string> > parseDelimitedRows(const std::string &tex
 		return std::vector<std::vector<std::string> >();
 
 	row.push_back(trim(cell));
-	if (hasCellContent(row) || recordHasDelimitedSyntax)
-		rows.push_back(row);
+	addDelimitedRow(rows, row, recordHasDelimitedSyntax, recordStarts, recordStart);
 	return rows;
 }
 
