@@ -3838,8 +3838,14 @@ InsertText tableInsertText(HWND scintilla, Sci_Position start, Sci_Position end,
 std::string delimitedReplacementText(const std::string &source, const MarkdownTable::EditResult &edit, const std::string &eol)
 {
 	std::string replacement = joinLines(edit.lines, eol);
-	if (!source.empty() && (source.back() == '\r' || source.back() == '\n'))
+	std::size_t end = source.size();
+	while (end > 0 && (source[end - 1] == '\r' || source[end - 1] == '\n'))
+	{
+		const char last = source[--end];
+		if (last == '\n' && end > 0 && source[end - 1] == '\r')
+			--end;
 		replacement += eol;
+	}
 	return replacement;
 }
 
