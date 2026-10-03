@@ -2,6 +2,16 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "ragged tsv header comma is punctuation",
+      "input": "Title, notes\nA\tB\nC\tD",
+      "lines": ["| Title, notes |     |", "| ------------ | --- |", "| A            | B   |", "| C            | D   |"]
+    },
+    {
+      "name": "ragged tsv header inference includes the final crlf record",
+      "input": "Title, notes\r\nA\tB",
+      "lines": ["| Title, notes |     |", "| ------------ | --- |", "| A            | B   |"]
+    },
+    {
       "name": "tsv preserves an empty leading header cell",
       "input": "\tName\nA\tB",
       "lines": ["|     | Name |", "| --- | ---- |", "| A   | B    |"]

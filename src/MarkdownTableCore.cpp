@@ -2164,6 +2164,7 @@ char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
 	std::size_t commas = 0;
+	bool firstDelimitedRecord = true;
 	bool inQuotes = false;
 	bool cellBlank = true;
 
@@ -2193,9 +2194,14 @@ char detectDelimiter(const std::string &text)
 		}
 		else if (ch == '\r' || ch == '\n')
 		{
-			// Later records may contain literal tabs in CSV fields.
-			if (tabs > 0 || commas > 0)
-				break;
+			if (firstDelimitedRecord && tabs > 0)
+				return '\t';
+			if (firstDelimitedRecord && commas > 0)
+			{
+				// A comma-only header can be a single TSV cell. Check the body.
+				firstDelimitedRecord = false;
+				commas = 0;
+			}
 			cellBlank = true;
 		}
 		else if (!isSpace(static_cast<unsigned char>(ch)))
@@ -2204,7 +2210,7 @@ char detectDelimiter(const std::string &text)
 		}
 	}
 
-	return tabs > 0 ? '\t' : ',';
+	return tabs > 0 && (firstDelimitedRecord || commas == 0) ? '\t' : ',';
 }
 
 bool hasDelimitedStructure(const std::string &text, char delimiter)
