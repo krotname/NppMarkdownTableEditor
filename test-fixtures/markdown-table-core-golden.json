@@ -2,6 +2,21 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "ragged tsv body tabs precede punctuation commas in every row",
+      "input": "Title, notes\nA\tone,two\nB\tthree,four",
+      "lines": ["| Title, notes |            |", "| ------------ | ---------- |", "| A            | one,two    |", "| B            | three,four |"]
+    },
+    {
+      "name": "csv body commas precede embedded tabs in every row",
+      "input": "Name,Note\nAnna,foo\tbar\nBob,baz\tqux",
+      "lines": ["| Name | Note    |", "| ---- | ------- |", "| Anna | foo\tbar |", "| Bob  | baz\tqux |"]
+    },
+    {
+      "name": "multiline csv quoted tabs cannot establish tsv records",
+      "input": "A,B\nx,\"foo\np\tq\nr\ts\"",
+      "lines": ["| A   | B           |", "| --- | ----------- |", "| x   | foo p\tq r\ts |"]
+    },
+    {
       "name": "ragged tsv body commas stay inside tab separated cells",
       "input": "Title, notes\nA\tone,two\nB\tplain",
       "lines": ["| Title, notes |         |", "| ------------ | ------- |", "| A            | one,two |", "| B            | plain   |"]
