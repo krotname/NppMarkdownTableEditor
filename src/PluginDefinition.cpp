@@ -3835,10 +3835,18 @@ InsertText tableInsertText(HWND scintilla, Sci_Position start, Sci_Position end,
 	return insertText;
 }
 
+std::string delimitedReplacementText(const std::string &source, const MarkdownTable::EditResult &edit, const std::string &eol)
+{
+	std::string replacement = joinLines(edit.lines, eol);
+	if (!source.empty() && (source.back() == '\r' || source.back() == '\n'))
+		replacement += eol;
+	return replacement;
+}
+
 void replaceRangeWithEdit(HWND scintilla, Sci_Position start, Sci_Position end, const std::string &source, const MarkdownTable::EditResult &edit)
 {
 	const std::string eol = chooseEol(source, currentEol(scintilla));
-	const std::string replacement = joinLines(edit.lines, eol);
+	const std::string replacement = delimitedReplacementText(source, edit, eol);
 	const std::size_t targetOffset = offsetForLineColumn(edit.lines, eol, edit.targetRow, edit.targetColumnOffset);
 
 	ScintillaUndoAction undo(scintilla);
@@ -4274,7 +4282,10 @@ ReplacementPreview replacementPreviewForTests(const MarkdownTable::EditResult &e
 
 ReplacementPreview delimitedReplacementPreviewForTests(const std::string &source, const std::string &fallback, const MarkdownTable::EditResult &edit)
 {
-	return replacementPreviewForTests(edit, chooseEol(source, fallback));
+	const std::string eol = chooseEol(source, fallback);
+	ReplacementPreview preview = replacementPreviewForTests(edit, eol);
+	preview.text = delimitedReplacementText(source, edit, eol);
+	return preview;
 }
 
 void applyNativeLangFileNameForTests(const std::string &nativeLangFileName)

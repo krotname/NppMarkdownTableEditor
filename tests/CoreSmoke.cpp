@@ -938,7 +938,7 @@ Anna	A\\|B)").lines,
 			"| ---- | ------ | -------- |",
 			"| Anna | kept   | trim     |"
 		});
-	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n\t").ok);
+	expectTrue("empty csv rejected", !MarkdownTable::convertDelimitedToTable(" \r\n ").ok);
 	expectTrue("setext heading is not mistaken for a table", !MarkdownTable::apply(
 		{
 			"A | B",

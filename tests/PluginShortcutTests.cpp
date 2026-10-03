@@ -546,6 +546,16 @@ int runPluginShortcutTests()
 	expectString(failures, "plugin single line csv fallback crlf", singleLineCsvPreview.text,
 		"| Name | Score |\r\n| ---- | ----- |");
 	expectSize(failures, "plugin single line csv caret", singleLineCsvPreview.caretOffset, std::string("| ").size());
+	for (const std::string &eol : { std::string("\n"), std::string("\r\n"), std::string("\r") })
+	{
+		const std::string source = "Name,Score" + eol + "Anna,10" + eol;
+		const MarkdownTable::EditResult edit = MarkdownTable::convertDelimitedToTable(source);
+		const MarkdownTablePluginTesting::ReplacementPreview preview =
+			MarkdownTablePluginTesting::delimitedReplacementPreviewForTests(source, "\n", edit);
+		expectString(failures, "csv selection keeps newline before following prose", preview.text + "Following paragraph",
+			"| Name | Score |" + eol + "| ---- | ----- |" + eol + "| Anna | 10    |" + eol + "Following paragraph");
+		expectSize(failures, "csv trailing newline keeps caret in first cell", preview.caretOffset, 2);
+	}
 
 	const MarkdownTable::EditResult shortColumnInsert = MarkdownTable::apply(
 		{

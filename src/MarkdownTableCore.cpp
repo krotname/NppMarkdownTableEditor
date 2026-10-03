@@ -2163,6 +2163,7 @@ bool differsFromSourceRows(const std::vector<std::string> &produced,
 char detectDelimiter(const std::string &text)
 {
 	std::size_t tabs = 0;
+	std::size_t commas = 0;
 	bool inQuotes = false;
 	bool cellBlank = true;
 
@@ -2187,10 +2188,14 @@ char detectDelimiter(const std::string &text)
 		}
 		else if (ch == ',')
 		{
+			++commas;
 			cellBlank = true;
 		}
 		else if (ch == '\r' || ch == '\n')
 		{
+			// Later records may contain literal tabs in CSV fields.
+			if (tabs > 0 || commas > 0)
+				break;
 			cellBlank = true;
 		}
 		else if (!isSpace(static_cast<unsigned char>(ch)))
@@ -2202,9 +2207,9 @@ char detectDelimiter(const std::string &text)
 	return tabs > 0 ? '\t' : ',';
 }
 
-bool hasDelimitedStructure(const std::string &text)
+bool hasDelimitedStructure(const std::string &text, char delimiter)
 {
-	const std::string value = trim(text);
+	const std::string &value = text;
 	if (value.empty())
 		return false;
 	bool inQuotes = false;
@@ -2224,7 +2229,7 @@ bool hasDelimitedStructure(const std::string &text)
 		{
 			inQuotes = true;
 		}
-		else if (ch == ',' || ch == '\t')
+		else if (ch == delimiter)
 		{
 			foundDelimiter = true;
 			cellBlank = true;
@@ -2765,14 +2770,16 @@ EditResult applyWrappedToWidth(const std::vector<std::string> &lines, int row, i
 EditResult convertDelimitedToTable(const std::string &text)
 {
 	EditResult result;
-	const std::string value = trim(text);
-	if (!hasDelimitedStructure(value))
+	// Tabs at the edges delimit empty TSV cells and must reach the parser.
+	const std::string &value = text;
+	const char delimiter = detectDelimiter(value);
+	if (!hasDelimitedStructure(value, delimiter))
 	{
 		result.message = "No CSV or TSV data found";
 		return result;
 	}
 
-	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(value, detectDelimiter(value));
+	const std::vector<std::vector<std::string> > rows = parseDelimitedRows(value, delimiter);
 	if (rows.empty())
 	{
 		result.message = "No CSV or TSV data found";

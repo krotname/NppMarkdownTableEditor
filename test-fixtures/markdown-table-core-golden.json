@@ -2,6 +2,31 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "tsv preserves an empty leading header cell",
+      "input": "\tName\nA\tB",
+      "lines": ["|     | Name |", "| --- | ---- |", "| A   | B    |"]
+    },
+    {
+      "name": "tsv preserves empty trailing columns",
+      "input": "Name\t\t",
+      "lines": ["| Name |     |     |", "| ---- | --- | --- |"]
+    },
+    {
+      "name": "tsv preserves a fully empty record",
+      "input": "\t\t",
+      "lines": ["|     |     |     |", "| --- | --- | --- |"]
+    },
+    {
+      "name": "csv delimiter is determined before later tab whitespace",
+      "input": "Name,Note\nAnna,\"x\"\t\nBob,done",
+      "lines": ["| Name | Note |", "| ---- | ---- |", "| Anna | x    |", "| Bob  | done |"]
+    },
+    {
+      "name": "tsv literal quotes after a comma stay textual",
+      "input": "Name\tNote\nAnna\tpart,\"unfinished",
+      "lines": ["| Name | Note             |", "| ---- | ---------------- |", "| Anna | part,\"unfinished |"]
+    },
+    {
       "name": "quoted csv to markdown table",
       "input": "Name,Note\nAnna,\"A, B\"\nBob,\"said \"\"hi\"\"\"",
       "lines": [
