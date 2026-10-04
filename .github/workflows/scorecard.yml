@@ -2,6 +2,7 @@ name: OpenSSF Scorecard
 
 on:
   branch_protection_rule:
+  pull_request:
   push:
     branches:
       - master
@@ -14,21 +15,20 @@ permissions: read-all
 jobs:
   scorecard:
     name: OSSF Scorecards
-    # Scorecard is a Docker action, so it needs a real Linux pool, not White Windows.
-    if: >-
-      !(github.repository == 'krotname/NppMarkdownTableEditor' &&
-        github.actor == github.repository_owner && github.triggering_actor == github.repository_owner) ||
-      vars.CI_LINUX_RUNS_ON != ''
+    # Native CLI runs in Direct mode without a Docker daemon or socket.
     runs-on: >-
       ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
           github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
-          vars.CI_LINUX_RUNS_ON || '["ubuntu-24.04"]') }}
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) &&
+          (vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') || '["ubuntu-24.04"]') }}
     timeout-minutes: 15
     permissions:
       actions: read
       checks: read
       contents: read
-      id-token: write
       issues: read
       pull-requests: read
       security-events: write
@@ -37,16 +37,39 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Run Scorecard
-        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
-        with:
-          results_file: scorecard-results.sarif
-          results_format: sarif
-          publish_results: true
+      - name: Install Scorecard CLI
+        env:
+          SCORECARD_VERSION: "5.5.0"
+          SCORECARD_SHA256: "83b90a05c1540ef1390db1cd5711e5fd04be9c1d8537fb84d39d02092d6a8dff"
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/scorecard.tar.gz"
+          curl -fsSL --retry 3 "https://github.com/ossf/scorecard/releases/download/v${SCORECARD_VERSION}/scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz" -o "$archive"
+          echo "${SCORECARD_SHA256}  ${archive}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/scorecard"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/scorecard" scorecard
+          chmod 0755 "$RUNNER_TEMP/scorecard/scorecard"
+      - name: Run native Scorecard with SARIF output
+        env:
+          GITHUB_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENABLE_SARIF: "true"
+          SCORECARD_REPO: ${{ github.repository }}
+          SCORECARD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/scorecard/scorecard" \
+            --repo="github.com/${SCORECARD_REPO}" \
+            --commit="${SCORECARD_COMMIT}" \
+            --format sarif \
+            --output="scorecard-results.sarif" \
+            --show-details
+          python3 -c 'import json; data = json.load(open("scorecard-results.sarif")); assert data["version"] == "2.1.0" and data["runs"], "Missing SARIF runs"'
       - name: Upload Scorecard SARIF
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: scorecard-results.sarif
+          category: openssf-scorecard
       - name: Upload Scorecard artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -22,12 +22,22 @@ Leave it unset for the default route. An override must retain `self-hosted`,
 shared, organisation-wide or unrelated runner. There is no hosted fallback for
 an offline trusted runner.
 
-Linux actionlint, dependency review and Docker-based Scorecard retain their
-checks. Owner jobs are **skipped, not passed**, while `CI_LINUX_RUNS_ON` is unset.
-Set it only after a repository-isolated Linux/ARC pool actually exists, using its
-real JSON runner selector. Do not invent a pool name or borrow another project's
-pool. External/untrusted PRs still use the free public hosted route. Restore and
-pass the Linux checks before treating the entire migration as complete.
+Linux actionlint, dependency review, portable-core CodeQL and native Scorecard
+target the repository-scoped Direct pool `arc-prod-adler-npp-mte`. The exact
+`CI_LINUX_RUNS_ON` JSON override is `["arc-prod-adler-npp-mte"]`; set it only after
+the canonical pool is live. Unset overrides select this same pool rather than
+skip the checks. External/untrusted PRs retain public hosted Linux. Both actors,
+the PR author and the same-repository/non-fork checks guard every home route.
+Windows plugin CodeQL remains required on White; the Linux core lane also builds
+and runs the existing core, golden-fixture and scenario tests and uses a separate
+SARIF category. It does not replace plugin analysis.
+
+Actionlint 1.7.12 and Scorecard 5.5.0 are downloaded with pinned SHA256 checks.
+Actionlint keeps shellcheck and pyflakes (installed into an unprivileged venv).
+Scorecard uses native `--format sarif`, enabled by `ENABLE_SARIF=true`, retaining
+the SARIF artifact and GitHub code-scanning upload. The CLI does not publish to
+Scorecard's external REST dataset. No job needs sudo, apt, pipx or a Docker socket.
+Manual dependency-review dispatch requires exact base/head commit inputs.
 
 These predicates enforce the reviewed workflows' routing; they are not a sandbox
 for arbitrary modified workflow YAML. Before bringing a public-repository runner
@@ -35,9 +45,8 @@ online, restrict repository write access and require approval for workflows from
 all outside collaborators in Actions settings. Review the current PR head and
 workflow changes before any such approval. Do not approve a workflow that removes
 the routing guards or directly requests a home runner.
-The current API policy is `first_time_contributors`; change it to
-`all_external_contributors` before registering the runner. This setting has not
-been changed by the migration PR.
+The repository API policy was set and read back as `all_external_contributors`
+on 2026-10-04 before admitting home public-PR jobs.
 
 ## Install on ADLER-WHITE-W1
 

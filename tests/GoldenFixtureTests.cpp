@@ -156,8 +156,8 @@ std::string findFixturePath()
 {
 	const char *candidates[] =
 	{
-		"test-fixtures\\markdown-table-core-golden.json",
-		"..\\test-fixtures\\markdown-table-core-golden.json"
+		"test-fixtures/markdown-table-core-golden.json",
+		"../test-fixtures/markdown-table-core-golden.json"
 	};
 	for (std::size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i)
 	{
@@ -165,7 +165,7 @@ std::string findFixturePath()
 		if (input)
 			return candidates[i];
 	}
-	throw std::runtime_error("Cannot find test-fixtures\\markdown-table-core-golden.json");
+	throw std::runtime_error("Cannot find test-fixtures/markdown-table-core-golden.json");
 }
 
 void runConversionScenarios(const JsonValue &scenarios)
