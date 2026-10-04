@@ -135,6 +135,14 @@ Safety-тест проверяет host, HTTPS, timeout и отсутствие 
 разделить проверенный head, merge и опубликованный результат. Отсутствие запуска
 из-за документированного path filter не обозначать как успешный CI-run.
 
+Если checks не появляются, проверить `gh api repos/krotname/NppMarkdownTableEditor/actions/workflows`
+и поле `state`: `disabled_manually` отличается от path filter или очереди runner.
+Не включать чужую остановленную миграцию и не убирать required checks ради docs PR.
+На 04.10.2026 workflows вручную остановлены во время
+[миграции CI #45](https://github.com/krotname/NppMarkdownTableEditor/pull/45);
+слияние документации ждёт возобновления и успешных обязательных checks.
+Это датированный snapshot; перед продолжением перечитать live state.
+
 ## Проверенный исторический результат
 
 03.10.2026: 85 scenario-проверок, 188 golden-проверок; performance gates прошли.
