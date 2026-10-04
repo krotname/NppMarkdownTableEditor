@@ -13,7 +13,16 @@ jobs:
   build:
     name: Build and tests (${{ matrix.build_configuration }}, ${{ matrix.build_platform }})
 
-    runs-on: windows-2022
+    # Only owner-authored, same-repository PRs triggered by the owner may use White.
+    # Forks, bots, other authors and non-owner reruns always use public hosted Windows.
+    runs-on: >-
+      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) &&
+          (vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') || '["windows-2022"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -92,7 +101,14 @@ jobs:
 
   npp-ui-smoke:
     name: Tests / Notepad++ compatibility smoke
-    runs-on: windows-2022
+    runs-on: >-
+      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) &&
+          (vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') || '["windows-2022"]') }}
     timeout-minutes: 20
 
     steps:

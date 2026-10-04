@@ -19,7 +19,14 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (cpp)
-    runs-on: windows-2022
+    runs-on: >-
+      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) &&
+          (vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') || '["windows-2022"]') }}
     timeout-minutes: 30
     permissions:
       actions: read

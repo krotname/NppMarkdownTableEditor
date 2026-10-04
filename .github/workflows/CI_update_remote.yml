@@ -18,12 +18,15 @@ concurrency:
 jobs:
   update:
     # Keep the upstream sync limited to the canonical project repository.
-    if: ${{ github.repository == 'krotname/NppMarkdownTableEditor' }}
+    if: >-
+      github.repository == 'krotname/NppMarkdownTableEditor' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/master'
 
     permissions:
       contents: write
 
-    runs-on: windows-2022
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') }}
     timeout-minutes: 30
 
     steps:

@@ -18,7 +18,22 @@ concurrency:
 
 jobs:
   actionlint:
-    runs-on: ubuntu-24.04
+    # Owner checks wait for an explicitly provisioned, repository-isolated Linux pool.
+    if: >-
+      !(github.repository == 'krotname/NppMarkdownTableEditor' &&
+        github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+        (github.event_name != 'pull_request' ||
+          (github.event.pull_request.user.login == github.repository_owner &&
+           github.event.pull_request.head.repo.full_name == github.repository &&
+           !github.event.pull_request.head.repo.fork))) || vars.CI_LINUX_RUNS_ON != ''
+    runs-on: >-
+      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) &&
+          vars.CI_LINUX_RUNS_ON || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     steps:
       - name: Checkout
