@@ -59,21 +59,42 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/scorecard/scorecard" \
             --repo="github.com/${SCORECARD_REPO}" \
-            --commit="${SCORECARD_COMMIT}" \
             --format sarif \
+            --policy=".github/scorecard-policy.yml" \
             --output="scorecard-results.sarif" \
             --show-details
-          python3 -c 'import json; data = json.load(open("scorecard-results.sarif")); assert data["version"] == "2.1.0" and data["runs"], "Missing SARIF runs"'
+          "$RUNNER_TEMP/scorecard/scorecard" \
+            --repo="github.com/${SCORECARD_REPO}" \
+            --commit="${SCORECARD_COMMIT}" \
+            --format sarif \
+            --policy=".github/scorecard-policy.yml" \
+            --output="scorecard-head-results.sarif" \
+            --show-details
+          python3 - <<'PY'
+          import json
+          for filename in ("scorecard-results.sarif", "scorecard-head-results.sarif"):
+              with open(filename, encoding="utf-8") as source:
+                  data = json.load(source)
+              assert data["version"] == "2.1.0" and data["runs"], f"Missing SARIF runs: {filename}"
+          PY
       - name: Upload Scorecard SARIF
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: scorecard-results.sarif
           category: openssf-scorecard
+      - name: Upload head-specific Scorecard SARIF
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: scorecard-head-results.sarif
+          category: openssf-scorecard-head
       - name: Upload Scorecard artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openssf-scorecard
-          path: scorecard-results.sarif
+          path: |
+            scorecard-results.sarif
+            scorecard-head-results.sarif
           if-no-files-found: error
           retention-days: 7

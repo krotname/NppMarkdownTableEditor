@@ -35,7 +35,12 @@ SARIF category. It does not replace plugin analysis.
 Actionlint 1.7.12 and Scorecard 5.5.0 are downloaded with pinned SHA256 checks.
 Actionlint keeps shellcheck and pyflakes (installed into an unprivileged venv).
 Scorecard uses native `--format sarif`, enabled by `ENABLE_SARIF=true`, retaining
-the SARIF artifact and GitHub code-scanning upload. The CLI does not publish to
+the SARIF artifacts and GitHub code-scanning uploads. The upstream v2.4.4 policy
+is preserved in `.github/scorecard-policy.yml`: it is required for native SARIF.
+The default-branch scan retains all original checks; a separate exact-head scan
+adds the commit-supported checks without reducing the default scan. Both output
+files are parsed before upload; CLI exit zero alone is not proof of valid SARIF.
+The CLI does not publish to
 Scorecard's external REST dataset. No job needs sudo, apt, pipx or a Docker socket.
 Manual dependency-review dispatch requires exact base/head commit inputs.
 
