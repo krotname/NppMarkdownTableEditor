@@ -13,6 +13,7 @@ Windows jobs выполняются в одноразовой Windows VM на Bl
 | --- | --- |
 | Windows build, GUI, plugin CodeQL, release и interface sync | `self-hosted, Windows, X64, adler-white-npp, adler-black-ephemeral` |
 | Actionlint, dependency review, portable-core CodeQL, Scorecard | `arc-prod-adler-npp-mte` |
+| Подписанная публикация Scorecard в OpenSSF после native scan ветки `master` | `arc-prod-adler-docker-npp-mte` |
 | Fork, посторонний автор, bot или повторный запуск посторонним | Пропуск; hosted fallback отсутствует |
 
 Оба actor, автор PR и исходный репозиторий должны принадлежать владельцу.
@@ -70,4 +71,8 @@ Actionlint 1.7.12 и Scorecard 5.5.0 сохраняют опубликованн
 Scorecard запускается нативно без Docker socket, с `ENABLE_SARIF=true` и
 `.github/scorecard-policy.yml`; результаты default branch и точного head разбираются
 перед загрузкой. Dependency-review dispatch требует точные base/head commits.
+Публикация в OpenSSF сохраняет официальный Scorecard action, `publish_results: true`
+и GitHub OIDC в отдельном Docker job только на `master`. Docker daemon и socket
+изолированы внутри pod; нативный scan не получает Docker socket.
+Debug x64 добавляет уже установленный Git shell в PATH перед Codecov.
 Jobs не используют sudo, apt или pipx.

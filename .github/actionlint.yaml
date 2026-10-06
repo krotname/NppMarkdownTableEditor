@@ -4,3 +4,4 @@ self-hosted-runner:
     - adler-white-npp
     - adler-black-ephemeral
     - arc-prod-adler-npp-mte
+    - arc-prod-adler-docker-npp-mte

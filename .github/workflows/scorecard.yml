@@ -98,3 +98,44 @@ jobs:
             scorecard-head-results.sarif
           if-no-files-found: error
           retention-days: 7
+
+  publish:
+    name: Publish OpenSSF Scorecard
+    needs: scorecard
+    if: >-
+      github.repository == 'krotname/NppMarkdownTableEditor' &&
+      github.ref == 'refs/heads/master' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: arc-prod-adler-docker-npp-mte
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      id-token: write
+      issues: read
+      pull-requests: read
+      security-events: write
+      statuses: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Require isolated container runtime
+        run: |
+          test "$(id -u)" -ne 0
+          test "$DOCKER_HOST" = 'unix:///var/run/docker.sock'
+          docker info >/dev/null
+      - name: Publish signed default-branch results with the original action
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
+        with:
+          results_file: scorecard-publication.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openssf-scorecard-publication
+          path: scorecard-publication.sarif
+          if-no-files-found: error
+          retention-days: 7
