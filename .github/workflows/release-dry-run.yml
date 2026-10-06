@@ -15,7 +15,7 @@ jobs:
       github.repository == 'krotname/NppMarkdownTableEditor' &&
       github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
       github.ref_type == 'branch'
-    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') }}
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 90
     strategy:
       fail-fast: false

@@ -19,14 +19,14 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (cpp)
-    runs-on: >-
-      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
           github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
           (github.event_name != 'pull_request' ||
             (github.event.pull_request.user.login == github.repository_owner &&
              github.event.pull_request.head.repo.full_name == github.repository &&
-             !github.event.pull_request.head.repo.fork)) &&
-          (vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp"]') || '["windows-2022"]') }}
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 30
     permissions:
       actions: read
@@ -53,14 +53,14 @@ jobs:
 
   analyze-core:
     name: Analyze (cpp core, Linux)
-    runs-on: >-
-      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
           github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
           (github.event_name != 'pull_request' ||
             (github.event.pull_request.user.login == github.repository_owner &&
              github.event.pull_request.head.repo.full_name == github.repository &&
-             !github.event.pull_request.head.repo.fork)) &&
-          (vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') || '["ubuntu-24.04"]') }}
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') }}
     timeout-minutes: 45
     permissions:
       actions: read

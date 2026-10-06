@@ -18,15 +18,15 @@ concurrency:
 
 jobs:
   actionlint:
-    # Forks, other authors and non-owner reruns retain the public hosted route.
-    runs-on: >-
-      ${{ fromJSON(github.repository == 'krotname/NppMarkdownTableEditor' &&
+    # Untrusted runs are skipped; no hosted fallback consumes the owner quota.
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
           github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
           (github.event_name != 'pull_request' ||
             (github.event.pull_request.user.login == github.repository_owner &&
              github.event.pull_request.head.repo.full_name == github.repository &&
-             !github.event.pull_request.head.repo.fork)) &&
-          (vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') || '["ubuntu-24.04"]') }}
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') }}
     timeout-minutes: 10
     steps:
       - name: Checkout
