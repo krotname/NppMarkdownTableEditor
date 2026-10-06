@@ -72,10 +72,15 @@ jobs:
             --show-details
           python3 - <<'PY'
           import json
-          for filename in ("scorecard-results.sarif", "scorecard-head-results.sarif"):
+          for filename, category in (("scorecard-results.sarif", "openssf-scorecard"),
+                                     ("scorecard-head-results.sarif", "openssf-scorecard-head")):
               with open(filename, encoding="utf-8") as source:
                   data = json.load(source)
               assert data["version"] == "2.1.0" and data["runs"], f"Missing SARIF runs: {filename}"
+              for index, run in enumerate(data["runs"]):
+                  run.setdefault("automationDetails", {})["id"] = f"{category}/{index}/"
+              with open(filename, "w", encoding="utf-8") as output:
+                  json.dump(data, output)
           PY
       - name: Upload Scorecard SARIF
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
