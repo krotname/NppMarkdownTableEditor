@@ -59,13 +59,13 @@ void expectLines(const std::string &name, const std::vector<std::string> &actual
 		std::cerr << actual[i] << "\n";
 }
 
-const JsonValue &member(const JsonValue &object, const std::string &key)
+const JsonValue &member(const JsonValue &object, const char *key)
 {
 	if (!object.is_object())
 		throw std::runtime_error("Expected JSON object");
 	JsonValue::const_iterator found = object.find(key);
 	if (found == object.end())
-		throw std::runtime_error("Missing JSON property: " + key);
+		throw std::runtime_error(std::string("Missing JSON property: ") + key);
 	return *found;
 }
 
