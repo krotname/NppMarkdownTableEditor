@@ -33,6 +33,10 @@ if (Test-Arm64Compiler -InstallPath $installPath) {
     exit 0
 }
 
+if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted') {
+    throw "Preinstall Microsoft.VisualStudio.Component.VC.Tools.ARM64 on the Windows runner. CI does not modify a persistent Visual Studio installation."
+}
+
 Write-Host "Installing ARM64 C++ build tools into: $installPath"
 & $installer modify `
     --installPath $installPath `

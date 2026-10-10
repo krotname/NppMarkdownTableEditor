@@ -1,6 +1,10 @@
 name: CI_build
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request: {}
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -13,7 +17,15 @@ jobs:
   build:
     name: Build and tests (${{ matrix.build_configuration }}, ${{ matrix.build_platform }})
 
-    runs-on: windows-2022
+    # Only owner-authored, same-repository runs may use the disposable home guest.
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -52,6 +64,16 @@ jobs:
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
       shell: pwsh
       run: msbuild Package.proj /m /t:RunCompatibilityScriptSafetyTests
+
+    - name: Make installed Git shell available to Codecov
+      if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
+      shell: pwsh
+      run: |
+        $gitShell = Join-Path $env:ProgramFiles 'Git\bin'
+        if (-not (Test-Path -LiteralPath (Join-Path $gitShell 'sh.exe'))) {
+          throw 'Git for Windows shell is required by Codecov'
+        }
+        $gitShell | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Upload coverage to Codecov
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Debug'
@@ -92,7 +114,14 @@ jobs:
 
   npp-ui-smoke:
     name: Tests / Notepad++ compatibility smoke
-    runs-on: windows-2022
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 20
 
     steps:

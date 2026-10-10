@@ -1,7 +1,7 @@
 name: Release build dry run
 
-# Manual check that the release build still compiles the plugin for every platform on a clean
-# GitHub-hosted runner. It never publishes anything: no release, no artifacts, no attestation.
+# Owner-only manual check of the White release runner, including a reviewed pre-merge branch.
+# It never publishes anything: no release, no artifacts, no attestation.
 
 on:
   workflow_dispatch:
@@ -11,7 +11,11 @@ permissions:
 
 jobs:
   selftest:
-    runs-on: windows-2022
+    if: >-
+      github.repository == 'krotname/NppMarkdownTableEditor' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+      github.ref_type == 'branch'
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 90
     strategy:
       fail-fast: false

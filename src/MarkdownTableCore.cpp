@@ -107,13 +107,6 @@ bool isEscaped(const std::string &line, std::size_t pos)
 	return (slashCount % 2) == 1;
 }
 
-bool endsWithUnescapedPipe(const std::string &line)
-{
-	if (line.empty() || line[line.size() - 1] != '|')
-		return false;
-	return !isEscaped(line, line.size() - 1);
-}
-
 bool endsWithUnescapedPipeTrimmed(const std::string &line)
 {
 	std::size_t last = line.size();

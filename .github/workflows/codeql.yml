@@ -19,7 +19,14 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (cpp)
-    runs-on: windows-2022
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
     timeout-minutes: 30
     permissions:
       actions: read
@@ -41,3 +48,43 @@ jobs:
         run: msbuild MarkdownTableEditor.vcxproj /m /p:configuration=Release /p:platform=x64
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: windows-plugin
+
+  analyze-core:
+    name: Analyze (cpp core, Linux)
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') }}
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - name: Build and test portable core for analysis
+        run: |
+          set -euo pipefail
+          g++ -std=c++14 -Wall -Wextra -Werror -g -O1 \
+            src/MarkdownTableCore.cpp tests/CoreSmoke.cpp tests/GoldenFixtureTests.cpp tests/ScenarioTests.cpp \
+            -o "$RUNNER_TEMP/CoreSmoke"
+          "$RUNNER_TEMP/CoreSmoke"
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: linux-core
+          threads: 2

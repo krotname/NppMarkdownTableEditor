@@ -2,6 +2,7 @@ name: OpenSSF Scorecard
 
 on:
   branch_protection_rule:
+  pull_request:
   push:
     branches:
       - master
@@ -14,7 +15,108 @@ permissions: read-all
 jobs:
   scorecard:
     name: OSSF Scorecards
-    runs-on: ubuntu-24.04
+    # Native CLI runs in Direct mode without a Docker daemon or socket.
+    if: >-
+      ${{ github.repository == 'krotname/NppMarkdownTableEditor' &&
+          github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+          (github.event_name != 'pull_request' ||
+            (github.event.pull_request.user.login == github.repository_owner &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             !github.event.pull_request.head.repo.fork)) }}
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNS_ON || '["arc-prod-adler-npp-mte"]') }}
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      security-events: write
+      statuses: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check ARC cache contract
+        if: startsWith(runner.name, 'arc-prod-adler-')
+        shell: bash
+        run: /opt/arc-cache/arc-cache check-workflow --file .github/workflows/scorecard.yml --job "$GITHUB_JOB"
+      - name: Install Scorecard CLI
+        env:
+          SCORECARD_VERSION: "5.5.0"
+          SCORECARD_SHA256: "83b90a05c1540ef1390db1cd5711e5fd04be9c1d8537fb84d39d02092d6a8dff"
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/scorecard.tar.gz"
+          curl -fsSL --retry 3 "https://github.com/ossf/scorecard/releases/download/v${SCORECARD_VERSION}/scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz" -o "$archive"
+          echo "${SCORECARD_SHA256}  ${archive}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/scorecard"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/scorecard" scorecard
+          chmod 0755 "$RUNNER_TEMP/scorecard/scorecard"
+      - name: Run native Scorecard with SARIF output
+        env:
+          GITHUB_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENABLE_SARIF: "true"
+          SCORECARD_REPO: ${{ github.repository }}
+          SCORECARD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/scorecard/scorecard" \
+            --repo="github.com/${SCORECARD_REPO}" \
+            --format sarif \
+            --policy=".github/scorecard-policy.yml" \
+            --output="scorecard-results.sarif" \
+            --show-details
+          "$RUNNER_TEMP/scorecard/scorecard" \
+            --repo="github.com/${SCORECARD_REPO}" \
+            --commit="${SCORECARD_COMMIT}" \
+            --format sarif \
+            --policy=".github/scorecard-policy.yml" \
+            --output="scorecard-head-results.sarif" \
+            --show-details
+          python3 - <<'PY'
+          import json
+          for filename, category in (("scorecard-results.sarif", "openssf-scorecard"),
+                                     ("scorecard-head-results.sarif", "openssf-scorecard-head")):
+              with open(filename, encoding="utf-8") as source:
+                  data = json.load(source)
+              assert data["version"] == "2.1.0" and data["runs"], f"Missing SARIF runs: {filename}"
+              for index, run in enumerate(data["runs"]):
+                  run.setdefault("automationDetails", {})["id"] = f"{category}/{index}/"
+              with open(filename, "w", encoding="utf-8") as output:
+                  json.dump(data, output)
+          PY
+      - name: Upload Scorecard SARIF
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: scorecard-results.sarif
+          category: openssf-scorecard
+      - name: Upload head-specific Scorecard SARIF
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: scorecard-head-results.sarif
+          category: openssf-scorecard-head
+      - name: Upload Scorecard artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openssf-scorecard
+          path: |
+            scorecard-results.sarif
+            scorecard-head-results.sarif
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish OpenSSF Scorecard
+    needs: scorecard
+    if: >-
+      github.repository == 'krotname/NppMarkdownTableEditor' &&
+      github.ref == 'refs/heads/master' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: arc-prod-adler-docker-npp-mte
     timeout-minutes: 15
     permissions:
       actions: read
@@ -26,23 +128,27 @@ jobs:
       security-events: write
       statuses: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Run Scorecard
-        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+      - name: Check ARC cache contract
+        if: startsWith(runner.name, 'arc-prod-adler-')
+        shell: bash
+        run: /opt/arc-cache/arc-cache check-workflow --file .github/workflows/scorecard.yml --job "$GITHUB_JOB"
+      - name: Require isolated container runtime
+        run: |
+          test "$(id -u)" -ne 0
+          test "$DOCKER_HOST" = 'unix:///var/run/docker.sock'
+          docker info >/dev/null
+      - name: Publish signed default-branch results with the original action
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
         with:
-          results_file: scorecard-results.sarif
+          results_file: scorecard-publication.sarif
           results_format: sarif
           publish_results: true
-      - name: Upload Scorecard SARIF
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          sarif_file: scorecard-results.sarif
-      - name: Upload Scorecard artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: openssf-scorecard
-          path: scorecard-results.sarif
+          name: openssf-scorecard-publication
+          path: scorecard-publication.sarif
           if-no-files-found: error
           retention-days: 7
