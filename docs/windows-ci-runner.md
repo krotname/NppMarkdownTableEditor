@@ -13,13 +13,14 @@ Notepad++ GUI smoke использует GitHub-hosted `windows-latest`: кон�
 | Job | Runner |
 | --- | --- |
 | Windows build, plugin CodeQL, release и interface sync | `CI_WINDOWS_RUNS_ON`; домашний одноразовый Windows runner |
-| `Tests / Notepad++ compatibility smoke` | GitHub-hosted `windows-latest` |
+| CI и Release: Notepad++ compatibility smoke | GitHub-hosted `windows-latest` |
 | Actionlint, dependency review, portable-core CodeQL, Scorecard | `arc-prod-adler-npp-mte` |
 | Подписанная публикация Scorecard в OpenSSF после native scan ветки `master` | `arc-prod-adler-docker-npp-mte` |
 | Fork, посторонний автор, bot или повторный запуск посторонним | Пропуск по owner guards, включая GUI job |
 
 Оба actor, автор PR и исходный репозиторий должны принадлежать владельцу.
-Это ограничение сохраняется и для hosted GUI job.
+Это ограничение сохраняется и для hosted GUI jobs; в Release оно наследуется
+через обязательный `version` job с guard ветки `master`/тега `v*`.
 Release и interface sync сохраняют отдельные guards ветки `master`/тега `v*`.
 `CI_WINDOWS_RUNS_ON` и `CI_LINUX_RUNS_ON` допускают JSON-массив labels только
 соответствующего домашнего пула. Общие или hosted runners не подставлять.

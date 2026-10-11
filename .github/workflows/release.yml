@@ -106,7 +106,8 @@ jobs:
 
   compatibility-smoke:
     needs: version
-    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
+    # Window and menu automation needs a desktop outside the container pool.
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
