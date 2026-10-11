@@ -1,26 +1,30 @@
 # Домашний CI Notepad++
 
-Windows jobs выполняются в одноразовой Windows VM на Black. Оператор на White
-создаёт свежий диск из закрытой базовой VM, выдаёт repository-scoped JIT одному job,
-сохраняет результат и логи, затем останавливает VM и удаляет только её диск.
-Первый реальный [GUI smoke](https://github.com/krotname/NppMarkdownTableEditor/actions/runs/37389564596/job/112031144077)
-прошёл для Notepad++ 7.5.9 Win32, 8.3.1 x64 и 8.9.8.1 x64 на head `607efd2`.
-Это подтверждает GUI-среду; полный CI окончательного head проверяется отдельно.
+Windows build и plugin CodeQL выполняются в одноразовых Windows-контейнерах
+на White с Hyper-V isolation. Оператор выдаёт repository-scoped JIT одному job,
+сохраняет результат и логи, затем удаляет контейнер и регистрацию runner.
+Notepad++ GUI smoke использует GitHub-hosted `windows-latest`: контейнерная
+среда не предоставляет интерактивный desktop для проверки окон и меню.
+[GUI smoke на Windows desktop](https://github.com/krotname/NppMarkdownTableEditor/actions/runs/38134737239/job/114456189578)
+прошёл на head `c0d0314`; полный CI окончательного head проверяется отдельно.
 
 ## Маршруты и границы доверия
 
 | Job | Runner |
 | --- | --- |
-| Windows build, GUI, plugin CodeQL, release и interface sync | `self-hosted, Windows, X64, adler-white-npp, adler-black-ephemeral` |
+| Windows build, plugin CodeQL, release и interface sync | `CI_WINDOWS_RUNS_ON`; домашний одноразовый Windows runner |
+| `Tests / Notepad++ compatibility smoke` | GitHub-hosted `windows-latest` |
 | Actionlint, dependency review, portable-core CodeQL, Scorecard | `arc-prod-adler-npp-mte` |
 | Подписанная публикация Scorecard в OpenSSF после native scan ветки `master` | `arc-prod-adler-docker-npp-mte` |
-| Fork, посторонний автор, bot или повторный запуск посторонним | Пропуск; hosted fallback отсутствует |
+| Fork, посторонний автор, bot или повторный запуск посторонним | Пропуск по owner guards, включая GUI job |
 
 Оба actor, автор PR и исходный репозиторий должны принадлежать владельцу.
+Это ограничение сохраняется и для hosted GUI job.
 Release и interface sync сохраняют отдельные guards ветки `master`/тега `v*`.
 `CI_WINDOWS_RUNS_ON` и `CI_LINUX_RUNS_ON` допускают JSON-массив labels только
 соответствующего домашнего пула. Общие или hosted runners не подставлять.
-Отказ домашнего сервера оставляет job в очереди.
+`windows-latest` закреплён только за GUI job и не является fallback домашнего пула.
+Отказ домашнего сервера оставляет его jobs в очереди.
 
 Политика Actions `all_external_contributors` требует предварительного решения
 владельца для workflows внешних участников. Guards в YAML не изолируют произвольно
@@ -30,25 +34,24 @@ Release и interface sync сохраняют отдельные guards ветк�
 
 ## Среда Windows
 
-Канонический lifecycle находится в `krotname/VpnOps`, `ops/ci-windows-black`.
+Канонический lifecycle находится в `krotname/VpnOps`, `ops/ci-windows-white`.
 Деплой оператора разрешён только из `main`; White запускает ограниченную задачу
 планировщика каждые пять минут без перекрытия. Не регистрировать постоянный runner
-на рабочем desktop White и не переносить туда сборки из изолированной VM.
+на рабочем desktop White и не переносить туда сборки из изолированных контейнеров.
 
-На Black VM ограничена 24 GiB RAM, шестью vCPU и отдельным дисковым томом 48 GiB.
-Гость Windows Server 2022 Evaluation имеет ограниченный срок лицензии; базовую
-среду нужно заменить до его окончания. Сеть гостя закрывает домашние/частные адреса
-и IPv6, сохраняя публичные загрузки и DNS. Используется QEMU `-audio none`.
+Контейнер ограничен 12 GiB RAM, шестью vCPU и отдельным writable слоем 64 GiB.
+Внутри образа зарегистрированы VS 2022 Build Tools в `C:\BuildTools`, Windows SDK
+и v143 x86/x64/ARM64. Readiness проверяет регистрацию toolchain, обычные VC imports,
+компиляцию, ресурс и линковку до выдачи JIT. Рабочий процесс идёт под `ContainerUser`.
 
-Базовая среда содержит Git, PowerShell 7/5.1, GitHub CLI без личного входа,
-Actions runner и Visual Studio Community 2026 с MSBuild, v143 x86/x64/ARM64 и
-`CodeCoverage.Console`. `Package.proj` использует full-framework MSBuild,
-а не `dotnet msbuild`. Недостающие OS/C++ компоненты устанавливают в базовую среду;
-job непривилегированного `ci-build` не меняет Visual Studio.
+Git, JDK и PowerShell подключены read-only; host Visual Studio и Windows Kits
+не подменяют установку внутри образа. `Package.proj` использует full-framework
+MSBuild, а не `dotnet msbuild`. Недостающие OS/C++ компоненты устанавливают при
+подготовке образа; непривилегированный job не меняет Visual Studio.
 
-Автовход `ci-build` использует защищённое хранилище Windows; GUI runner запускается
-в интерактивной Session 1. Session 0 для Notepad++ smoke непригодна. Единственный
-worker последовательно выполняет полную матрицу; новый job получает новый диск.
+Домашний worker последовательно выполняет jobs; новый job получает новый контейнер.
+GUI job независимо проверяет `NppCompatibilitySmoke` и `NppLatestSmoke` на hosted
+Windows desktop. Оператор White не обслуживает этот job и не запускает его на хосте.
 Исчезнувшая регистрация runner сама по себе не подтверждает успех: требуются
 actual job ID, head SHA, conclusion и завершение bootstrap гостя.
 
