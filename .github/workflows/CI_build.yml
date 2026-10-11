@@ -121,7 +121,8 @@ jobs:
             (github.event.pull_request.user.login == github.repository_owner &&
              github.event.pull_request.head.repo.full_name == github.repository &&
              !github.event.pull_request.head.repo.fork)) }}
-    runs-on: ${{ fromJSON(vars.CI_WINDOWS_RUNS_ON || '["self-hosted","Windows","X64","adler-white-npp","adler-black-ephemeral"]') }}
+    # Window and menu automation requires a desktop unavailable in Windows containers.
+    runs-on: windows-latest
     timeout-minutes: 20
 
     steps:
