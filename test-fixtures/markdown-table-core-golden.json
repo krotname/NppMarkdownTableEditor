@@ -2,6 +2,41 @@
   "schemaVersion": 2,
   "conversion": [
     {
+      "name": "leading bom quoted csv",
+      "input": "\uFEFF\"Name\",\"City\"\n\"Bob\",\"Paris\"",
+      "lines": ["| Name | City  |", "| ---- | ----- |", "| Bob  | Paris |"]
+    },
+    {
+      "name": "leading bom quoted tsv crlf",
+      "input": "\uFEFF\"Name\"\t\"City\"\r\n\"Bob\"\t\"Paris\"",
+      "lines": ["| Name | City  |", "| ---- | ----- |", "| Bob  | Paris |"]
+    },
+    {
+      "name": "leading bom multiline quoted csv header",
+      "input": "\uFEFF\"First\nName\",City\nBob,Paris",
+      "lines": ["| First Name | City  |", "| ---------- | ----- |", "| Bob        | Paris |"]
+    },
+    {
+      "name": "leading bom empty tsv edge cells",
+      "input": "\uFEFF\tName\t\n\tBob\t",
+      "lines": ["|     | Name |     |", "| --- | ---- | --- |", "|     | Bob  |     |"]
+    },
+    {
+      "name": "leading bom preserves internal bom",
+      "input": "\uFEFFName,City\nBo\uFEFFb,Paris",
+      "lines": ["| Name | City  |", "| ---- | ----- |", "| Bo\uFEFFb  | Paris |"]
+    },
+    {
+      "name": "leading bom quoted csv tab is data",
+      "input": "\uFEFF\"Name\tAlias\",City\nBob,Paris",
+      "lines": ["| Name\tAlias | City  |", "| ---------- | ----- |", "| Bob        | Paris |"]
+    },
+    {
+      "name": "leading bom escaped pipe contract",
+      "input": "\uFEFFName,Note\nBob,\"a|b\\|c\"",
+      "lines": ["| Name | Note    |", "| ---- | ------- |", "| Bob  | a\\|b\\|c |"]
+    },
+    {
       "name": "quoted tabs in later records preserve established tsv",
       "input": "Title, notes\nA\tfoo\nB\tbar\n\t\"x\ty\"",
       "lines": [

@@ -2824,7 +2824,7 @@ EditResult convertDelimitedToTable(const std::string &text)
 {
 	EditResult result;
 	// Tabs at the edges delimit empty TSV cells and must reach the parser.
-	const std::string &value = text;
+	const std::string value = text.compare(0, 3, "\xEF\xBB\xBF") == 0 ? text.substr(3) : text;
 	const char delimiter = detectDelimiter(value);
 	if (!hasDelimitedStructure(value, delimiter))
 	{
