@@ -186,6 +186,19 @@ void testAutomaticWorkBounds(int &failures)
 	editorProbe.document = smallTable + "\n" + std::string(200000, 'x');
 	expectTrue(failures, "long following prose does not disable a small table", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.largestTextRead < 100);
 	editorProbe = EditorProbe();
+	editorProbe.document = smallTable + "\n|" + std::string(200000, 'x') + "|";
+	expectTrue(failures, "oversized continuation never formats a table prefix", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0 && editorProbe.largestTextRead <= 64);
+	editorProbe = EditorProbe();
+	editorProbe.document = "|" + std::string(200000, 'x') + "|\n" + smallTable;
+	editorProbe.currentPosition = 200005;
+	expectTrue(failures, "oversized preceding table row is not a scan boundary", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0 && editorProbe.largestTextRead <= 64);
+	editorProbe = EditorProbe();
+	editorProbe.document = smallTable + "\n" + std::string(80, ' ') + "|" + std::string(200000, 'x') + "|";
+	expectTrue(failures, "unknown oversized indentation skips the whole table", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0 && editorProbe.largestTextRead <= 64);
+	editorProbe = EditorProbe();
+	editorProbe.document = "A | B\n- | -\nx | yy\n" + std::string(200000, 'x') + "| y";
+	expectTrue(failures, "optional leading pipe table skips an oversized continuation", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0 && editorProbe.largestTextRead <= 64);
+	editorProbe = EditorProbe();
 	editorProbe.document = smallTable;
 	for (int row = 0; row < 600; ++row)
 		editorProbe.document += "\nprose | value";
@@ -222,6 +235,21 @@ void testAutomaticWorkBounds(int &failures)
 	for (int row = 0; row < 20; ++row)
 		editorProbe.document += "\n|x|y|";
 	expectTrue(failures, "wide cells have a projected output bound", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0);
+	std::string expandingTable;
+	for (int row = 0; row < 50; ++row)
+	{
+		if (row) expandingTable += "\n";
+		for (int column = 0; column < 10; ++column)
+			expandingTable += "|" + (row == 1 ? std::string("-") : row == column + 2 ? std::string(200, 'x') : std::string("x"));
+		expandingTable += "|";
+	}
+	editorProbe = EditorProbe();
+	editorProbe.document = expandingTable;
+	expectTrue(failures, "one expanding table remains within the automatic budget", MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.replacements == 1 && editorProbe.replacementText.size() > 100000);
+	editorProbe = EditorProbe();
+	for (int table = 0; table < 12; ++table)
+		editorProbe.document += expandingTable + "\n\n";
+	expectTrue(failures, "aggregate output overflow leaves every table unchanged", !MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.replacements == 0);
 	const std::vector<std::string> noSeparator(10000, "| x | y |");
 	const auto scanStart = std::chrono::steady_clock::now();
 	expectTrue(failures, "pipe-only document has no table ranges", MarkdownTablePluginTesting::documentMarkdownTableRangeLinesForTests(noSeparator).empty());

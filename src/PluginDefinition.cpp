@@ -2343,6 +2343,7 @@ bool shouldDeferInitialAutoTableFormatForDocumentLength(LRESULT textLength)
 // explicit table commands remain available regardless of document size.
 const LRESULT automaticDocumentByteLimit = 1024 * 1024;
 const LRESULT automaticDocumentLineLimit = 10000;
+const std::size_t automaticDocumentOutputByteLimit = 1024 * 1024;
 const Sci_Position automaticTableByteLimit = 128 * 1024;
 const std::size_t automaticTableLineLimit = 500;
 const std::size_t automaticTableColumnLimit = 64;
@@ -3114,6 +3115,7 @@ bool runAutoTableFormatForDocument(MarkdownTable::Action action)
 		return false;
 
 	std::vector<DocumentTableReplacement> replacements;
+	std::size_t replacementBytes = 0;
 	for (std::size_t i = 0; i < ranges.size(); ++i)
 	{
 		if (ranges[i].lastLine - ranges[i].firstLine + 1 > automaticTableLineLimit ||
@@ -3121,7 +3123,12 @@ bool runAutoTableFormatForDocument(MarkdownTable::Action action)
 			continue;
 		DocumentTableReplacement replacement;
 		if (collectDocumentTableReplacement(scintilla, documentLines, lineCount, action, ranges[i], replacement))
+		{
+			if (replacement.text.size() > automaticDocumentOutputByteLimit - replacementBytes)
+				return false;
+			replacementBytes += replacement.text.size();
 			replacements.push_back(replacement);
+		}
 	}
 	if (replacements.empty())
 		return false;
@@ -4010,6 +4017,23 @@ bool promptTableSize(TableSizeDialogState &state)
 	return state.accepted;
 }
 
+bool startsWithTablePipe(const std::string &line)
+{
+	const std::size_t first = line.find_first_not_of(" \t\r\n\f\v");
+	return first != std::string::npos && line[first] == '|';
+}
+
+bool oversizedNeighborMayBelongToTable(HWND scintilla, std::size_t line, const std::vector<std::string> &lines, const MarkdownTable::TableRange &range)
+{
+	if (!startsWithTablePipe(lines[range.firstRow]) || !startsWithTablePipe(lines[range.firstRow + 1]))
+		return true; // An optional-leading-pipe table can continue anywhere in the oversized line.
+	const Sci_Position start = lineStartPosition(scintilla, line);
+	const std::string prefix = getRangeText(scintilla, start, start + 64);
+	const std::size_t first = prefix.find_first_not_of(" \t\r\n\f\v");
+	// Unknown (long indentation) must not turn an incomplete table into an editable prefix.
+	return first == std::string::npos || prefix[first] == '|';
+}
+
 bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement)
 {
 	HWND scintilla = currentScintilla();
@@ -4044,10 +4068,14 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 
 	std::size_t potentialFirstLine = currentLine;
 	bool truncatedBefore = false;
+	bool oversizedBefore = false;
 	while (potentialFirstLine > 0)
 	{
 		if (quiet && lineEndPosition(scintilla, potentialFirstLine - 1) - lineStartPosition(scintilla, potentialFirstLine - 1) > automaticTableByteLimit)
+		{
+			oversizedBefore = true;
 			break;
+		}
 		if (!MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialFirstLine - 1)))
 			break;
 		if (quiet && (currentLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
@@ -4061,10 +4089,14 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	}
 
 	std::size_t potentialLastLine = currentLine;
+	bool oversizedAfter = false;
 	while (potentialLastLine + 1 < lineCount)
 	{
 		if (quiet && lineEndPosition(scintilla, potentialLastLine + 1) - lineStartPosition(scintilla, potentialLastLine + 1) > automaticTableByteLimit)
+		{
+			oversizedAfter = true;
 			break;
+		}
 		if (!MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialLastLine + 1)))
 			break;
 		if (quiet && (potentialLastLine - currentLine + 1 >= automaticTableLineLimit ||
@@ -4094,6 +4126,11 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 
 	const std::size_t firstLine = potentialFirstLine + tableRange.firstRow;
 	const std::size_t lastLine = potentialFirstLine + tableRange.lastRow;
+	if (quiet && ((oversizedBefore && tableRange.firstRow == 0 &&
+		oversizedNeighborMayBelongToTable(scintilla, potentialFirstLine - 1, candidateLines, tableRange)) ||
+		(oversizedAfter && tableRange.lastRow + 1 == candidateLines.size() &&
+		oversizedNeighborMayBelongToTable(scintilla, potentialLastLine + 1, candidateLines, tableRange))))
+		return false;
 	if (quiet && (lastLine - firstLine + 1 > automaticTableLineLimit ||
 		lineEndPosition(scintilla, lastLine) - lineStartPosition(scintilla, firstLine) > automaticTableByteLimit))
 		return false;
