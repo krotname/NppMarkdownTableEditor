@@ -4064,7 +4064,12 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 			break;
 		if (quiet && (potentialLastLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
 			lineEndPosition(scintilla, potentialLastLine + 1) - lineStartPosition(scintilla, potentialFirstLine) > automaticTableByteLimit))
-			return false;
+		{
+			// Keep one lookahead row so the core can distinguish a table continuation
+			// from pipe-containing prose before applying limits to the actual table.
+			++potentialLastLine;
+			break;
+		}
 		++potentialLastLine;
 	}
 
@@ -4082,6 +4087,9 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 
 	const std::size_t firstLine = potentialFirstLine + tableRange.firstRow;
 	const std::size_t lastLine = potentialFirstLine + tableRange.lastRow;
+	if (quiet && (lastLine - firstLine + 1 > automaticTableLineLimit ||
+		lineEndPosition(scintilla, lastLine) - lineStartPosition(scintilla, firstLine) > automaticTableByteLimit))
+		return false;
 	std::vector<std::string> tableLines;
 	for (std::size_t i = tableRange.firstRow; i <= tableRange.lastRow; ++i)
 		tableLines.push_back(candidateLines[i]);

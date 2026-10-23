@@ -153,7 +153,7 @@ void testAutomaticWorkBounds(int &failures)
 	expectTrue(failures, "oversized current line is rejected before allocation", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads == 0);
 	editorProbe = EditorProbe();
 	editorProbe.continuousTable = true;
-	expectTrue(failures, "huge table scan is bounded", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads <= 501 && editorProbe.replacements == 0);
+	expectTrue(failures, "huge table scan is bounded", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads <= 1002 && editorProbe.replacements == 0);
 	editorProbe = EditorProbe();
 	expectTrue(failures, "small table in large document still auto aligns", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.textReads < 20);
 	editorProbe = EditorProbe();
@@ -181,6 +181,17 @@ void testAutomaticWorkBounds(int &failures)
 	editorProbe = EditorProbe();
 	editorProbe.document = smallTable + "\n" + std::string(200000, 'x');
 	expectTrue(failures, "long following prose does not disable a small table", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.largestTextRead < 100);
+	editorProbe = EditorProbe();
+	editorProbe.document = smallTable;
+	for (int row = 0; row < 600; ++row)
+		editorProbe.document += "\nprose | value";
+	expectTrue(failures, "following pipe prose does not count toward the table budget", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.textReads < 1020);
+	editorProbe = EditorProbe();
+	editorProbe.document = smallTable;
+	for (int row = 0; row < 497; ++row)
+		editorProbe.document += "\n| x | yy |";
+	editorProbe.document += "\nprose | value";
+	expectTrue(failures, "lookahead preserves a table exactly at the line limit", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1);
 	editorProbe = EditorProbe();
 	for (int column = 0; column < 20000; ++column)
 		editorProbe.document += "|x";
