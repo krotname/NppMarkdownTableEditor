@@ -160,6 +160,8 @@ bool shouldRunInitialAutoTableFormatForBufferForTests(bool autoAlignEnabled, boo
 bool shouldQueueInitialAutoTableFormatForOpenedBufferForTests(bool autoAlignEnabled, bool autoFitEnabled, bool alreadyHandled);
 bool shouldTryQueuedInitialAutoTableFormatForNotificationForTests(UINT notificationCode);
 bool shouldDeferInitialAutoTableFormatForDocumentLengthForTests(long textLength);
+bool autoFormatDocumentForTests();
+bool alignCurrentTableForTests(bool automatic);
 std::vector<std::size_t> documentMarkdownTableRangeLinesForTests(const std::vector<std::string> &lines);
 std::vector<std::string> autoFormatDocumentTablesForTests(const std::vector<std::string> &lines, MarkdownTable::Action action, std::size_t maxTableWidth);
 bool shouldMoveCaretToTargetForTests(std::size_t currentPosition, std::size_t targetPosition);

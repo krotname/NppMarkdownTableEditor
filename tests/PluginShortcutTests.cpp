@@ -5,12 +5,14 @@
 #include "../src/PluginDefinition.h"
 
 #include <cwchar>
+#include <cstring>
 #include <iostream>
 #include <set>
 #include <sstream>
 #include <string>
 
 extern FuncItem funcItem[nbFunc];
+extern NppData nppData;
 
 namespace
 {
@@ -38,6 +40,90 @@ void expectTrue(int &failures, const std::string &name, bool value)
 {
 	if (!value)
 		fail(failures, name, "expected true");
+}
+
+struct EditorProbe
+{
+	LRESULT bytes = 127803254;
+	LRESULT lines = 454045;
+	LRESULT lineWidth = 12;
+	bool readOnly = false;
+	bool continuousTable = false;
+	int textReads = 0;
+	int replacements = 0;
+} editorProbe;
+
+LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case NPPM_GETCURRENTSCINTILLA: *reinterpret_cast<int *>(lParam) = 0; return TRUE;
+	case SCI_GETREADONLY: return editorProbe.readOnly;
+	case SCI_GETLENGTH: return editorProbe.bytes;
+	case SCI_GETLINECOUNT: return editorProbe.lines;
+	case SCI_GETCURRENTPOS: return 2;
+	case SCI_LINEFROMPOSITION: return static_cast<LRESULT>(wParam) / editorProbe.lineWidth;
+	case SCI_POSITIONFROMLINE: return static_cast<LRESULT>(wParam) * editorProbe.lineWidth;
+	case SCI_GETLINEENDPOSITION: return (static_cast<LRESULT>(wParam) + 1) * editorProbe.lineWidth - 1;
+	case SCI_GETTEXTRANGEFULL:
+	{
+		++editorProbe.textReads;
+		Sci_TextRangeFull *range = reinterpret_cast<Sci_TextRangeFull *>(lParam);
+		const LRESULT row = range->chrg.cpMin / editorProbe.lineWidth;
+		const std::string text = row == 0 ? "| A | B |" : row == 1 ? "| - | - |" :
+			(row == 2 || editorProbe.continuousTable) ? "| x | yy |" : "";
+		std::memcpy(range->lpstrText, text.c_str(), text.size() + 1);
+		return static_cast<LRESULT>(text.size());
+	}
+	case SCI_REPLACETARGET: ++editorProbe.replacements; return static_cast<LRESULT>(wParam);
+	default: return ::DefWindowProc(hwnd, message, wParam, lParam);
+	}
+}
+
+void testAutomaticWorkBounds(int &failures)
+{
+	WNDCLASS windowClass = {};
+	windowClass.lpfnWndProc = probeWindowProc;
+	windowClass.hInstance = ::GetModuleHandle(NULL);
+	windowClass.lpszClassName = L"MarkdownTableEditorWorkBoundsTest";
+	::RegisterClass(&windowClass);
+	HWND window = ::CreateWindow(windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, windowClass.hInstance, NULL);
+	expectTrue(failures, "create editor message probe", window != NULL);
+	if (!window)
+		return;
+	const NppData savedData = nppData;
+	nppData._nppHandle = window;
+	nppData._scintillaMainHandle = window;
+	const bool savedFit = MarkdownTablePluginTesting::autoFitTableEnabledForTests();
+	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+
+	editorProbe = EditorProbe();
+	expectTrue(failures, "122 MiB automatic open avoids scanning text", !MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.textReads == 0);
+	editorProbe.bytes = 500000;
+	expectTrue(failures, "many short lines avoid automatic document scan", !MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.textReads == 0);
+	editorProbe.lines = 4;
+	editorProbe.readOnly = true;
+	expectTrue(failures, "read-only document avoids formatting", !MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.textReads == 0);
+	expectTrue(failures, "read-only current table avoids formatting", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads == 0);
+	editorProbe.readOnly = false;
+	editorProbe.lineWidth = 200000;
+	expectTrue(failures, "oversized current line is rejected before allocation", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads == 0);
+	editorProbe = EditorProbe();
+	editorProbe.continuousTable = true;
+	expectTrue(failures, "huge table scan is bounded", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.textReads <= 500 && editorProbe.replacements == 0);
+	editorProbe = EditorProbe();
+	expectTrue(failures, "small table in large document still auto aligns", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.textReads < 20);
+	editorProbe = EditorProbe();
+	expectTrue(failures, "explicit table command works in large document", MarkdownTablePluginTesting::alignCurrentTableForTests(false) && editorProbe.replacements == 1);
+	editorProbe = EditorProbe();
+	editorProbe.bytes = 48;
+	editorProbe.lines = 4;
+	expectTrue(failures, "small document still formats on open", MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.replacements == 1);
+
+	nppData = savedData;
+	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(savedFit);
+	::DestroyWindow(window);
+	::UnregisterClass(windowClass.lpszClassName, windowClass.hInstance);
 }
 
 void expectSize(int &failures, const std::string &name, std::size_t actual, std::size_t expected)
@@ -576,5 +662,6 @@ int runPluginShortcutTests()
 		"| H   |     |\n| --- | --- |\n| a   |     |");
 	expectSize(failures, "plugin short column replacement caret", shortColumnPreview.caretOffset, shortColumnPreview.text.find("    |", shortColumnPreview.text.find("| a")));
 
+	testAutomaticWorkBounds(failures);
 	return failures;
 }

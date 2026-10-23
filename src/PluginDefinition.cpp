@@ -2339,6 +2339,13 @@ bool shouldDeferInitialAutoTableFormatForDocumentLength(LRESULT textLength)
 	return textLength <= 0;
 }
 
+// Automatic work runs on the editor thread. Bound it before reading text;
+// explicit table commands remain available regardless of document size.
+const LRESULT automaticDocumentByteLimit = 1024 * 1024;
+const LRESULT automaticDocumentLineLimit = 10000;
+const Sci_Position automaticTableByteLimit = 128 * 1024;
+const std::size_t automaticTableLineLimit = 500;
+
 int availableTextPixelWidth(HWND scintilla)
 {
 	if (!scintilla)
@@ -2892,6 +2899,8 @@ bool captureEnterColumnToPreserve(HWND hwnd, UINT message, WPARAM key, std::size
 	const LRESULT line = ::SendMessage(hwnd, SCI_LINEFROMPOSITION, static_cast<WPARAM>(currentPos), 0);
 	if (line < 0)
 		return false;
+	if (lineEndPosition(hwnd, static_cast<std::size_t>(line)) - lineStartPosition(hwnd, static_cast<std::size_t>(line)) > automaticTableByteLimit)
+		return false;
 
 	const bool tableLine = MarkdownTable::isPotentialTableLine(getLineText(hwnd, static_cast<std::size_t>(line)));
 	if (!shouldPreserveEnterColumn(true, true, tableLine, message, key))
@@ -3099,11 +3108,14 @@ bool collectDocumentTableReplacement(HWND scintilla, const std::vector<std::stri
 bool runAutoTableFormatForDocument(MarkdownTable::Action action)
 {
 	HWND scintilla = currentScintilla();
-	if (!scintilla)
+	if (!scintilla || ::SendMessage(scintilla, SCI_GETREADONLY, 0, 0))
+		return false;
+	const LRESULT textLength = ::SendMessage(scintilla, SCI_GETLENGTH, 0, 0);
+	if (textLength <= 0 || textLength > automaticDocumentByteLimit)
 		return false;
 
 	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
-	if (lineCountResult <= 0)
+	if (lineCountResult <= 0 || lineCountResult > automaticDocumentLineLimit)
 		return false;
 	const std::size_t lineCount = static_cast<std::size_t>(lineCountResult);
 	const std::vector<std::string> documentLines = readDocumentLines(scintilla, lineCount);
@@ -3114,6 +3126,9 @@ bool runAutoTableFormatForDocument(MarkdownTable::Action action)
 	std::vector<DocumentTableReplacement> replacements;
 	for (std::size_t i = 0; i < ranges.size(); ++i)
 	{
+		if (ranges[i].lastLine - ranges[i].firstLine + 1 > automaticTableLineLimit ||
+			lineEndPosition(scintilla, ranges[i].lastLine) - lineStartPosition(scintilla, ranges[i].firstLine) > automaticTableByteLimit)
+			continue;
 		DocumentTableReplacement replacement;
 		if (collectDocumentTableReplacement(scintilla, documentLines, lineCount, action, ranges[i], replacement))
 			replacements.push_back(replacement);
@@ -4008,7 +4023,7 @@ bool promptTableSize(TableSizeDialogState &state)
 bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement)
 {
 	HWND scintilla = currentScintilla();
-	if (!scintilla)
+	if (!scintilla || ::SendMessage(scintilla, SCI_GETREADONLY, 0, 0))
 		return false;
 
 	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
@@ -4025,6 +4040,10 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	if (currentLine >= lineCount)
 		currentLine = lineCount - 1;
 
+	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
+	const Sci_Position currentLineEnd = lineEndPosition(scintilla, currentLine);
+	if (quiet && currentLineEnd - currentLineStart > automaticTableByteLimit)
+		return false;
 	const std::string currentLineText = getLineText(scintilla, currentLine);
 	if (!MarkdownTable::isPotentialTableLine(currentLineText))
 	{
@@ -4034,12 +4053,26 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	}
 
 	std::size_t potentialFirstLine = currentLine;
-	while (potentialFirstLine > 0 && MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialFirstLine - 1)))
+	while (potentialFirstLine > 0)
+	{
+		if (quiet && (currentLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
+			currentLineEnd - lineStartPosition(scintilla, potentialFirstLine - 1) > automaticTableByteLimit))
+			return false;
+		if (!MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialFirstLine - 1)))
+			break;
 		--potentialFirstLine;
+	}
 
 	std::size_t potentialLastLine = currentLine;
-	while (potentialLastLine + 1 < lineCount && MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialLastLine + 1)))
+	while (potentialLastLine + 1 < lineCount)
+	{
+		if (quiet && (potentialLastLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
+			lineEndPosition(scintilla, potentialLastLine + 1) - lineStartPosition(scintilla, potentialFirstLine) > automaticTableByteLimit))
+			return false;
+		if (!MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialLastLine + 1)))
+			break;
 		++potentialLastLine;
+	}
 
 	std::vector<std::string> candidateLines;
 	for (std::size_t i = potentialFirstLine; i <= potentialLastLine; ++i)
@@ -4060,7 +4093,6 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 		tableLines.push_back(candidateLines[i]);
 
 	const std::size_t row = currentLine - firstLine;
-	const Sci_Position currentLineStart = lineStartPosition(scintilla, currentLine);
 	const std::size_t byteColumn = static_cast<std::size_t>((std::max)(static_cast<LRESULT>(0), currentPosResult - static_cast<LRESULT>(currentLineStart)));
 	const std::size_t column = MarkdownTable::columnFromCursor(currentLineText, byteColumn);
 	const CellCaretSnapshot preservedCaret = caretPlacement == CaretPlacement::PreserveCellOffset
@@ -4446,6 +4478,16 @@ bool shouldTryQueuedInitialAutoTableFormatForNotificationForTests(UINT notificat
 bool shouldDeferInitialAutoTableFormatForDocumentLengthForTests(long textLength)
 {
 	return shouldDeferInitialAutoTableFormatForDocumentLength(static_cast<LRESULT>(textLength));
+}
+
+bool autoFormatDocumentForTests()
+{
+	return runAutoTableFormatForDocument(MarkdownTable::Action::Align);
+}
+
+bool alignCurrentTableForTests(bool automatic)
+{
+	return runTableAction(MarkdownTable::Action::Align, automatic, CaretPlacement::PreserveCellOffset);
 }
 
 std::vector<std::size_t> documentMarkdownTableRangeLinesForTests(const std::vector<std::string> &lines)
