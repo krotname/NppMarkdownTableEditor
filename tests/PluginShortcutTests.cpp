@@ -79,9 +79,16 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 			std::memcpy(range->lpstrText, text.c_str(), text.size() + 1);
 			return static_cast<LRESULT>(text.size());
 		}
-		const LRESULT row = range->chrg.cpMin / editorProbe.lineWidth;
-		const std::string text = row == 0 ? "| A | B |" : row == 1 ? "| - | - |" :
-			(row == 2 || editorProbe.continuousTable) ? "| x | yy |" : "";
+		std::string text;
+		for (Sci_Position position = range->chrg.cpMin; position < range->chrg.cpMax; ++position)
+		{
+			const LRESULT row = position / editorProbe.lineWidth;
+			const std::size_t column = static_cast<std::size_t>(position % editorProbe.lineWidth);
+			const std::string line = row == 0 ? "| A | B |" : row == 1 ? "| - | - |" :
+				(row == 2 || editorProbe.continuousTable) ? "| x | yy |" : "";
+			text += column == static_cast<std::size_t>(editorProbe.lineWidth - 1) ? '\n' :
+				column < line.size() ? line[column] : ' ';
+		}
 		std::memcpy(range->lpstrText, text.c_str(), text.size() + 1);
 		return static_cast<LRESULT>(text.size());
 	}
