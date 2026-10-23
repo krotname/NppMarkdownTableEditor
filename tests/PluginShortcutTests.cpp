@@ -49,6 +49,8 @@ struct EditorProbe
 	LRESULT lineWidth = 12;
 	bool readOnly = false;
 	bool continuousTable = false;
+	std::string document;
+	LRESULT currentPosition = 2;
 	int textReads = 0;
 	int replacements = 0;
 } editorProbe;
@@ -61,7 +63,8 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 	case SCI_GETREADONLY: return editorProbe.readOnly;
 	case SCI_GETLENGTH: return editorProbe.bytes;
 	case SCI_GETLINECOUNT: return editorProbe.lines;
-	case SCI_GETCURRENTPOS: return 2;
+	case SCI_GETCURRENTPOS: return editorProbe.currentPosition;
+	case SCI_GOTOPOS: editorProbe.currentPosition = static_cast<LRESULT>(wParam); return 0;
 	case SCI_LINEFROMPOSITION: return static_cast<LRESULT>(wParam) / editorProbe.lineWidth;
 	case SCI_POSITIONFROMLINE: return static_cast<LRESULT>(wParam) * editorProbe.lineWidth;
 	case SCI_GETLINEENDPOSITION: return (static_cast<LRESULT>(wParam) + 1) * editorProbe.lineWidth - 1;
@@ -69,6 +72,13 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 	{
 		++editorProbe.textReads;
 		Sci_TextRangeFull *range = reinterpret_cast<Sci_TextRangeFull *>(lParam);
+		if (!editorProbe.document.empty())
+		{
+			const std::string text = editorProbe.document.substr(static_cast<std::size_t>(range->chrg.cpMin),
+				static_cast<std::size_t>(range->chrg.cpMax - range->chrg.cpMin));
+			std::memcpy(range->lpstrText, text.c_str(), text.size() + 1);
+			return static_cast<LRESULT>(text.size());
+		}
 		const LRESULT row = range->chrg.cpMin / editorProbe.lineWidth;
 		const std::string text = row == 0 ? "| A | B |" : row == 1 ? "| - | - |" :
 			(row == 2 || editorProbe.continuousTable) ? "| x | yy |" : "";
@@ -119,6 +129,17 @@ void testAutomaticWorkBounds(int &failures)
 	editorProbe.bytes = 48;
 	editorProbe.lines = 4;
 	expectTrue(failures, "small document still formats on open", MarkdownTablePluginTesting::autoFormatDocumentForTests() && editorProbe.replacements == 1);
+	editorProbe = EditorProbe();
+	editorProbe.readOnly = true;
+	expectTrue(failures, "manual formatting cannot replace read-only text", !MarkdownTablePluginTesting::alignCurrentTableForTests(false) && editorProbe.replacements == 0);
+	editorProbe.document = "| A   | B   |\n| --- | --- |\n| x   | yy  |";
+	editorProbe.bytes = static_cast<LRESULT>(editorProbe.document.size());
+	editorProbe.lines = 3;
+	editorProbe.lineWidth = 14;
+	nextCell();
+	expectTrue(failures, "next cell navigates a formatted read-only table", editorProbe.currentPosition > 2 && editorProbe.replacements == 0);
+	previousCell();
+	expectTrue(failures, "previous cell navigates a formatted read-only table", editorProbe.currentPosition == 2 && editorProbe.replacements == 0);
 
 	nppData = savedData;
 	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(savedFit);

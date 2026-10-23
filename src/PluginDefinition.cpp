@@ -4023,7 +4023,7 @@ bool promptTableSize(TableSizeDialogState &state)
 bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement caretPlacement)
 {
 	HWND scintilla = currentScintilla();
-	if (!scintilla || ::SendMessage(scintilla, SCI_GETREADONLY, 0, 0))
+	if (!scintilla || (quiet && ::SendMessage(scintilla, SCI_GETREADONLY, 0, 0)))
 		return false;
 
 	const LRESULT lineCountResult = ::SendMessage(scintilla, SCI_GETLINECOUNT, 0, 0);
@@ -4135,6 +4135,8 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 			::SendMessage(scintilla, SCI_GOTOPOS, static_cast<WPARAM>(targetPosition), 0);
 		return true;
 	}
+	if (::SendMessage(scintilla, SCI_GETREADONLY, 0, 0))
+		return false;
 
 	ScintillaUndoAction undo(scintilla);
 	PluginEditGuard pluginEdit;
