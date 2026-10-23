@@ -4043,6 +4043,7 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 	}
 
 	std::size_t potentialFirstLine = currentLine;
+	bool truncatedBefore = false;
 	while (potentialFirstLine > 0)
 	{
 		if (quiet && lineEndPosition(scintilla, potentialFirstLine - 1) - lineStartPosition(scintilla, potentialFirstLine - 1) > automaticTableByteLimit)
@@ -4051,7 +4052,11 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 			break;
 		if (quiet && (currentLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
 			currentLineEnd - lineStartPosition(scintilla, potentialFirstLine - 1) > automaticTableByteLimit))
-			return false;
+		{
+			--potentialFirstLine;
+			truncatedBefore = true;
+			break;
+		}
 		--potentialFirstLine;
 	}
 
@@ -4062,8 +4067,8 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 			break;
 		if (!MarkdownTable::isPotentialTableLine(getLineText(scintilla, potentialLastLine + 1)))
 			break;
-		if (quiet && (potentialLastLine - potentialFirstLine + 1 >= automaticTableLineLimit ||
-			lineEndPosition(scintilla, potentialLastLine + 1) - lineStartPosition(scintilla, potentialFirstLine) > automaticTableByteLimit))
+		if (quiet && (potentialLastLine - currentLine + 1 >= automaticTableLineLimit ||
+			lineEndPosition(scintilla, potentialLastLine + 1) - currentLineStart > automaticTableByteLimit))
 		{
 			// Keep one lookahead row so the core can distinguish a table continuation
 			// from pipe-containing prose before applying limits to the actual table.
@@ -4078,6 +4083,8 @@ bool runTableAction(MarkdownTable::Action action, bool quiet, CaretPlacement car
 		candidateLines.push_back(getLineText(scintilla, i));
 
 	const MarkdownTable::TableRange tableRange = MarkdownTable::findTableRange(candidateLines, coreIndex(currentLine - potentialFirstLine));
+	if (quiet && truncatedBefore && tableRange.found && tableRange.firstRow == 0)
+		return false;
 	if (!tableRange.found)
 	{
 		if (!quiet)

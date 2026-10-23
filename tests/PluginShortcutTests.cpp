@@ -55,6 +55,7 @@ struct EditorProbe
 	LRESULT currentPosition = 2;
 	int textReads = 0;
 	int replacements = 0;
+	std::string replacementText;
 	std::size_t largestTextRead = 0;
 } editorProbe;
 
@@ -118,7 +119,10 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 		std::memcpy(range->lpstrText, text.c_str(), text.size() + 1);
 		return static_cast<LRESULT>(text.size());
 	}
-	case SCI_REPLACETARGET: ++editorProbe.replacements; return static_cast<LRESULT>(wParam);
+	case SCI_REPLACETARGET:
+		++editorProbe.replacements;
+		editorProbe.replacementText.assign(reinterpret_cast<const char *>(lParam), static_cast<std::size_t>(wParam));
+		return static_cast<LRESULT>(wParam);
 	default: return ::DefWindowProc(hwnd, message, wParam, lParam);
 	}
 }
@@ -186,6 +190,16 @@ void testAutomaticWorkBounds(int &failures)
 	for (int row = 0; row < 600; ++row)
 		editorProbe.document += "\nprose | value";
 	expectTrue(failures, "following pipe prose does not count toward the table budget", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.textReads < 1020);
+	editorProbe = EditorProbe();
+	for (int row = 0; row < 600; ++row)
+		editorProbe.document += "prose | value\n";
+	editorProbe.currentPosition = static_cast<LRESULT>(editorProbe.document.size()) + 2;
+	editorProbe.document += smallTable;
+	expectTrue(failures, "preceding pipe prose does not count toward the table budget", MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 1 && editorProbe.textReads < 1020 && editorProbe.replacementText.find("yy") != std::string::npos);
+	editorProbe = EditorProbe();
+	editorProbe.continuousTable = true;
+	editorProbe.currentPosition = 600 * editorProbe.lineWidth + 2;
+	expectTrue(failures, "truncated large table without its header is not formatted", !MarkdownTablePluginTesting::alignCurrentTableForTests(true) && editorProbe.replacements == 0 && editorProbe.textReads < 2020);
 	editorProbe = EditorProbe();
 	editorProbe.document = smallTable;
 	for (int row = 0; row < 497; ++row)
