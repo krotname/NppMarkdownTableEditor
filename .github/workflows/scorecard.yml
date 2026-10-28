@@ -106,7 +106,7 @@ jobs:
             scorecard-results.sarif
             scorecard-head-results.sarif
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   publish:
     name: Publish OpenSSF Scorecard
@@ -151,4 +151,4 @@ jobs:
           name: openssf-scorecard-publication
           path: scorecard-publication.sarif
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1

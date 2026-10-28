@@ -102,7 +102,7 @@ jobs:
             build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}.zip
             build/MarkdownTableEditor-${{ needs.version.outputs.version }}-${{ matrix.label }}-pluginadmin.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   compatibility-smoke:
     needs: version
