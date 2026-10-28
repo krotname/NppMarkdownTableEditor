@@ -211,7 +211,6 @@ bool captureEnterColumnToPreserve(HWND hwnd, UINT message, WPARAM key, std::size
 void restoreEnterColumn(HWND hwnd, std::size_t column);
 
 const UiText &uiText() { return g_runtime.localization.uiText(); }
-const wchar_t *commandText(std::size_t index) { return g_runtime.localization.commandText(index); }
 const wchar_t *commandMenuText(std::size_t index) { return g_runtime.localization.commandMenuText(index); }
 
 void applyCommandNames()
@@ -3242,7 +3241,7 @@ const wchar_t *pluginMenuNameForTests()
 
 const wchar_t *commandTextForTests(std::size_t index)
 {
-	return commandText(index);
+	return g_runtime.localization.commandText(index);
 }
 
 const wchar_t *commandMenuTextForTests(std::size_t index)
