@@ -2,6 +2,7 @@
 // Copyright (c) 2026 krotname
 
 #include "PluginShortcutTests.h"
+#include "../src/PluginSettings.h"
 #include "../src/PluginDefinition.h"
 
 #include <cwchar>
@@ -57,6 +58,13 @@ struct EditorProbe
 	int replacements = 0;
 	std::string replacementText;
 	std::size_t largestTextRead = 0;
+	int activeView = 0;
+	uptr_t buffer = 10;
+	LRESULT selectionStart = 0;
+	LRESULT selectionEnd = 0;
+	int undoBegins = 0;
+	int undoEnds = 0;
+	bool reentrantNotifications = false;
 } editorProbe;
 
 std::size_t probeLineStart(std::size_t row)
@@ -76,7 +84,12 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 {
 	switch (message)
 	{
-	case NPPM_GETCURRENTSCINTILLA: *reinterpret_cast<int *>(lParam) = 0; return TRUE;
+	case NPPM_GETCURRENTSCINTILLA: *reinterpret_cast<int *>(lParam) = editorProbe.activeView; return TRUE;
+	case NPPM_GETCURRENTBUFFERID: return static_cast<LRESULT>(editorProbe.buffer);
+	case SCI_GETSELECTIONSTART: return editorProbe.selectionStart;
+	case SCI_GETSELECTIONEND: return editorProbe.selectionEnd;
+	case SCI_BEGINUNDOACTION: ++editorProbe.undoBegins; return 0;
+	case SCI_ENDUNDOACTION: ++editorProbe.undoEnds; return 0;
 	case SCI_GETREADONLY: return editorProbe.readOnly;
 	case SCI_GETLENGTH: return editorProbe.document.empty() ? editorProbe.bytes : static_cast<LRESULT>(editorProbe.document.size());
 	case SCI_GETLINECOUNT: return editorProbe.document.empty() ? editorProbe.lines : 1 + static_cast<LRESULT>(std::count(editorProbe.document.begin(), editorProbe.document.end(), '\n'));
@@ -122,9 +135,98 @@ LRESULT CALLBACK probeWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 	case SCI_REPLACETARGET:
 		++editorProbe.replacements;
 		editorProbe.replacementText.assign(reinterpret_cast<const char *>(lParam), static_cast<std::size_t>(wParam));
+		if (editorProbe.reentrantNotifications && editorProbe.replacements == 1)
+		{
+			SCNotification notification = {};
+			notification.nmhdr.hwndFrom = hwnd;
+			notification.modificationType = SC_MOD_INSERTTEXT;
+			notification.updated = SC_UPDATE_CONTENT;
+			handleScintillaModified(&notification);
+			handleScintillaUpdateUi(&notification);
+			handleGlobalModified();
+		}
 		return static_cast<LRESULT>(wParam);
 	default: return ::DefWindowProc(hwnd, message, wParam, lParam);
 	}
+}
+
+void testWarningSettingsPersistence(int &failures)
+{
+	wchar_t directory[MAX_PATH] = {};
+	wchar_t path[MAX_PATH] = {};
+	if (!::GetTempPath(MAX_PATH, directory) || !::GetTempFileName(directory, L"MTE", 0, path))
+	{
+		fail(failures, "warning settings", "could not create temporary INI");
+		return;
+	}
+	MarkdownTablePlugin::PluginSettings settings;
+	expectTrue(failures, "unavailable settings directory keeps default", !settings.wordWrapAutoFitWarningSuppressed(L""));
+	expectTrue(failures, "write legacy warning INI key", ::WritePrivateProfileString(L"Warnings", L"HideWordWrapAutoFitWarning", L"1", path) != FALSE);
+	expectTrue(failures, "settings retry load after directory becomes available", settings.wordWrapAutoFitWarningSuppressed(path));
+	settings.setWordWrapAutoFitWarningSuppressed(path, false);
+	MarkdownTablePlugin::PluginSettings reloaded;
+	expectTrue(failures, "warning suppression persists under original INI key", !reloaded.wordWrapAutoFitWarningSuppressed(path) &&
+		::GetPrivateProfileInt(L"Warnings", L"HideWordWrapAutoFitWarning", 1, path) == 0);
+	expectTrue(failures, "temporary settings file removed", ::DeleteFile(path) != FALSE);
+}
+
+void testEditorNotificationTransitions(int &failures)
+{
+	WNDCLASS windowClass = {};
+	windowClass.lpfnWndProc = probeWindowProc;
+	windowClass.hInstance = ::GetModuleHandle(NULL);
+	windowClass.lpszClassName = L"MarkdownTableEditorNotificationTest";
+	::RegisterClass(&windowClass);
+	HWND mainView = ::CreateWindow(windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, windowClass.hInstance, NULL);
+	HWND secondView = ::CreateWindow(windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, windowClass.hInstance, NULL);
+	expectTrue(failures, "create both Scintilla message probes", mainView && secondView);
+	if (mainView && secondView)
+	{
+		const NppData savedData = nppData;
+		nppData._nppHandle = mainView;
+		nppData._scintillaMainHandle = mainView;
+		nppData._scintillaSecondHandle = secondView;
+		editorProbe = EditorProbe();
+		MarkdownTablePluginTesting::resetAutoFormatStateForTests();
+		MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+		SCNotification notification = {};
+		notification.nmhdr.hwndFrom = secondView;
+		notification.modificationType = SC_MOD_INSERTTEXT;
+		notification.updated = SC_UPDATE_CONTENT;
+		handleScintillaModified(&notification);
+		expectTrue(failures, "inactive secondary notification does not edit main view", editorProbe.replacements == 0);
+		editorProbe.activeView = 1;
+		editorProbe.reentrantNotifications = true;
+		handleScintillaModified(&notification);
+		expectTrue(failures, "active secondary view formats once without recursive notifications", editorProbe.replacements == 1);
+		expectTrue(failures, "automatic edit is one balanced undo action", editorProbe.undoBegins == 1 && editorProbe.undoEnds == 1);
+		expectTrue(failures, "automatic edit retains caret within cell", editorProbe.currentPosition == 2);
+
+		for (int modification : { SC_PERFORMED_UNDO, SC_PERFORMED_REDO })
+		{
+			editorProbe = EditorProbe();
+			editorProbe.activeView = 1;
+			MarkdownTablePluginTesting::resetAutoFormatStateForTests();
+			MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+			notification.modificationType = modification;
+			handleScintillaModified(&notification);
+			expectTrue(failures, "undo/redo notifications retain automatic formatting path", editorProbe.replacements == 1 && editorProbe.undoBegins == 1 && editorProbe.undoEnds == 1);
+		}
+		editorProbe = EditorProbe();
+		editorProbe.activeView = 1;
+		editorProbe.selectionStart = 1;
+		editorProbe.selectionEnd = 6;
+		MarkdownTablePluginTesting::resetAutoFormatStateForTests();
+		MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(false);
+		handleScintillaModified(&notification);
+		handleGlobalModified();
+		expectTrue(failures, "content and global notifications preserve selection", editorProbe.replacements == 0 && editorProbe.selectionStart == 1 && editorProbe.selectionEnd == 6);
+		nppData = savedData;
+		MarkdownTablePluginTesting::resetAutoFormatStateForTests();
+	}
+	if (mainView) ::DestroyWindow(mainView);
+	if (secondView) ::DestroyWindow(secondView);
+	::UnregisterClass(windowClass.lpszClassName, windowClass.hInstance);
 }
 
 void testAutomaticWorkBounds(int &failures)
@@ -799,5 +901,7 @@ int runPluginShortcutTests()
 	expectSize(failures, "plugin short column replacement caret", shortColumnPreview.caretOffset, shortColumnPreview.text.find("    |", shortColumnPreview.text.find("| a")));
 
 	testAutomaticWorkBounds(failures);
+	testEditorNotificationTransitions(failures);
+	testWarningSettingsPersistence(failures);
 	return failures;
 }

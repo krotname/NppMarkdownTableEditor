@@ -2,12 +2,13 @@
 // Copyright (c) 2026 krotname
 
 #include "PluginShortcutTests.h"
+#include "AutoFormatCoordinatorTests.h"
 
 #include <iostream>
 
 int main()
 {
-	const int failures = runPluginShortcutTests();
+	const int failures = runPluginShortcutTests() + runAutoFormatCoordinatorTests();
 	if (failures != 0)
 	{
 		std::cerr << failures << " plugin shortcut test(s) failed\n";

@@ -13,11 +13,20 @@
   <ItemGroup>
     <ClCompile Include="PluginShortcutSmoke.cpp" />
     <ClCompile Include="PluginShortcutTests.cpp" />
+    <ClCompile Include="AutoFormatCoordinatorTests.cpp" />
     <ClCompile Include="..\src\MarkdownTableCore.cpp" />
     <ClCompile Include="..\src\PluginDefinition.cpp" />
+    <ClCompile Include="..\src\AutoFormatCoordinator.cpp" />
+    <ClCompile Include="..\src\PluginLocalization.cpp" />
+    <ClCompile Include="..\src\PluginSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PluginShortcutTests.h" />
+    <ClInclude Include="AutoFormatCoordinatorTests.h" />
+    <ClInclude Include="..\src\AutoFormatCoordinator.h" />
+    <ClInclude Include="..\src\PluginCommands.h" />
+    <ClInclude Include="..\src\PluginLocalization.h" />
+    <ClInclude Include="..\src\PluginSettings.h" />
     <ClInclude Include="..\src\MarkdownTableCore.h" />
     <ClInclude Include="..\src\PluginDefinition.h" />
     <ClInclude Include="..\src\PluginInterface.h" />
