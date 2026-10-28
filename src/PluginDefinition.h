@@ -135,6 +135,7 @@ void applyNativeLangFileNameForTests(const std::string &nativeLangFileName);
 const wchar_t *pluginMenuNameForTests();
 const wchar_t *commandTextForTests(std::size_t index);
 const wchar_t *commandMenuTextForTests(std::size_t index);
+void resetAutoFormatStateForTests();
 bool autoFitTableEnabledForTests();
 void setAutoFitTableEnabledForTests(bool enabled);
 bool autoAlignTableEnabledForTests();

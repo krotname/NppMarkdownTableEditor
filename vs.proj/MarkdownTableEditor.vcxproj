@@ -37,6 +37,10 @@
     <ClInclude Include="..\src\MarkdownTableCore.h" />
     <ClInclude Include="..\src\Notepad_plus_msgs.h" />
     <ClInclude Include="..\src\PluginDefinition.h" />
+    <ClInclude Include="..\src\AutoFormatCoordinator.h" />
+    <ClInclude Include="..\src\PluginCommands.h" />
+    <ClInclude Include="..\src\PluginLocalization.h" />
+    <ClInclude Include="..\src\PluginSettings.h" />
     <ClInclude Include="..\src\PluginInterface.h" />
     <ClInclude Include="..\src\Scintilla.h" />
     <ClInclude Include="..\src\Sci_Position.h" />
@@ -47,6 +51,9 @@
     <ClCompile Include="..\src\MarkdownTableCore.cpp" />
     <ClCompile Include="..\src\MarkdownTableEditorPlugin.cpp" />
     <ClCompile Include="..\src\PluginDefinition.cpp" />
+    <ClCompile Include="..\src\AutoFormatCoordinator.cpp" />
+    <ClCompile Include="..\src\PluginLocalization.cpp" />
+    <ClCompile Include="..\src\PluginSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\DockingFeature\goLine.rc" />
