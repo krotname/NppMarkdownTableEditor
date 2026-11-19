@@ -170,6 +170,38 @@ void testWarningSettingsPersistence(int &failures)
 	expectTrue(failures, "temporary settings file removed", ::DeleteFile(path) != FALSE);
 }
 
+void testAutoFormatSettingsPersistence(int &failures)
+{
+	wchar_t directory[MAX_PATH] = {};
+	wchar_t path[MAX_PATH] = {};
+	if (!::GetTempPath(MAX_PATH, directory) || !::GetTempFileName(directory, L"MTE", 0, path))
+	{
+		fail(failures, "auto format settings", "could not create temporary INI");
+		return;
+	}
+	MarkdownTablePlugin::PluginSettings settings;
+	expectTrue(failures, "auto format modes disabled without settings directory", !settings.autoFitEnabled(L"") && !settings.autoAlignEnabled(L""));
+	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
+	expectTrue(failures, "missing auto format keys disable both modes",
+		!MarkdownTablePluginTesting::autoFitTableEnabledForTests() && !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	settings.setAutoFormatEnabled(path, false, true);
+	expectTrue(failures, "auto format state written under AutoFormat keys",
+		::GetPrivateProfileInt(L"AutoFormat", L"AutoFit", 1, path) == 0 && ::GetPrivateProfileInt(L"AutoFormat", L"AutoAlign", 0, path) == 1);
+	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
+	expectTrue(failures, "saved auto align restored without auto fit",
+		!MarkdownTablePluginTesting::autoFitTableEnabledForTests() && MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	settings.setAutoFormatEnabled(path, true, false);
+	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
+	expectTrue(failures, "saved auto fit keeps auto align enabled",
+		MarkdownTablePluginTesting::autoFitTableEnabledForTests() && MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	settings.setAutoFormatEnabled(path, false, false);
+	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
+	expectTrue(failures, "saved disabled modes restored",
+		!MarkdownTablePluginTesting::autoFitTableEnabledForTests() && !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "temporary auto format settings file removed", ::DeleteFile(path) != FALSE);
+	MarkdownTablePluginTesting::resetAutoFormatStateForTests();
+}
+
 void testEditorNotificationTransitions(int &failures)
 {
 	WNDCLASS windowClass = {};
@@ -437,9 +469,9 @@ int runPluginShortcutTests()
 	const ExpectedCommand expected[] =
 	{
 		{ 0, "align", L"Align table (no width change)\tCtrl+Alt+Shift+1", alignTable, false, true, true, true, true, static_cast<UCHAR>('1') },
-		{ 1, "auto align table", L"Light Auto align after edit (no width change)\tCtrl+Alt+Shift+A", toggleAutoAlignTable, true, true, true, true, true, static_cast<UCHAR>('A') },
+		{ 1, "auto align table", L"Light Auto align after edit (no width change)\tCtrl+Alt+Shift+A", toggleAutoAlignTable, false, true, true, true, true, static_cast<UCHAR>('A') },
 		{ 2, "fit table width", L"Fit table width to window\tCtrl+Alt+Shift+W", wrapLongCells, false, true, true, true, true, static_cast<UCHAR>('W') },
-		{ 3, "auto fit table", L"Power Auto fit table width to window\tCtrl+Alt+Shift+F", toggleAutoFitTable, true, true, true, true, true, static_cast<UCHAR>('F') },
+		{ 3, "auto fit table", L"Power Auto fit table width to window\tCtrl+Alt+Shift+F", toggleAutoFitTable, false, true, true, true, true, static_cast<UCHAR>('F') },
 		{ 4, "next cell", L"Next cell\tCtrl+Alt+Shift+2", nextCell, false, true, true, true, true, static_cast<UCHAR>('2') },
 		{ 5, "previous cell", L"Previous cell\tCtrl+Alt+Shift+3", previousCell, false, true, true, true, true, static_cast<UCHAR>('3') },
 		{ 6, "insert row", L"Insert row below\tCtrl+Alt+Shift+4", insertRowBelow, false, true, true, true, true, static_cast<UCHAR>('4') },
@@ -571,10 +603,13 @@ int runPluginShortcutTests()
 	for (std::size_t index = 0; index < expectedCount; ++index)
 		expectCommandName(failures, expected[index], funcItem[expected[index].index]);
 
-	expectTrue(failures, "auto fit table starts enabled by default", MarkdownTablePluginTesting::autoFitTableEnabledForTests());
-	expectTrue(failures, "fit table command starts disabled while auto fit is on by default", !MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
-	expectTrue(failures, "auto fit keeps auto align enabled by default", MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
-	expectTrue(failures, "auto align toggle starts disabled while auto fit is on by default", !MarkdownTablePluginTesting::autoAlignTableToggleEnabledForTests());
+	expectTrue(failures, "auto fit table starts disabled without saved settings", !MarkdownTablePluginTesting::autoFitTableEnabledForTests());
+	expectTrue(failures, "auto align table starts disabled without saved settings", !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "fit table command starts enabled while auto fit is off by default", MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
+	MarkdownTablePluginTesting::setAutoFitTableEnabledForTests(true);
+	expectTrue(failures, "fit table command disabled while auto fit is on", !MarkdownTablePluginTesting::fitTableToWindowCommandEnabledForTests());
+	expectTrue(failures, "auto fit keeps auto align enabled", MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "auto align toggle disabled while auto fit is on", !MarkdownTablePluginTesting::autoAlignTableToggleEnabledForTests());
 	MarkdownTablePluginTesting::setAutoAlignTableEnabledForTests(false);
 	expectTrue(failures, "auto fit blocks disabling auto align", MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
 	expectTrue(failures, "auto fit table default does not fit align", !MarkdownTablePluginTesting::shouldApplyAutoFitAfterActionForTests(MarkdownTable::Action::Align));
@@ -903,5 +938,6 @@ int runPluginShortcutTests()
 	testAutomaticWorkBounds(failures);
 	testEditorNotificationTransitions(failures);
 	testWarningSettingsPersistence(failures);
+	testAutoFormatSettingsPersistence(failures);
 	return failures;
 }

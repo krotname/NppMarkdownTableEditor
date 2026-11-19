@@ -65,7 +65,10 @@ extern "C" __declspec(dllexport) void beNotified(SCNotification *notifyCode)
 			installFitToWindowResizeHooks();
 			refreshUiLanguageFromNotepad();
 			if (notifyCode->nmhdr.code == NPPN_READY)
+			{
+				loadPendingAutoFormatSettings();
 				handleInitialAutoTableFormatForCurrentBuffer();
+			}
 			checkWordWrapAutoFitWarning();
 		}
 		break;

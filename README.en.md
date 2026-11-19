@@ -108,9 +108,9 @@ On x64 Notepad++ 7.5.9-8.2.1, the plugin loads and the menu item is visible, but
 | Command                                        | What It Does                                                         |
 | ---------------------------------------------- | -------------------------------------------------------------------- |
 | `Align table (no width change)`                | Aligns the current Markdown table once without fitting it to the window |
-| `Light Auto align after edit (no width change)` | Automatically aligns the table after edits; enabled on first install and disables manual align |
+| `Light Auto align after edit (no width change)` | Automatically aligns the table after edits; disabled on first install, its state is remembered between Notepad++ sessions; disables manual align |
 | `Fit table width to window`                    | Fits the current table to the visible width once: it narrows long cells or rejoins continuation rows when the window is wider |
-| `Power Auto fit table width to window`         | Automatically fits the table to the editor width; enabled on first install, disables manual fit, and keeps Light Auto align enabled |
+| `Power Auto fit table width to window`         | Automatically fits the table to the editor width; disabled on first install, its state is remembered between Notepad++ sessions; disables manual fit and keeps Light Auto align enabled |
 | `Next cell` / `Previous cell`                  | Moves the caret between cells                                        |
 | `Insert row below` / `Delete row`              | Adds or deletes a row                                                |
 | `Insert column right` / `Delete column`        | Adds or deletes a column                                             |
