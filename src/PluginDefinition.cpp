@@ -173,6 +173,7 @@ struct PluginRuntimeState
 	PluginSettings settings;
 	HINSTANCE moduleHandle = NULL;
 	bool wordWrapWarningComboActive = false;
+	bool autoFormatSettingsLoaded = false;
 	bool mainScintillaSubclassInstalled = false;
 	bool secondScintillaSubclassInstalled = false;
 	bool nppSubclassInstalled = false;
@@ -273,6 +274,19 @@ bool wordWrapAutoFitWarningSuppressed()
 void setWordWrapAutoFitWarningSuppressed(bool suppressed)
 {
 	g_runtime.settings.setWordWrapAutoFitWarningSuppressed(pluginConfigFilePath(), suppressed);
+}
+
+// Power is applied first: enabling it forces Light on, as when the user toggles it.
+void applyAutoFormatSettings(const std::wstring &path)
+{
+	g_runtime.autoFormat.setAutoFitEnabled(g_runtime.settings.autoFitEnabled(path));
+	g_runtime.autoFormat.setAutoAlignEnabled(g_runtime.settings.autoAlignEnabled(path));
+	g_runtime.autoFormatSettingsLoaded = !path.empty();
+}
+
+void saveAutoFormatSettings()
+{
+	g_runtime.settings.setAutoFormatEnabled(pluginConfigFilePath(), g_runtime.autoFormat.autoFitEnabled(), g_runtime.autoFormat.autoAlignEnabled());
 }
 
 bool standardWordWrapEnabledForMode(LRESULT wrapMode)
@@ -3200,12 +3214,27 @@ void forgetInitialAutoTableFormatForBuffer(const SCNotification *notification)
 	g_runtime.autoFormat.forgetBuffer(notification ? notification->nmhdr.idFrom : 0);
 }
 
+// Retry when Notepad++ did not report its plugin config directory during setInfo.
+void loadPendingAutoFormatSettings()
+{
+	if (g_runtime.autoFormatSettingsLoaded)
+		return;
+	applyAutoFormatSettings(pluginConfigFilePath());
+	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
+}
+
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
 {
 void resetAutoFormatStateForTests()
 {
 	g_runtime.autoFormat = AutoFormatCoordinator();
+}
+
+void applyAutoFormatSettingsForTests(const std::wstring &path)
+{
+	applyAutoFormatSettings(path);
 }
 
 std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback)
@@ -3595,6 +3624,7 @@ void commandMenuInit()
 	//            bool check0nInit                // optional. Make this menu item be checked visually
 	//            );
 	refreshUiLanguageState();
+	applyAutoFormatSettings(pluginConfigFilePath());
 	setCommand(alignCommandIndex, commandMenuText(alignCommandIndex), alignTable, &g_alignShortcut, false);
 	setCommand(autoAlignTableCommandIndex, commandMenuText(autoAlignTableCommandIndex), toggleAutoAlignTable, &g_autoAlignTableShortcut, g_runtime.autoFormat.autoAlignEnabled());
 	setCommand(wrapLongCellsCommandIndex, commandMenuText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
@@ -3849,6 +3879,7 @@ void toggleAutoFitTable()
 	}
 	refreshAutoFitTableUi();
 	refreshAutoAlignTableUi();
+	saveAutoFormatSettings();
 	if (enabling)
 		checkWordWrapAutoFitWarningInternal();
 }
@@ -3862,6 +3893,7 @@ void toggleAutoAlignTable()
 		autoAlignCurrentTable(true);
 	g_runtime.autoFormat.setAutoAlignEnabled(enabling);
 	refreshAutoAlignTableUi();
+	saveAutoFormatSettings();
 }
 
 void installFitToWindowResizeHooks()

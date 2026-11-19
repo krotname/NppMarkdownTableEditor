@@ -24,6 +24,24 @@ void PluginSettings::setWordWrapAutoFitWarningSuppressed(const std::wstring &pat
 		::WritePrivateProfileString(L"Warnings", L"HideWordWrapAutoFitWarning", suppressed ? L"1" : L"0", path.c_str());
 }
 
+bool PluginSettings::autoFitEnabled(const std::wstring &path) const
+{
+	return !path.empty() && ::GetPrivateProfileInt(L"AutoFormat", L"AutoFit", 0, path.c_str()) != 0;
+}
+
+bool PluginSettings::autoAlignEnabled(const std::wstring &path) const
+{
+	return !path.empty() && ::GetPrivateProfileInt(L"AutoFormat", L"AutoAlign", 0, path.c_str()) != 0;
+}
+
+void PluginSettings::setAutoFormatEnabled(const std::wstring &path, bool autoFit, bool autoAlign)
+{
+	if (path.empty())
+		return;
+	::WritePrivateProfileString(L"AutoFormat", L"AutoFit", autoFit ? L"1" : L"0", path.c_str());
+	::WritePrivateProfileString(L"AutoFormat", L"AutoAlign", autoAlign ? L"1" : L"0", path.c_str());
+}
+
 std::string extractNativeLangFileName(const std::string &text)
 {
 	const std::string marker = "filename=\"";

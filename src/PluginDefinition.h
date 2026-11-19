@@ -75,6 +75,7 @@ void handleGlobalModified();
 void handleInitialAutoTableFormatForBuffer(const SCNotification *notification);
 void handleInitialAutoTableFormatForCurrentBuffer();
 void forgetInitialAutoTableFormatForBuffer(const SCNotification *notification);
+void loadPendingAutoFormatSettings();
 void installFitToWindowResizeHooks();
 void removeFitToWindowResizeHooks();
 
@@ -136,6 +137,7 @@ const wchar_t *pluginMenuNameForTests();
 const wchar_t *commandTextForTests(std::size_t index);
 const wchar_t *commandMenuTextForTests(std::size_t index);
 void resetAutoFormatStateForTests();
+void applyAutoFormatSettingsForTests(const std::wstring &path);
 bool autoFitTableEnabledForTests();
 void setAutoFitTableEnabledForTests(bool enabled);
 bool autoAlignTableEnabledForTests();
