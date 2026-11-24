@@ -138,6 +138,9 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
+    - name: Plugin settings and command state tests
+      run: msbuild Package.proj /m /t:RunPluginShortcutSmokeTests /p:Configuration=Debug /p:Platform=x64
+
     - name: Notepad++ compatibility smoke
       shell: pwsh
       env:
