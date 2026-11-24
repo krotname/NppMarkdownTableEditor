@@ -99,7 +99,7 @@ jobs:
           sarif_file: scorecard-head-results.sarif
           category: openssf-scorecard-head
       - name: Upload Scorecard artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: openssf-scorecard
           path: |
@@ -141,12 +141,12 @@ jobs:
           test "$DOCKER_HOST" = 'unix:///var/run/docker.sock'
           docker info >/dev/null
       - name: Publish signed default-branch results with the original action
-        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e
         with:
           results_file: scorecard-publication.sarif
           results_format: sarif
           publish_results: true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: openssf-scorecard-publication
           path: scorecard-publication.sarif
