@@ -13,7 +13,7 @@ public:
 	// Automatic modes stay disabled until the user enables them and the state is saved.
 	bool autoFitEnabled(const std::wstring &path) const;
 	bool autoAlignEnabled(const std::wstring &path) const;
-	void setAutoFormatEnabled(const std::wstring &path, bool autoFit, bool autoAlign);
+	bool setAutoFormatEnabled(const std::wstring &path, bool autoFit, bool autoAlign);
 private:
 	bool warningSuppressed_ = false;
 	bool warningLoaded_ = false;

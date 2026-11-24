@@ -180,6 +180,13 @@ void testAutoFormatSettingsPersistence(int &failures)
 		return;
 	}
 	MarkdownTablePlugin::PluginSettings settings;
+	expectTrue(failures, "empty path reports save failure", !settings.setAutoFormatEnabled(L"", false, false));
+	::WritePrivateProfileString(L"Warnings", L"HideWordWrapAutoFitWarning", L"1", path);
+	expectTrue(failures, "save initial Power setting", settings.setAutoFormatEnabled(path, true, true));
+	expectTrue(failures, "make settings read only", ::SetFileAttributes(path, FILE_ATTRIBUTE_READONLY) != FALSE);
+	expectTrue(failures, "failed disable is reported", !settings.setAutoFormatEnabled(path, false, false));
+	expectTrue(failures, "restore settings attributes", ::SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL) != FALSE);
+	expectTrue(failures, "remove test keys", ::WritePrivateProfileString(L"AutoFormat", NULL, NULL, path) != FALSE);
 	expectTrue(failures, "auto format modes disabled without settings directory", !settings.autoFitEnabled(L"") && !settings.autoAlignEnabled(L""));
 	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
 	expectTrue(failures, "missing auto format keys disable both modes",
@@ -198,7 +205,16 @@ void testAutoFormatSettingsPersistence(int &failures)
 	MarkdownTablePluginTesting::applyAutoFormatSettingsForTests(path);
 	expectTrue(failures, "saved disabled modes restored",
 		!MarkdownTablePluginTesting::autoFitTableEnabledForTests() && !MarkdownTablePluginTesting::autoAlignTableEnabledForTests());
+	expectTrue(failures, "unrelated warning setting preserved", ::GetPrivateProfileInt(L"Warnings", L"HideWordWrapAutoFitWarning", 0, path) == 1);
 	expectTrue(failures, "temporary auto format settings file removed", ::DeleteFile(path) != FALSE);
+	// Reuse the unique temporary filename as an absent parent directory.
+	const std::wstring nestedDirectory = std::wstring(path) + L"\\Config";
+	const std::wstring nestedPath = nestedDirectory + L"\\MarkdownTableEditor.ini";
+	expectTrue(failures, "create missing config directories", settings.setAutoFormatEnabled(nestedPath, false, true));
+	expectTrue(failures, "restore state from newly created directory", !settings.autoFitEnabled(nestedPath) && settings.autoAlignEnabled(nestedPath));
+	expectTrue(failures, "remove nested INI", ::DeleteFile(nestedPath.c_str()) != FALSE);
+	expectTrue(failures, "remove nested directory", ::RemoveDirectory(nestedDirectory.c_str()) != FALSE);
+	expectTrue(failures, "remove temporary parent", ::RemoveDirectory(path) != FALSE);
 	MarkdownTablePluginTesting::resetAutoFormatStateForTests();
 }
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Upgrading from versions without saved automatic-mode keys also starts with both modes off. Configuration directories are created when saving; failed saves display a warning instead of silently restoring old values on the next launch.
+
 - Remember `Power Auto fit table width to window` and `Light Auto align after edit (no width change)` between Notepad++ sessions in `MarkdownTableEditor.ini` (`[AutoFormat]` keys `AutoFit` and `AutoAlign`). Both automatic modes are disabled on first install, so opening a file no longer reformats its tables until the user enables a mode.
 
 ## 11.2.2

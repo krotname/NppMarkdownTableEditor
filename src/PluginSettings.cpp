@@ -1,6 +1,7 @@
 #include "PluginSettings.h"
 
 #include <windows.h>
+#include <shlobj.h>
 #include <cstdlib>
 #include <fstream>
 
@@ -34,12 +35,20 @@ bool PluginSettings::autoAlignEnabled(const std::wstring &path) const
 	return !path.empty() && ::GetPrivateProfileInt(L"AutoFormat", L"AutoAlign", 0, path.c_str()) != 0;
 }
 
-void PluginSettings::setAutoFormatEnabled(const std::wstring &path, bool autoFit, bool autoAlign)
+bool PluginSettings::setAutoFormatEnabled(const std::wstring &path, bool autoFit, bool autoAlign)
 {
 	if (path.empty())
-		return;
-	::WritePrivateProfileString(L"AutoFormat", L"AutoFit", autoFit ? L"1" : L"0", path.c_str());
-	::WritePrivateProfileString(L"AutoFormat", L"AutoAlign", autoAlign ? L"1" : L"0", path.c_str());
+		return false;
+	const std::size_t separator = path.find_last_of(L"\\/");
+	if (separator == std::wstring::npos)
+		return false; // Require the absolute path provided by Notepad++.
+	const std::wstring directory = path.substr(0, separator + 1);
+	const int result = ::SHCreateDirectoryExW(NULL, directory.c_str(), NULL);
+	if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS)
+		return false;
+	if (!::WritePrivateProfileString(L"AutoFormat", L"AutoFit", autoFit ? L"1" : L"0", path.c_str()))
+		return false;
+	return ::WritePrivateProfileString(L"AutoFormat", L"AutoAlign", autoAlign ? L"1" : L"0", path.c_str()) != FALSE;
 }
 
 std::string extractNativeLangFileName(const std::string &text)
