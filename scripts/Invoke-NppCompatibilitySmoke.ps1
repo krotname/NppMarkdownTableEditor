@@ -408,13 +408,13 @@ function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath, [string]
         }
 
         if ($EnableLightBeforeExit) {
-            $lightId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Ctrl+Alt+Shift+A"
+            $lightId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Light Auto align"
             if ($null -eq $lightId) { throw "${Name}: Light toggle was not found" }
             [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$lightId, [IntPtr]::Zero)
             Start-Sleep -Seconds 1
             $ini = Get-Content -LiteralPath $iniPath -Raw
             if ($ini -notmatch '(?m)^AutoAlign=1\s*$' -or $ini -notmatch '(?m)^AutoFit=0\s*$') {
-                throw "${Name}: Light toggle did not persist off/on settings"
+                throw "${Name}: Light toggle (menu ID $lightId) did not persist off/on settings in $iniPath.`nActual INI:`n$ini"
             }
             [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$saveId, [IntPtr]::Zero)
             Start-Sleep -Seconds 1
