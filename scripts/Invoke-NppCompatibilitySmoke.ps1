@@ -139,7 +139,10 @@ function Download-And-Extract([string]$Name, [string]$Url, [string]$ZipName) {
     Invoke-WebRequest -Uri $Url -OutFile $zipPath
 
     Reset-Directory $targetDir
-    Expand-Archive -LiteralPath $zipPath -DestinationPath $targetDir -Force
+    # The two-argument API works on Windows PowerShell 5.1 as well as PowerShell 7.
+    # Some runner Archive module versions require a newer three-argument overload.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $targetDir)
     $exe = Get-ChildItem -Path $targetDir -Filter "notepad++.exe" -Recurse | Select-Object -First 1
     if (-not $exe) {
         throw "notepad++.exe not found after extracting $ZipName"
