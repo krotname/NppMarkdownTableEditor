@@ -286,7 +286,7 @@ void applyAutoFormatSettings(const std::wstring &path)
 
 void saveAutoFormatSettings()
 {
-	if (!g_runtime.settings.setAutoFormatEnabled(pluginConfigFilePath(), g_runtime.autoFormat.autoFitEnabled(), g_runtime.autoFormat.autoAlignEnabled()))
+	if (!g_runtime.settings.setAutoFormatEnabled(pluginConfigFilePath(), g_runtime.autoFormat.autoFitEnabled(), g_runtime.autoFormat.autoAlignEnabled()) && nppData._nppHandle)
 		::MessageBox(nppData._nppHandle,
 			L"Could not save automatic formatting settings. The change applies only to this session; previously saved settings may return after restarting Notepad++. Check write access to the plugin configuration directory.",
 			uiText().pluginMenuName, MB_OK | MB_ICONWARNING);
