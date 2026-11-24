@@ -246,10 +246,10 @@ std::wstring pluginConfigFilePath()
 		return std::wstring();
 
 	const LRESULT required = ::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, 0, 0);
-	if (required <= 0)
-		return std::wstring();
-
-	std::vector<wchar_t> buffer(static_cast<std::size_t>(required) + 1, L'\0');
+	// Older supported Notepad++ releases return FALSE for the size-only query.
+	// They still accept a caller-provided buffer; allow the full Windows path limit.
+	const std::size_t capacity = required > 0 ? static_cast<std::size_t>(required) + 1 : 32768;
+	std::vector<wchar_t> buffer(capacity, L'\0');
 	const LRESULT copied = ::SendMessage(
 		nppData._nppHandle,
 		NPPM_GETPLUGINSCONFIGDIR,
