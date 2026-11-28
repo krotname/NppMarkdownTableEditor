@@ -346,7 +346,18 @@ function Invoke-ConvertSmoke([string]$Name, [string]$ExePath) {
     }
 }
 
-function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath) {
+function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath, [string]$Mode = "Missing", [bool]$Seed = $true, [switch]$EnableLightBeforeExit) {
+    $configDir = Join-Path (Split-Path $ExePath -Parent) "plugins\Config"
+    $iniPath = Join-Path $configDir "MarkdownTableEditor.ini"
+    if ($Seed -and $Mode -ne "Missing") {
+        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        $fit = if ($Mode -eq "Power") { 1 } else { 0 }
+        $align = if ($Mode -eq "Off") { 0 } else { 1 }
+        Set-Content -LiteralPath $iniPath -Encoding Unicode -Value "[AutoFormat]`r`nAutoFit=$fit`r`nAutoAlign=$align`r`n"
+    }
+    elseif ($Mode -eq "Missing" -and (Test-Path -LiteralPath $iniPath)) {
+        throw "${Name}: missing-settings smoke requires an absent INI"
+    }
     $inputText = "# title`r`n`r`n| Name | Age |`r`n| --- | ---: |`r`n| Anna | 20 |`r`n| Alexander | 7 |`r`n"
     $expectedLine = "| Name      | Age |"
     $testFile = Join-Path (Split-Path $ExePath -Parent) "mte-startup-auto.md"
@@ -386,11 +397,28 @@ function Invoke-StartupAutoFormatSmoke([string]$Name, [string]$ExePath) {
         Start-Sleep -Seconds 1
 
         $actual = (Get-Content -LiteralPath $testFile -Raw -Encoding UTF8) -replace "`r`n", "`n"
-        if ($actual -notlike "*$expectedLine*") {
-            throw "${Name}: startup auto format did not align the current file.`nExpected line:`n$expectedLine`nActual:`n$actual"
+        if ($Mode -in @("Missing", "Off")) {
+            if ($actual -ne ($inputText -replace "`r`n", "`n")) {
+                throw "${Name}: disabled auto format changed the file ($Mode)"
+            }
+        }
+        elseif ($actual -notlike "*$expectedLine*") {
+            throw "${Name}: saved $Mode mode did not align the current file.`nActual:`n$actual"
         }
 
-        Write-Host "${Name}: startup auto format smoke passed"
+        if ($EnableLightBeforeExit) {
+            $lightId = Find-MenuItemId ([MarkdownTableEditorNppSmokeNative]::GetMenu($mainWindow)) "Light Auto align"
+            if ($null -eq $lightId) { throw "${Name}: Light toggle was not found" }
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$lightId, [IntPtr]::Zero)
+            Start-Sleep -Seconds 1
+            $ini = Get-Content -LiteralPath $iniPath -Raw
+            if ($ini -notmatch '(?m)^AutoAlign=1\s*$' -or $ini -notmatch '(?m)^AutoFit=0\s*$') {
+                throw "${Name}: Light toggle (menu ID $lightId) did not persist off/on settings in $iniPath.`nActual INI:`n$ini"
+            }
+            [void][MarkdownTableEditorNppSmokeNative]::PostMessage($mainWindow, $WM_COMMAND, [IntPtr]$saveId, [IntPtr]::Zero)
+            Start-Sleep -Seconds 1
+        }
+        Write-Host "${Name}: startup auto format smoke passed ($Mode)"
     }
     finally {
         if (-not $process.HasExited) {
@@ -492,9 +520,19 @@ if (-not $LatestOnly) {
     Install-X64Plugin $npp831 $X64PluginPath
 
     Invoke-ConvertSmoke "Notepad++ 7.5.9 x86" $npp759
-    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Missing
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Light
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Power
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Off -EnableLightBeforeExit
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Light -Seed:$false
+    Invoke-StartupAutoFormatSmoke "Notepad++ 7.5.9 x86" $npp759 -Mode Off
     Invoke-ConvertSmoke "Notepad++ 8.3.1 x64" $npp831
-    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Missing
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Light
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Power
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Off -EnableLightBeforeExit
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Light -Seed:$false
+    Invoke-StartupAutoFormatSmoke "Notepad++ 8.3.1 x64" $npp831 -Mode Off
 }
 
 if ($IncludeLatest -or $LatestOnly) {
@@ -509,7 +547,12 @@ if ($IncludeLatest -or $LatestOnly) {
     $latestLabel = "Notepad++ $($latest.Tag) x64"
     Write-Host "$latestLabel release page: $($latest.HtmlUrl)"
     Invoke-ConvertSmoke $latestLabel $latestExe
-    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Missing
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Light
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Power
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Off -EnableLightBeforeExit
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Light -Seed:$false
+    Invoke-StartupAutoFormatSmoke $latestLabel $latestExe -Mode Off
     Invoke-TableMenuCommandSmoke `
         -Name $latestLabel `
         -ExePath $latestExe `

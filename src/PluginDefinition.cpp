@@ -173,6 +173,7 @@ struct PluginRuntimeState
 	PluginSettings settings;
 	HINSTANCE moduleHandle = NULL;
 	bool wordWrapWarningComboActive = false;
+	bool autoFormatSettingsLoaded = false;
 	bool mainScintillaSubclassInstalled = false;
 	bool secondScintillaSubclassInstalled = false;
 	bool nppSubclassInstalled = false;
@@ -245,10 +246,10 @@ std::wstring pluginConfigFilePath()
 		return std::wstring();
 
 	const LRESULT required = ::SendMessage(nppData._nppHandle, NPPM_GETPLUGINSCONFIGDIR, 0, 0);
-	if (required <= 0)
-		return std::wstring();
-
-	std::vector<wchar_t> buffer(static_cast<std::size_t>(required) + 1, L'\0');
+	// Older supported Notepad++ releases return FALSE for the size-only query.
+	// They still accept a caller-provided buffer; allow the full Windows path limit.
+	const std::size_t capacity = required > 0 ? static_cast<std::size_t>(required) + 1 : 32768;
+	std::vector<wchar_t> buffer(capacity, L'\0');
 	const LRESULT copied = ::SendMessage(
 		nppData._nppHandle,
 		NPPM_GETPLUGINSCONFIGDIR,
@@ -273,6 +274,22 @@ bool wordWrapAutoFitWarningSuppressed()
 void setWordWrapAutoFitWarningSuppressed(bool suppressed)
 {
 	g_runtime.settings.setWordWrapAutoFitWarningSuppressed(pluginConfigFilePath(), suppressed);
+}
+
+// Power is applied first: enabling it forces Light on, as when the user toggles it.
+void applyAutoFormatSettings(const std::wstring &path)
+{
+	g_runtime.autoFormat.setAutoFitEnabled(g_runtime.settings.autoFitEnabled(path));
+	g_runtime.autoFormat.setAutoAlignEnabled(g_runtime.settings.autoAlignEnabled(path));
+	g_runtime.autoFormatSettingsLoaded = !path.empty();
+}
+
+void saveAutoFormatSettings()
+{
+	if (!g_runtime.settings.setAutoFormatEnabled(pluginConfigFilePath(), g_runtime.autoFormat.autoFitEnabled(), g_runtime.autoFormat.autoAlignEnabled()) && nppData._nppHandle)
+		::MessageBox(nppData._nppHandle,
+			L"Could not save automatic formatting settings. The change applies only to this session; previously saved settings may return after restarting Notepad++. Check write access to the plugin configuration directory.",
+			uiText().pluginMenuName, MB_OK | MB_ICONWARNING);
 }
 
 bool standardWordWrapEnabledForMode(LRESULT wrapMode)
@@ -3200,12 +3217,27 @@ void forgetInitialAutoTableFormatForBuffer(const SCNotification *notification)
 	g_runtime.autoFormat.forgetBuffer(notification ? notification->nmhdr.idFrom : 0);
 }
 
+// Retry when Notepad++ did not report its plugin config directory during setInfo.
+void loadPendingAutoFormatSettings()
+{
+	if (g_runtime.autoFormatSettingsLoaded)
+		return;
+	applyAutoFormatSettings(pluginConfigFilePath());
+	refreshAutoFitTableUi();
+	refreshAutoAlignTableUi();
+}
+
 #ifdef MARKDOWN_TABLE_PLUGIN_TESTING
 namespace MarkdownTablePluginTesting
 {
 void resetAutoFormatStateForTests()
 {
 	g_runtime.autoFormat = AutoFormatCoordinator();
+}
+
+void applyAutoFormatSettingsForTests(const std::wstring &path)
+{
+	applyAutoFormatSettings(path);
 }
 
 std::string chooseEolFromTextForTests(const std::string &text, const std::string &fallback)
@@ -3595,6 +3627,7 @@ void commandMenuInit()
 	//            bool check0nInit                // optional. Make this menu item be checked visually
 	//            );
 	refreshUiLanguageState();
+	applyAutoFormatSettings(pluginConfigFilePath());
 	setCommand(alignCommandIndex, commandMenuText(alignCommandIndex), alignTable, &g_alignShortcut, false);
 	setCommand(autoAlignTableCommandIndex, commandMenuText(autoAlignTableCommandIndex), toggleAutoAlignTable, &g_autoAlignTableShortcut, g_runtime.autoFormat.autoAlignEnabled());
 	setCommand(wrapLongCellsCommandIndex, commandMenuText(wrapLongCellsCommandIndex), wrapLongCells, &g_wrapLongCellsShortcut, false);
@@ -3849,6 +3882,7 @@ void toggleAutoFitTable()
 	}
 	refreshAutoFitTableUi();
 	refreshAutoAlignTableUi();
+	saveAutoFormatSettings();
 	if (enabling)
 		checkWordWrapAutoFitWarningInternal();
 }
@@ -3862,6 +3896,7 @@ void toggleAutoAlignTable()
 		autoAlignCurrentTable(true);
 	g_runtime.autoFormat.setAutoAlignEnabled(enabling);
 	refreshAutoAlignTableUi();
+	saveAutoFormatSettings();
 }
 
 void installFitToWindowResizeHooks()
